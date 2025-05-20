@@ -748,6 +748,16 @@ async def chat(request: ChatRequest, authorization: Optional[str] = Header(None)
             # ✅ Trả về kết quả cuối
             response_text = final_response or "Xin lỗi, tôi chưa thể xử lý yêu cầu của bạn."
 
+            # Đánh giá API responses và tạo message phù hợp
+            if api_calls and api_responses:
+                evaluated_response = evaluate_api_response(
+                    api_calls=api_calls,
+                    api_responses=api_responses,
+                    last_response={"text": response_text},
+                    is_confirmation=any(call["tool"] in ["create_student", "create_class", "create_message"] for call in api_calls)
+                )
+                response_text = evaluated_response
+
             # ✅ FIX
             return ChatResponse(
                 response=response_text,
