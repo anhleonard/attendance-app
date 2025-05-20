@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { CreateClassDto } from './dto/create-class.dto';
 import { TokenPayload } from 'src/auth/token-payload/token-payload.auth';
 import { PrismaService } from 'src/prisma/prisma.service';
@@ -14,6 +14,8 @@ export interface CalendarResponse {
 
 @Injectable()
 export class ClassesService {
+  private readonly logger = new Logger(ClassesService.name);
+
   constructor(
     private readonly prismaService: PrismaService,
     private readonly sessionsService: SessionsService,
@@ -41,27 +43,63 @@ export class ClassesService {
   async createClass(createClassDto: CreateClassDto, user: TokenPayload) {
     const { sessions, ...rest } = createClassDto;
     try {
+      this.logger.log(`Starting to create class: ${createClassDto.name}`);
+      this.logger.debug(`Class data: ${JSON.stringify(rest)}`);
+      this.logger.debug(`Sessions data: ${JSON.stringify(sessions)}`);
+
       const createdClass = await this.prismaService.class.create({
         data: {
           ...rest,
           createdBy: { connect: { id: user.userId } },
         },
       });
+
+      this.logger.log(`Successfully created class with ID: ${createdClass.id}`);
+
       let createdNewSessions = [];
       if (sessions.length > 0 && createdClass) {
+        this.logger.log(`Creating ${sessions.length} sessions for class ${createdClass.id}`);
+        
         for (const session of sessions) {
-          const createdSession = await this.sessionsService.createSession(
-            createdClass.id,
-            session,
-          );
-          createdNewSessions.push(createdSession);
+          try {
+            const createdSession = await this.sessionsService.createSession(
+              createdClass.id,
+              session,
+            );
+            createdNewSessions.push(createdSession);
+            this.logger.debug(`Created session ${createdSession.id} for class ${createdClass.id}`);
+          } catch (sessionError) {
+            this.logger.error(
+              `Failed to create session for class ${createdClass.id}: ${sessionError.message}`,
+              sessionError.stack,
+              {
+                classId: createdClass.id,
+                sessionData: session,
+                error: sessionError,
+              }
+            );
+            throw new BadRequestException(
+              `Failed to create session: ${sessionError.message}`
+            );
+          }
         }
       }
+
+      this.logger.log(`Successfully created all sessions for class ${createdClass.id}`);
       return {
         ...createdClass,
         sessions: createdNewSessions,
       };
     } catch (error) {
+      this.logger.error(
+        `Failed to create class: ${error.message}`,
+        error.stack,
+        {
+          classData: createClassDto,
+          userId: user.userId,
+          error: error,
+        }
+      );
       throw new BadRequestException(error.message);
     }
   }

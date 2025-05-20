@@ -400,115 +400,148 @@ async def save_message(content: str, sender: Sender, chat_id: Optional[int] = No
             detail=f"Internal server error: {str(e)}"
         )
 
+def convert_proto_to_dict(obj):
+    """Convert protobuf objects to Python dict"""
+    if hasattr(obj, 'items'):  # For MapComposite
+        return {k: convert_proto_to_dict(v) for k, v in obj.items()}
+    elif hasattr(obj, '__iter__') and not isinstance(obj, (str, bytes)):  # For RepeatedComposite
+        return [convert_proto_to_dict(item) for item in obj]
+    else:
+        return obj
+
 async def execute_tool(tool_name: str, tool_args: Dict[str, Any], token: str) -> Dict[str, Any]:
     """Thực thi tool dựa trên tên và tham số"""
     try:
-        if tool_name == "create_message":
-            response = await save_message(
-                content=tool_args["content"],
-                sender=Sender(tool_args["sender"]),
-                chat_id=tool_args.get("chatId"),
-                token=token
-            )
-            return response
-        elif tool_name == "find_messages":
-            response = call_backend_api(
-                endpoint="/messages/find-messages",
-                method="POST",
-                data=tool_args,
-                token=token
-            )
-            return response
-        elif tool_name == "history_messages":
-            response = call_backend_api(
-                endpoint="/messages/history-messages",
-                method="POST",
-                data=tool_args,
-                token=token
-            )
-            return response
-        elif tool_name == "find_classes":
-            # Thêm fetchAll: true vào payload
-            tool_args["fetchAll"] = True
-            
-            # Nếu có month và year, gọi API lấy lịch học
-            if "month" in tool_args and "year" in tool_args:
-                response = call_backend_api(
-                    endpoint="/classes/calendar",
-                    method="POST",
-                    data=tool_args,
+        # Convert protobuf objects to Python dict
+        converted_args = convert_proto_to_dict(tool_args)
+        
+        # Add detailed logging
+        print("\n=== Tool Execution Details ===")
+        print(f"Tool Name: {tool_name}")
+        print("Original Tool Arguments:", tool_args)
+        print("Converted Tool Arguments:")
+        print(json.dumps(converted_args, indent=2, ensure_ascii=False))
+        print("===========================\n")
+
+        try:
+            if tool_name == "create_message":
+                response = await save_message(
+                    content=converted_args["content"],
+                    sender=Sender(converted_args["sender"]),
+                    chat_id=converted_args.get("chatId"),
                     token=token
                 )
-            else:
-                # Ngược lại gọi API tìm kiếm lớp học
+                print("create_message response:", response)
+                return response
+            elif tool_name == "find_messages":
                 response = call_backend_api(
-                    endpoint="/classes/find-classes",
+                    endpoint="/messages/find-messages",
                     method="POST",
-                    data=tool_args,
+                    data=converted_args,
                     token=token
                 )
-            return response
-        elif tool_name == "create_student":
-            response = call_backend_api(
-                endpoint="/students/create",
-                method="POST",
-                data=tool_args,
-                token=token
-            )
-            return response
-        elif tool_name == "create_class":
-            # Validate required fields
-            required_fields = ["name", "status", "sessions"]
-            for field in required_fields:
-                if field not in tool_args:
-                    raise HTTPException(
-                        status_code=400,
-                        detail=f"Missing required field: {field}"
+                print("find_messages response:", response)
+                return response
+            elif tool_name == "history_messages":
+                response = call_backend_api(
+                    endpoint="/messages/history-messages",
+                    method="POST",
+                    data=converted_args,
+                    token=token
+                )
+                print("history_messages response:", response)
+                return response
+            elif tool_name == "find_classes":
+                converted_args["fetchAll"] = True
+                
+                if "month" in converted_args and "year" in converted_args:
+                    response = call_backend_api(
+                        endpoint="/classes/calendar",
+                        method="POST",
+                        data=converted_args,
+                        token=token
                     )
-            
-            # Validate sessions
-            for session in tool_args["sessions"]:
-                session_required = ["sessionKey", "startTime", "endTime", "amount"]
-                for field in session_required:
-                    if field not in session:
+                else:
+                    response = call_backend_api(
+                        endpoint="/classes/find-classes",
+                        method="POST",
+                        data=converted_args,
+                        token=token
+                    )
+                print("find_classes response:", response)
+                return response
+            elif tool_name == "create_student":
+                response = call_backend_api(
+                    endpoint="/students/create",
+                    method="POST",
+                    data=converted_args,
+                    token=token
+                )
+                print("create_student response:", response)
+                return response
+            elif tool_name == "create_class":
+                # Validate required fields
+                required_fields = ["name", "status", "sessions"]
+                for field in required_fields:
+                    if field not in converted_args:
                         raise HTTPException(
                             status_code=400,
-                            detail=f"Missing required field in session: {field}"
+                            detail=f"Missing required field: {field}"
                         )
                 
-                # Validate sessionKey
-                valid_session_keys = ["SESSION_1", "SESSION_2", "SESSION_3", "SESSION_4", "SESSION_5", "SESSION_6", "SESSION_7"]
-                if session["sessionKey"] not in valid_session_keys:
-                    raise HTTPException(
-                        status_code=400,
-                        detail=f"Invalid sessionKey: {session['sessionKey']}. Must be one of {valid_session_keys}"
-                    )
-                
-                # Validate time format
-                time_pattern = r"^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$"
-                if not re.match(time_pattern, session["startTime"]) or not re.match(time_pattern, session["endTime"]):
-                    raise HTTPException(
-                        status_code=400,
-                        detail="Invalid time format. Use HH:mm format (e.g., 08:30)"
-                    )
-                
-                # Validate amount is positive
-                if session["amount"] <= 0:
-                    raise HTTPException(
-                        status_code=400,
-                        detail="Amount must be greater than 0"
-                    )
+                # Validate sessions
+                for session in converted_args["sessions"]:
+                    session_required = ["sessionKey", "startTime", "endTime", "amount"]
+                    for field in session_required:
+                        if field not in session:
+                            raise HTTPException(
+                                status_code=400,
+                                detail=f"Missing required field in session: {field}"
+                            )
+                    
+                    # Validate sessionKey
+                    valid_session_keys = ["SESSION_1", "SESSION_2", "SESSION_3", "SESSION_4", "SESSION_5", "SESSION_6", "SESSION_7"]
+                    if session["sessionKey"] not in valid_session_keys:
+                        raise HTTPException(
+                            status_code=400,
+                            detail=f"Invalid sessionKey: {session['sessionKey']}. Must be one of {valid_session_keys}"
+                        )
+                    
+                    # Validate time format
+                    time_pattern = r"^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$"
+                    if not re.match(time_pattern, session["startTime"]) or not re.match(time_pattern, session["endTime"]):
+                        raise HTTPException(
+                            status_code=400,
+                            detail="Invalid time format. Use HH:mm format (e.g., 08:30)"
+                        )
+                    
+                    # Validate amount is positive
+                    if session["amount"] <= 0:
+                        raise HTTPException(
+                            status_code=400,
+                            detail="Amount must be greater than 0"
+                        )
 
-            response = call_backend_api(
-                endpoint="/classes/create",
-                method="POST",
-                data=tool_args,
-                token=token
-            )
-            return response
-        else:
-            raise HTTPException(status_code=400, detail=f"Tool {tool_name} không được hỗ trợ")
+                try:
+                    response = call_backend_api(
+                        endpoint="/classes/create",
+                        method="POST",
+                        data=converted_args,
+                        token=token
+                    )
+                    print("create_class response:", response)
+                    return response
+                except Exception as e:
+                    print("Error in create_class API call:", str(e))
+                    raise
+            else:
+                raise HTTPException(status_code=400, detail=f"Tool {tool_name} không được hỗ trợ")
+        except Exception as e:
+            print(f"Error executing {tool_name}:", str(e))
+            raise
+
     except Exception as e:
+        print(f"Error in execute_tool for {tool_name}:", str(e))
         raise HTTPException(status_code=500, detail=f"Lỗi khi thực thi tool {tool_name}: {str(e)}")
 
 # =========================
@@ -542,184 +575,205 @@ async def chat(request: ChatRequest, authorization: Optional[str] = Header(None)
         api_calls = []
         api_responses = []
         process_query = True
-        function_call_count = 0  # Thêm biến đếm số lần gọi function
+        function_call_count = 0
 
-        # Khởi tạo danh sách tin nhắn
-        messages = [
-            glm.Content(
-                role="user",
-                parts=[glm.Part(text=request.message)]
-            )
-        ]
-        
-        # Đọc system prompt
-        with open("prompts/system_prompt.txt", "r", encoding="utf-8") as f:
-            system_prompt = f.read()
-
-        # Tạo prompt cho Gemini với tools
-        prompt = f"""
-        System: {system_prompt}
-        
-        User: {request.message}
-        
-        Assistant: Vui lòng phản hồi yêu cầu của người dùng một cách hữu ích và thân thiện.
-        """
-
-        # Cấu hình generation
-        generation_config = {
-            "temperature": 0.7,
-            "top_p": 0.8,
-            "top_k": 40,
-            "max_output_tokens": 2048,
-        }
-
-        response = model.generate_content(
-            contents=[{"parts": [{"text": prompt}]}],
-            generation_config=generation_config,
-            # tools=tools
-        )
-
-        print(response, "response anhtt 1")
-
-        final_response = None
-
-        # Bắt đầu xử lý loop
-        while process_query:
-            assistant_content = []
-            has_function_call = False  # Flag to track if we found a function call
-
-            for content in response.candidates[0].content.parts:
-                # ✅ ƯU TIÊN function_call nếu có
-                if hasattr(content, 'function_call') and content.function_call:
-                    has_function_call = True  # Mark that we found a function call
-                    function_call_count += 1
-                    tool_call = content.function_call
-                    print(f"Function call #{function_call_count}: {tool_call.name}")
-
-                    assistant_content.append({
-                        "type": "tool_use",
-                        "name": tool_call.name,
-                        "input": tool_call.args
-                    })
-
-                    messages.append(
-                        glm.Content(
-                            role="assistant",
-                            parts=[glm.Part(
-                                function_call=glm.FunctionCall(
-                                    name=tool_call.name,
-                                    args=dict(tool_call.args)
-                                )
-                            )]
-                        )
-                    )
-
-                    api_calls.append({
-                        "tool": tool_call.name,
-                        "args": dict(tool_call.args)
-                    })
-
-                    args_dict = dict(tool_call.args)
-                    result = await execute_tool(tool_call.name, args_dict, token)
-                    api_responses.append(result)
-
-                    messages.append(
-                        glm.Content(
-                            role="user",
-                            parts=[glm.Part(
-                                function_response=glm.FunctionResponse(
-                                    name=tool_call.name,
-                                    response={"content": result}
-                                )
-                            )]
-                        )
-                    )
-
-                elif content.text:
-                    # ✨ Thử parse text thành tool_call JSON
-                    tool_call_raw = try_parse_tool_from_text(content.text)
-
-                    if tool_call_raw:
-                        has_function_call = True  # Mark that we found a function call
-                        function_call_count += 1
-                        print(f"Function call #{function_call_count} (from text): {tool_call_raw['name']}")
-
-                        # Là tool_call JSON bị bọc trong text
-                        tool_call = glm.FunctionCall(
-                            name=tool_call_raw["name"],
-                            args=tool_call_raw["args"]
-                        )
-
-                        assistant_content.append({
-                            "type": "tool_use",
-                            "name": tool_call.name,
-                            "input": tool_call.args
-                        })
-
-                        messages.append(
-                            glm.Content(
-                                role="assistant",
-                                parts=[glm.Part(function_call=tool_call)]
-                            )
-                        )
-
-                        api_calls.append({
-                            "tool": tool_call.name,
-                            "args": dict(tool_call.args)
-                        })
-
-                        args_dict = dict(tool_call.args)
-                        result = await execute_tool(tool_call.name, args_dict, token)
-                        api_responses.append(result)
-
-                        messages.append(
-                            glm.Content(
-                                role="user",
-                                parts=[glm.Part(
-                                    function_response=glm.FunctionResponse(
-                                        name=tool_call.name,
-                                        response={"content": result}
-                                    )
-                                )]
-                            )
-                        )
-
-                    else:
-                        # ❗ Nếu là text thuần, thêm vào assistant_content nhưng không dừng xử lý
-                        assistant_content.append({"type": "text", "text": content.text})
-
-            # Sau khi xử lý tất cả parts, kiểm tra xem có function call không
-            if has_function_call:
-                # Nếu có function call, tiếp tục loop với response mới
-                response = model.generate_content(
-                    contents=messages,
-                    generation_config=generation_config,
+        try:
+            # Khởi tạo danh sách tin nhắn
+            messages = [
+                glm.Content(
+                    role="user",
+                    parts=[glm.Part(text=request.message)]
                 )
-                print(response, "response in loop")
-            else:
-                # Nếu không có function call nào, lấy text cuối cùng làm final response
-                final_response = next((item["text"] for item in assistant_content if item["type"] == "text"), None)
-                process_query = False
+            ]
+            
+            # Đọc system prompt
+            with open("prompts/system_prompt.txt", "r", encoding="utf-8") as f:
+                system_prompt = f.read()
 
-        # ✅ Trả về kết quả cuối
-        response_text = final_response or "Xin lỗi, tôi chưa thể xử lý yêu cầu của bạn."
+            # Tạo prompt cho Gemini với tools
+            prompt = f"""
+            System: {system_prompt}
+            
+            User: {request.message}
+            
+            Assistant: Vui lòng phản hồi yêu cầu của người dùng một cách hữu ích và thân thiện.
+            """
 
-        return ChatResponse(
-            response=response_text,
-            data={
-                "api_calls": api_calls,
-                "api_responses": api_responses,
-                "function_call_count": function_call_count  # Thêm số lần gọi function vào response
+            # Cấu hình generation
+            generation_config = {
+                "temperature": 0.7,
+                "top_p": 0.8,
+                "top_k": 40,
+                "max_output_tokens": 2048,
             }
-        )
 
+            response = model.generate_content(
+                contents=[{"parts": [{"text": prompt}]}],
+                generation_config=generation_config,
+            )
+
+            print("Initial response:", response)
+
+            final_response = None
+
+            # Bắt đầu xử lý loop
+            while process_query:
+                try:
+                    assistant_content = []
+                    has_function_call = False
+
+                    for content in response.candidates[0].content.parts:
+                        try:
+                            # ✅ ƯU TIÊN function_call nếu có
+                            if hasattr(content, 'function_call') and content.function_call:
+                                has_function_call = True
+                                function_call_count += 1
+                                tool_call = content.function_call
+                                print(f"Function call #{function_call_count}: {tool_call.name}")
+
+                                try:
+                                    args_dict = dict(tool_call.args)
+                                    print("Function call args:", args_dict)
+                                    result = await execute_tool(tool_call.name, args_dict, token)
+                                    print("Function call result:", result)
+                                    
+                                    api_calls.append({
+                                        "tool": tool_call.name,
+                                        "args": args_dict
+                                    })
+                                    api_responses.append(result)
+
+                                    messages.append(
+                                        glm.Content(
+                                            role="assistant",
+                                            parts=[glm.Part(
+                                                function_call=glm.FunctionCall(
+                                                    name=tool_call.name,
+                                                    args=args_dict
+                                                )
+                                            )]
+                                        )
+                                    )
+
+                                    messages.append(
+                                        glm.Content(
+                                            role="user",
+                                            parts=[glm.Part(
+                                                function_response=glm.FunctionResponse(
+                                                    name=tool_call.name,
+                                                    response={"content": result}
+                                                )
+                                            )]
+                                        )
+                                    )
+
+                                except Exception as e:
+                                    print(f"Error executing tool {tool_call.name}:", str(e))
+                                    raise
+
+                            elif content.text:
+                                # ✨ Thử parse text thành tool_call JSON
+                                tool_call_raw = try_parse_tool_from_text(content.text)
+
+                                if tool_call_raw:
+                                    has_function_call = True
+                                    function_call_count += 1
+                                    print(f"Function call #{function_call_count} (from text): {tool_call_raw['name']}")
+
+                                    try:
+                                        tool_call = glm.FunctionCall(
+                                            name=tool_call_raw["name"],
+                                            args=tool_call_raw["args"]
+                                        )
+
+                                        args_dict = dict(tool_call.args)
+                                        print("Function call args (from text):", args_dict)
+                                        result = await execute_tool(tool_call.name, args_dict, token)
+                                        print("Function call result (from text):", result)
+
+                                        api_calls.append({
+                                            "tool": tool_call.name,
+                                            "args": args_dict
+                                        })
+                                        api_responses.append(result)
+
+                                        messages.append(
+                                            glm.Content(
+                                                role="assistant",
+                                                parts=[glm.Part(function_call=tool_call)]
+                                            )
+                                        )
+
+                                        messages.append(
+                                            glm.Content(
+                                                role="user",
+                                                parts=[glm.Part(
+                                                    function_response=glm.FunctionResponse(
+                                                        name=tool_call.name,
+                                                        response={"content": result}
+                                                    )
+                                                )]
+                                            )
+                                        )
+
+                                    except Exception as e:
+                                        print(f"Error executing tool {tool_call_raw['name']} (from text):", str(e))
+                                        raise
+
+                                else:
+                                    assistant_content.append({"type": "text", "text": content.text})
+
+                        except Exception as e:
+                            print(f"Error processing content part:", str(e))
+                            raise
+
+                    if has_function_call:
+                        try:
+                            response = model.generate_content(
+                                contents=messages,
+                                generation_config=generation_config,
+                            )
+                            print("New response in loop:", response)
+                        except Exception as e:
+                            print("Error generating new response:", str(e))
+                            raise
+                    else:
+                        final_response = next((item["text"] for item in assistant_content if item["type"] == "text"), None)
+                        process_query = False
+
+                except Exception as e:
+                    print("Error in process_query loop:", str(e))
+                    raise
+
+            # ✅ Trả về kết quả cuối
+            response_text = final_response or "Xin lỗi, tôi chưa thể xử lý yêu cầu của bạn."
+
+            # ✅ FIX
+            return ChatResponse(
+                response=response_text,
+                data={
+                    "api_calls": convert_proto_to_dict(api_calls),
+                    "api_responses": convert_proto_to_dict(api_responses),
+                    "function_call_count": function_call_count
+                }
+            )
+
+
+        except Exception as e:
+            print("Error in chat processing:", str(e))
+            raise HTTPException(
+                status_code=500,
+                detail=f"Error processing chat: {str(e)}"
+            )
+
+    except HTTPException as http_error:
+        print("HTTP Exception:", str(http_error))
+        raise http_error
     except Exception as e:
-        error_message = f"Lỗi: {str(e)}"
-        return ChatResponse(
-            response=error_message,
-            data={
-                "function_call_count": function_call_count  # Vẫn trả về số lần gọi function ngay cả khi có lỗi
-            }
+        print("Unexpected error:", str(e))
+        raise HTTPException(
+            status_code=500,
+            detail=f"Unexpected error: {str(e)}"
         )
 
 # =========================
