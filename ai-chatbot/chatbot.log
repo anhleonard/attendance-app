@@ -1,0 +1,162 @@
+2025-05-19 18:06:27,349 - INFO - Assistant tool call: find_classes
+2025-05-19 18:06:27,350 - INFO - Tool call arguments: {
+  "name": "MMA Class"
+}
+2025-05-19 18:06:27,380 - INFO - Backend API Response [POST /classes/find-classes]: {
+  "total": 1,
+  "data": [
+    {
+      "id": 1,
+      "name": "MMA Class",
+      "description": "Whereas disregard and contempt for human rights have resulted",
+      "status": "ACTIVE",
+      "createdAt": "2025-05-16T06:10:39.944Z",
+      "updatedAt": "2025-05-16T06:10:39.944Z",
+      "createdById": 1,
+      "sessions": [
+        {
+          "id": 1,
+          "sessionKey": "SESSION_1",
+          "startTime": "05:00",
+          "endTime": "07:00",
+          "amount": 60000,
+          "status": "ACTIVE",
+          "createdAt": "2025-05-16T06:10:39.949Z",
+          "updatedAt": "2025-05-16T06:10:39.949Z",
+          "classId": 1
+        },
+        {
+          "id": 2,
+          "sessionKey": "SESSION_3",
+          "startTime": "06:30",
+          "endTime": "10:30",
+          "amount": 80000,
+          "status": "ACTIVE",
+          "createdAt": "2025-05-16T06:10:39.951Z",
+          "updatedAt": "2025-05-16T06:10:39.951Z",
+          "classId": 1
+        }
+      ]
+    }
+  ]
+}
+2025-05-19 18:06:27,383 - INFO - Tool find_classes execution completed
+2025-05-19 18:06:27,384 - INFO - Tool response: {
+  "total": 1,
+  "data": [
+    {
+      "id": 1,
+      "name": "MMA Class",
+      "description": "Whereas disregard and contempt for human rights have resulted",
+      "status": "ACTIVE",
+      "createdAt": "2025-05-16T06:10:39.944Z",
+      "updatedAt": "2025-05-16T06:10:39.944Z",
+      "createdById": 1,
+      "sessions": [
+        {
+          "id": 1,
+          "sessionKey": "SESSION_1",
+          "startTime": "05:00",
+          "endTime": "07:00",
+          "amount": 60000,
+          "status": "ACTIVE",
+          "createdAt": "2025-05-16T06:10:39.949Z",
+          "updatedAt": "2025-05-16T06:10:39.949Z",
+          "classId": 1
+        },
+        {
+          "id": 2,
+          "sessionKey": "SESSION_3",
+          "startTime": "06:30",
+          "endTime": "10:30",
+          "amount": 80000,
+          "status": "ACTIVE",
+          "createdAt": "2025-05-16T06:10:39.951Z",
+          "updatedAt": "2025-05-16T06:10:39.951Z",
+          "classId": 1
+        }
+      ]
+    }
+  ]
+}
+2025-05-19 18:11:50,584 - INFO - Assistant tool call: find_classes
+2025-05-19 18:11:50,585 - INFO - Tool call arguments: {
+  "name": "MMA Class"
+}
+2025-05-19 18:11:50,735 - INFO - Backend API Response [POST /classes/find-classes]: {
+  "total": 1,
+  "data": [
+    {
+      "id": 1,
+      "name": "MMA Class",
+      "description": "Whereas disregard and contempt for human rights have resulted",
+      "status": "ACTIVE",
+      "createdAt": "2025-05-16T06:10:39.944Z",
+      "updatedAt": "2025-05-16T06:10:39.944Z",
+      "createdById": 1,
+      "sessions": [
+        {
+          "id": 1,
+          "sessionKey": "SESSION_1",
+          "startTime": "05:00",
+          "endTime": "07:00",
+          "amount": 60000,
+          "status": "ACTIVE",
+          "createdAt": "2025-05-16T06:10:39.949Z",
+          "updatedAt": "2025-05-16T06:10:39.949Z",
+          "classId": 1
+        },
+        {
+          "id": 2,
+          "sessionKey": "SESSION_3",
+          "startTime": "06:30",
+          "endTime": "10:30",
+          "amount": 80000,
+          "status": "ACTIVE",
+          "createdAt": "2025-05-16T06:10:39.951Z",
+          "updatedAt": "2025-05-16T06:10:39.951Z",
+          "classId": 1
+        }
+      ]
+    }
+  ]
+}
+2025-05-19 18:11:50,735 - INFO - Tool find_classes execution completed
+2025-05-19 18:11:50,736 - INFO - Tool response: {
+  "total": 1,
+  "data": [
+    {
+      "id": 1,
+      "name": "MMA Class",
+      "description": "Whereas disregard and contempt for human rights have resulted",
+      "status": "ACTIVE",
+      "createdAt": "2025-05-16T06:10:39.944Z",
+      "updatedAt": "2025-05-16T06:10:39.944Z",
+      "createdById": 1,
+      "sessions": [
+        {
+          "id": 1,
+          "sessionKey": "SESSION_1",
+          "startTime": "05:00",
+          "endTime": "07:00",
+          "amount": 60000,
+          "status": "ACTIVE",
+          "createdAt": "2025-05-16T06:10:39.949Z",
+          "updatedAt": "2025-05-16T06:10:39.949Z",
+          "classId": 1
+        },
+        {
+          "id": 2,
+          "sessionKey": "SESSION_3",
+          "startTime": "06:30",
+          "endTime": "10:30",
+          "amount": 80000,
+          "status": "ACTIVE",
+          "createdAt": "2025-05-16T06:10:39.951Z",
+          "updatedAt": "2025-05-16T06:10:39.951Z",
+          "classId": 1
+        }
+      ]
+    }
+  ]
+}

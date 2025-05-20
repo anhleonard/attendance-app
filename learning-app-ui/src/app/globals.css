@@ -1,0 +1,68 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
+body {
+  color: var(--foreground);
+  background: var(--background);
+  /* font-family: Arial, Helvetica, sans-serif; */
+}
+
+@layer utilities {
+  * {
+    @apply box-border;
+  }
+
+  *::-webkit-scrollbar {
+    @apply w-[5px] h-[5px] bg-transparent;
+  }
+
+  *::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+
+  *::-webkit-scrollbar-thumb {
+    @apply bg-gray-300 rounded-full;
+  }
+
+  *::-webkit-scrollbar-thumb:active {
+    @apply bg-gray-400;
+  }
+
+  *::-webkit-scrollbar-button {
+    @apply hidden;
+  }
+}
+
+@layer base {
+  html {
+    @apply font-medium;
+  }
+  th,
+  td {
+    @apply font-medium;
+  }
+
+  thead th {
+    @apply font-bold;
+  }
+}
+
+.hidden-for-capture {
+  position: absolute;
+  top: -9999px;
+  left: -9999px;
+  width: 1200px;
+}
