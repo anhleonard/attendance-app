@@ -62,32 +62,10 @@ tools = [
                         "limit": glm.Schema(
                             type=glm.Type.INTEGER,
                             description="Số lượng tin nhắn tối đa trên mỗi trang (mặc định là 10)"
-                        )
-                    },
-                    required=["chatId"]
-                )
-            )
-        ]
-    ),
-    glm.Tool(
-        function_declarations=[
-            glm.FunctionDeclaration(
-                name="history_messages",
-                description="Lấy lịch sử tin nhắn của một cuộc trò chuyện, được định dạng đặc biệt cho việc hiển thị lịch sử chat.",
-                parameters=glm.Schema(
-                    type=glm.Type.OBJECT,
-                    properties={
-                        "chatId": glm.Schema(
-                            type=glm.Type.INTEGER,
-                            description="ID của cuộc trò chuyện cần lấy lịch sử"
                         ),
-                        "page": glm.Schema(
-                            type=glm.Type.INTEGER,
-                            description="Số trang cần lấy (mặc định là 1)"
-                        ),
-                        "limit": glm.Schema(
-                            type=glm.Type.INTEGER,
-                            description="Số lượng tin nhắn tối đa trên mỗi trang (mặc định là 20)"
+                        "fetchAll": glm.Schema(
+                            type=glm.Type.BOOLEAN,
+                            description="Nếu true, sẽ lấy tất cả tin nhắn mà không phân trang"
                         )
                     },
                     required=["chatId"]
@@ -442,15 +420,6 @@ async def execute_tool(tool_name: str, tool_args: Dict[str, Any], token: str) ->
                 )
                 print("find_messages response:", response)
                 return response
-            elif tool_name == "history_messages":
-                response = call_backend_api(
-                    endpoint="/messages/history-messages",
-                    method="POST",
-                    data=converted_args,
-                    token=token
-                )
-                print("history_messages response:", response)
-                return response
             elif tool_name == "find_classes":
                 converted_args["fetchAll"] = True
                 
@@ -578,28 +547,79 @@ async def chat(request: ChatRequest, authorization: Optional[str] = Header(None)
         function_call_count = 0
         user_message_saved = False
         user_chat_id = request.chat_id  # Lưu chat_id từ request
+        chat_history = []  # Lưu lịch sử chat
 
         try:
-            # Khởi tạo danh sách tin nhắn
-            messages = [
-                glm.Content(
-                    role="user",
-                    parts=[glm.Part(text=request.message)]
-                )
-            ]
+            # Nếu có chat_id, lấy lịch sử chat trước
+            if user_chat_id:
+                try:
+                    history_response = call_backend_api(
+                        endpoint="/messages/find-messages",
+                        method="POST",
+                        data={"chatId": user_chat_id, "fetchAll": True},
+                        token=token
+                    )
+                    if history_response and "data" in history_response:
+                        chat_history = history_response["data"]
+                        # Thêm lịch sử chat vào messages để bot có context
+                        messages = [
+                            glm.Content(
+                                role="model",
+                                parts=[glm.Part(text="Đây là lịch sử chat trước đó:")]
+                            )
+                        ]
+                        # Thêm từng tin nhắn vào context
+                        for msg in chat_history:
+                            # Map role: USER -> user, BOT -> model
+                            role = "user" if msg["sender"] == "USER" else "model"
+                            messages.append(
+                                glm.Content(
+                                    role=role,
+                                    parts=[glm.Part(text=msg["content"])]
+                                )
+                            )
+                        # Thêm tin nhắn mới của user
+                        messages.append(
+                            glm.Content(
+                                role="user",
+                                parts=[glm.Part(text=request.message)]
+                            )
+                        )
+                    else:
+                        # Nếu không lấy được lịch sử, chỉ thêm tin nhắn mới
+                        messages = [
+                            glm.Content(
+                                role="user",
+                                parts=[glm.Part(text=request.message)]
+                            )
+                        ]
+                except Exception as e:
+                    print(f"Error fetching chat history: {str(e)}")
+                    # Nếu có lỗi khi lấy lịch sử, chỉ thêm tin nhắn mới
+                    messages = [
+                        glm.Content(
+                            role="user",
+                            parts=[glm.Part(text=request.message)]
+                        )
+                    ]
+            else:
+                # Nếu không có chat_id, chỉ thêm tin nhắn mới
+                messages = [
+                    glm.Content(
+                        role="user",
+                        parts=[glm.Part(text=request.message)]
+                    )
+                ]
             
             # Đọc system prompt
             with open("prompts/system_prompt.txt", "r", encoding="utf-8") as f:
                 system_prompt = f.read()
 
-            # Tạo prompt cho Gemini với tools
-            prompt = f"""
-            System: {system_prompt}
-            
-            User: {request.message}
-            
-            Assistant: Vui lòng phản hồi yêu cầu của người dùng một cách hữu ích và thân thiện.
-            """
+            # Thêm system prompt vào đầu messages với role là model
+            messages.insert(0, glm.Content(
+                role="model",
+                parts=[glm.Part(text=system_prompt)]
+            ))
 
             # Cấu hình generation
             generation_config = {
@@ -610,7 +630,7 @@ async def chat(request: ChatRequest, authorization: Optional[str] = Header(None)
             }
 
             response = model.generate_content(
-                contents=[{"parts": [{"text": prompt}]}],
+                contents=messages,
                 generation_config=generation_config,
             )
 
@@ -647,7 +667,7 @@ async def chat(request: ChatRequest, authorization: Optional[str] = Header(None)
 
                                     messages.append(
                                         glm.Content(
-                                            role="assistant",
+                                            role="model",
                                             parts=[glm.Part(
                                                 function_call=glm.FunctionCall(
                                                     name=tool_call.name,
@@ -701,7 +721,7 @@ async def chat(request: ChatRequest, authorization: Optional[str] = Header(None)
 
                                         messages.append(
                                             glm.Content(
-                                                role="assistant",
+                                                role="model",
                                                 parts=[glm.Part(function_call=tool_call)]
                                             )
                                         )

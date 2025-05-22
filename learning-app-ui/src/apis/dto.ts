@@ -121,7 +121,13 @@ export interface UpdateChatDto {
 }
 
 export interface FilterMessageDto {
-  chatId: number;
-  page: number;
-  limit: number;
+  chatId?: number;
+  fetchAll?: boolean;
+  page?: number;
+  limit?: number;
+  isSaved?: boolean;
+}
+export interface UpdateMessageDto {
+  messageId: number;
+  isSaved: boolean;
 }

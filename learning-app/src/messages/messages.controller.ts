@@ -1,7 +1,8 @@
-import { Controller, Post, Body, UseGuards } from '@nestjs/common';
+import { Controller, Post, Body, UseGuards, Put } from '@nestjs/common';
 import { MessagesService } from './messages.service';
 import { CreateMessageDto } from './dto/create-message.dto';
 import { FilterMessagesDto } from './dto/filter-messages.dto';
+import { UpdateMessageDto } from './dto/update-message.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/role.decorator';
@@ -24,12 +25,18 @@ export class MessagesController {
   }
 
   @Post('find-messages')
-  findMessages(@Body() filterMessagesDto: FilterMessagesDto) {
-    return this.messagesService.findMessages(filterMessagesDto);
+  findMessages(
+    @Body() filterMessagesDto: FilterMessagesDto,
+    @CurrentUser() user: TokenPayload,
+  ) {
+    return this.messagesService.findMessages(filterMessagesDto, user.userId);
   }
 
-  @Post('history-messages')
-  historyMessages(@Body() filterMessagesDto: FilterMessagesDto) {
-    return this.messagesService.historyMessages(filterMessagesDto);
+  @Post('update')
+  async updateMessage(
+    @Body() updateMessageDto: UpdateMessageDto,
+    @CurrentUser() user: TokenPayload,
+  ) {
+    return this.messagesService.updateMessage(updateMessageDto, user.userId);
   }
 }

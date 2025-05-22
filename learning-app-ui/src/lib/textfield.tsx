@@ -194,8 +194,8 @@ const TextField = ({
                 ? "border-support-c100 bg-support-c10"
                 : "border-grey-c200 group-hover:border-primary-c300"
             } ${disabled ? "bg-grey-c100/80 group-hover:border-grey-c200 text-grey-c400" : ""}
-            ${inputType === "password" ? "font-mono text-sm placeholder:text-sm leading-[20px]" : ""}
-            // placeholder:font-urbanist
+            ${inputType === "password" ? "font-mono text-sm placeholder:text-sm leading-[20px] placeholder:font-sourceSans3" : ""}
+            placeholder:font-sourceSans3
             ${inputClassName}`}
           />
           {endIcon && (

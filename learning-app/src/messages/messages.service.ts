@@ -1,8 +1,10 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateMessageDto } from './dto/create-message.dto';
 import { FilterMessagesDto } from './dto/filter-messages.dto';
+import { UpdateMessageDto } from './dto/update-message.dto';
 import { ChatsService } from '../chats/chats.service';
+import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class MessagesService {
@@ -41,64 +43,76 @@ export class MessagesService {
     });
   }
 
-  async findMessages(filterMessagesDto: FilterMessagesDto) {
-    const { chatId, page = 1, limit = 10 } = filterMessagesDto;
-    const skip = (page - 1) * limit;
+  async findMessages(filterMessagesDto: FilterMessagesDto, userId: number) {
+    const { chatId, fetchAll = false, page = 1, limit = 10, isSaved } = filterMessagesDto;
+    
+    const baseQuery = {
+      where: { 
+        ...(chatId !== undefined && { chatId }), // Only add chatId if provided
+        userId, // Only get messages of current user
+        ...(isSaved !== undefined && { isSaved }), // Add isSaved filter if provided
+      },
+      orderBy: {
+        createdAt: Prisma.SortOrder.asc,
+      },
+    };
+
+    const queryOptions = fetchAll 
+      ? baseQuery 
+      : {
+          ...baseQuery,
+          skip: (page - 1) * limit,
+          take: limit,
+        };
 
     const [messages, total] = await Promise.all([
-      this.prisma.message.findMany({
-        where: { chatId },
-        orderBy: {
-          createdAt: 'asc',
-        },
-        include: {
-          user: true,
-        },
-        skip,
-        take: limit,
-      }),
+      this.prisma.message.findMany(queryOptions),
       this.prisma.message.count({
-        where: { chatId },
+        where: { 
+          ...(chatId !== undefined && { chatId }), // Only add chatId if provided
+          userId, // Count only messages of current user
+          ...(isSaved !== undefined && { isSaved }),
+        },
       }),
     ]);
 
     return {
       data: messages,
-      meta: {
-        total,
-        page,
-        limit,
-        totalPages: Math.ceil(total / limit),
-      },
+      ...(fetchAll ? {} : {
+        meta: {
+          total,
+          page,
+          limit,
+          totalPages: Math.ceil(total / limit),
+        }
+      }),
     };
   }
 
-  async historyMessages(filterMessagesDto: FilterMessagesDto) {
-    const { chatId, page = 1, limit = 20 } = filterMessagesDto;
-    const skip = (page - 1) * limit;
+  async updateMessage(updateMessageDto: UpdateMessageDto, userId: number) {
+    const { messageId, isSaved } = updateMessageDto;
 
-    const [messages, total] = await Promise.all([
-      this.prisma.message.findMany({
-        where: { chatId },
-        orderBy: {
-          createdAt: 'asc',
-        },
-        skip,
-        take: limit,
-      }),
-      this.prisma.message.count({
-        where: { chatId },
-      }),
-    ]);
+    // Find the message first
+    const message = await this.prisma.message.findUnique({
+      where: { id: messageId },
+      include: {
+        user: true,
+      },
+    });
 
-    // Format messages into table format with role and content
-    const formattedMessages = messages.map(message => ({
-      role: message.sender,
-      content: message.content
-    }));
+    if (!message) {
+      throw new NotFoundException('Message not found');
+    }
 
-    return {
-      data: formattedMessages,
-    };
+    // Check if user is the owner of the message
+    if (message.userId !== userId) {
+      throw new ForbiddenException('You can only update your own messages');
+    }
+
+    // Update only isSaved field
+    return this.prisma.message.update({
+      where: { id: messageId },
+      data: { isSaved },
+    });
   }
 }

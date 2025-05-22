@@ -92,6 +92,14 @@ export interface Student {
   classes: StudentClass[];
 }
 
+export interface Message {
+  id: number;
+  content: string;
+  sender: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface ClassesResponse {
   total: number;
   data: Class[];

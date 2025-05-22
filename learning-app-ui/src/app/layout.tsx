@@ -1,8 +1,6 @@
 "use client";
 import "./globals.css";
 import localFont from "next/font/local";
-import Header from "./header";
-import Sidebar from "./sidebar";
 import { Provider } from "react-redux";
 import { store } from "@/redux/store";
 import Modal from "@/components/modal";
@@ -10,12 +8,13 @@ import Drawer from "@/lib/drawer";
 import ConfirmModal from "@/components/confirm-modal";
 import Loading from "@/lib/loading";
 import { Alert } from "@/components/alert";
+// import { Ysabeau_Office } from "next/font/google";
+import { Source_Sans_3 } from "next/font/google";
 
-import { Ysabeau_Office } from "next/font/google";
-
-const beVietnamPro = Ysabeau_Office({
+const sourceSans3 = Source_Sans_3({
   subsets: ["latin"],
-  weight: ["100", "200", "300", "400", "500", "600", "700", "800", "900"],
+  weight: ["200", "300", "400", "500", "600", "700", "800"],
+  variable: "--font-source-sans-3",
 });
 
 const Urbanist = localFont({
@@ -55,8 +54,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning className={`${beVietnamPro.className}`}>
-      <body suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning className={`${sourceSans3.className} ${sourceSans3.variable}`}>
+      <body suppressHydrationWarning className="font-normal">
         <Provider store={store}>
           <div>{children}</div>
           <Modal />

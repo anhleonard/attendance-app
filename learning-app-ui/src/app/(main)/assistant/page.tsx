@@ -1,9 +1,9 @@
 "use client";
 import Image from "next/image";
 import React, { useState, useRef, useEffect, useCallback } from "react";
-import { useDispatch } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import TextArea from "@/lib/textarea";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { Tooltip } from "react-tooltip";
 import { openModal } from "@/redux/slices/modal-slice";
 import SavedPromptsModal from "@/components/assistant/saved-prompts-modal";
@@ -14,8 +14,10 @@ import { openLoading, closeLoading } from "@/redux/slices/loading-slice";
 import { openConfirm } from "@/redux/slices/confirm-slice";
 import { ConfirmState } from "@/config/types";
 import { getChats, updateChat } from "@/apis/services/chats";
-import { FilterChatDto, FilterMessageDto, UpdateChatDto } from "@/apis/dto";
-import { getMessages } from "@/apis/services/messages";
+import { FilterChatDto, FilterMessageDto, UpdateChatDto, UpdateMessageDto } from "@/apis/dto";
+import { getMessages, updateMessage } from "@/apis/services/messages";
+import { RootState } from "@/redux/store";
+import { refetch } from "@/redux/slices/refetch-slice";
 
 interface MessageResponse {
   data: Array<{
@@ -51,6 +53,7 @@ interface Message {
   content: string;
   isUser: boolean;
   timestamp: Date;
+  isSaved?: boolean;
 }
 
 interface ChatHistory {
@@ -211,17 +214,68 @@ const groupChatHistory = (chats: ChatHistory[]): GroupedChatHistory[] => {
 const ChatMessages = React.memo(({ 
   messages, 
   welcomeState, 
-  isLoadingMessages 
+  shouldScroll,
+  isLoading
 }: { 
   messages: Message[], 
   welcomeState: WelcomeState,
-  isLoadingMessages: boolean 
+  shouldScroll: boolean,
+  isLoading: boolean
 }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const dispatch = useDispatch();
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+    if (shouldScroll && messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [shouldScroll, messages]);
+
+  const handleSavePrompt = async (message: Message) => {
+    // Only allow saving if the message has a numeric ID (not a temporary one)
+    if (message.id.startsWith('temp_')) {
+      dispatch(
+        openAlert({
+          isOpen: true,
+          title: "ERROR",
+          subtitle: "Cannot save this message. Please try again.",
+          type: "error",
+        })
+      );
+      return;
+    }
+
+    try {
+      dispatch(openLoading());
+      const updateData: UpdateMessageDto = {
+        messageId: Number(message.id),
+        isSaved: true
+      };
+
+      await updateMessage(updateData);
+      dispatch(refetch());
+
+      dispatch(
+        openAlert({
+          isOpen: true,
+          title: "SUCCESS",
+          subtitle: "Prompt saved successfully!",
+          type: "success",
+        })
+      );
+    } catch (error: any) {
+      dispatch(
+        openAlert({
+          isOpen: true,
+          title: "ERROR",
+          subtitle: error.message || "Failed to save prompt. Please try again.",
+          type: "error",
+        })
+      );
+    } finally {
+      dispatch(closeLoading());
+    }
+  };
 
   if (welcomeState.isWelcome) {
     return (
@@ -233,12 +287,10 @@ const ChatMessages = React.memo(({
     );
   }
 
-  if (isLoadingMessages) {
+  if (isLoading) {
     return (
       <div className="flex-1 flex items-center justify-center">
-        <div className="animate-spin">
-          <Image src="/icons/loading-icon.svg" alt="loading" width={24} height={24} />
-        </div>
+        <Image src="/images/solid-loading.svg" alt="solid-loading" width={28} height={28} className="animate-spin" />
       </div>
     );
   }
@@ -246,13 +298,34 @@ const ChatMessages = React.memo(({
   return (
     <div className="flex-1 overflow-y-auto p-5 space-y-4">
       {messages.map((message) => (
-        <div key={message.id} className={`flex ${message.isUser ? "justify-end" : "justify-start"}`}>
-          <div
-            className={`max-w-[70%] rounded-lg p-3 whitespace-pre-wrap font-questrial text-[15px] ${
-              message.isUser ? "bg-primary-c900 text-white" : "bg-grey-c50 text-grey-c900"
-            }`}
-          >
-            {message.content}
+        <div key={message.id} className={`flex w-full ${message.isUser ? "justify-end" : "justify-start"}`}>
+          <div className={`relative group ${message.isUser ? "w-full flex justify-end" : ""}`}>
+            <div
+              className={`rounded-lg p-3 whitespace-pre-wrap font-questrial text-[15px] relative ${
+                message.isUser 
+                  ? "bg-primary-c900 text-white max-w-[70%] ml-auto" 
+                  : "bg-grey-c50 text-grey-c900 max-w-[70%]"
+              }`}
+            >
+              {message.content}
+              {message.isUser && (
+                message.isSaved ? (
+                  <div className="absolute -bottom-3 right-6 translate-x-1/2 p-0 bg-white rounded-full shadow-[0px_4px_16px_rgba(17,17,26,0.1),_0px_8px_24px_rgba(17,17,26,0.1),_0px_16px_56px_rgba(17,17,26,0.1)]">
+                    <Image src="/icons/saved-heart.svg" alt="saved-prompt" width={24} height={24} />
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => handleSavePrompt(message)}
+                    className="absolute -bottom-4 right-6 translate-x-1/2 p-1.5 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-support-c10 rounded-full bg-white shadow-[0px_4px_16px_rgba(17,17,26,0.1),_0px_8px_24px_rgba(17,17,26,0.1),_0px_16px_56px_rgba(17,17,26,0.1)]"
+                    data-tooltip-id={`save-prompt-${message.id}`}
+                    data-tooltip-content="Save prompt"
+                  >
+                    <Image src="/icons/heart-icon.svg" alt="save-prompt" width={16} height={16} />
+                    <Tooltip id={`save-prompt-${message.id}`} />
+                  </button>
+                )
+              )}
+            </div>
           </div>
         </div>
       ))}
@@ -267,21 +340,23 @@ const Assistant = () => {
   const dispatch = useDispatch();
   const router = useRouter();
   const [inputMessage, setInputMessage] = useState("");
-  const messagesEndRef = useRef<HTMLDivElement>(null);
   const [currentChatId, setCurrentChatId] = useState<string | null>(null);
+  const [activeChatId, setActiveChatId] = useState<string | null>(null);
+  const count = useSelector((state: RootState) => state.refetch.count);
+  const [shouldScroll, setShouldScroll] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [welcomeState, setWelcomeState] = useState<WelcomeState>({
     isWelcome: true,
     message: "Chào mừng tới với AI Assistant",
   });
   const [updatedChatHistory, setUpdatedChatHistory] = useState<ChatHistory[]>([]);
-  const [isLoadingMessages, setIsLoadingMessages] = useState(false);
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [updateSource, setUpdateSource] = useState<'initial' | 'newChat' | 'newMessage' | 'savedPrompt'>('initial');
 
   // Fetch chats only once when component mounts
   useEffect(() => {
     const fetchChats = async () => {
       try {
-        dispatch(openLoading());
         const filterData: FilterChatDto = {
           page: 1,
           rowPerPage: 30,
@@ -306,23 +381,21 @@ const Assistant = () => {
             type: "error",
           })
         );
-      } finally {
-        dispatch(closeLoading());
       }
     };
 
     fetchChats();
   }, [dispatch]);
 
-  // Update active state when currentChatId changes
+  // Update chat history with active state
   useEffect(() => {
     setUpdatedChatHistory(prev => 
       prev.map(chat => ({
         ...chat,
-        isActive: chat.id === currentChatId,
+        isActive: chat.id === activeChatId,
       }))
     );
-  }, [currentChatId]);
+  }, [activeChatId]);
 
   const handleEditChatTitle = async (chatId: string, newTitle: string) => {
     try {
@@ -395,15 +468,20 @@ const Assistant = () => {
   };
 
   const handleChatSelect = useCallback((chatId: string) => {
+    // Update both currentChatId and activeChatId when selecting a chat
+    setActiveChatId(chatId);
     // Batch state updates together
     React.startTransition(() => {
       setCurrentChatId(chatId);
       setMessages([]);
       setWelcomeState({ isWelcome: false, message: "" });
+      setUpdateSource('newChat');
     });
   }, []);
 
   const handleNewChat = useCallback(() => {
+    // Clear both currentChatId and activeChatId for new chat
+    setActiveChatId(null);
     // Batch state updates together
     React.startTransition(() => {
       setCurrentChatId(null);
@@ -412,6 +490,7 @@ const Assistant = () => {
         isWelcome: true,
         message: "Chào mừng tới với AI Assistant",
       });
+      setUpdateSource('newChat');
     });
   }, []);
 
@@ -437,15 +516,7 @@ const Assistant = () => {
     );
   };
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
-
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
-
-  // Fetch messages when chatId changes
+  // Separate effect for initial chat load and chat switching
   useEffect(() => {
     const fetchMessages = async () => {
       if (!currentChatId) {
@@ -454,15 +525,15 @@ const Assistant = () => {
           isWelcome: true,
           message: "Chào mừng tới với AI Assistant",
         });
+        setIsLoading(false);
         return;
       }
 
       try {
-        setIsLoadingMessages(true);
+        setIsLoading(true);
         const filterData: FilterMessageDto = {
           chatId: Number(currentChatId),
-          page: 1,
-          limit: 10
+          fetchAll: true,
         };
 
         const response = await getMessages(filterData);
@@ -473,9 +544,11 @@ const Assistant = () => {
           content: msg.content,
           isUser: msg.sender === "USER",
           timestamp: new Date(msg.createdAt),
+          isSaved: msg.isSaved,
         }));
 
         setMessages(messages);
+        setShouldScroll(updateSource === 'newChat');
       } catch (error: any) {
         console.error('Error fetching messages:', error);
         dispatch(
@@ -487,12 +560,26 @@ const Assistant = () => {
           })
         );
       } finally {
-        setIsLoadingMessages(false);
+        setIsLoading(false);
       }
     };
 
-    fetchMessages();
-  }, [currentChatId, dispatch]);
+    // Fetch messages when:
+    // 1. Switching chats (newChat)
+    // 2. Initial load (initial)
+    // 3. After saving/unsaving a prompt (savedPrompt)
+    if (updateSource === 'newChat' || updateSource === 'initial' || updateSource === 'savedPrompt') {
+      fetchMessages();
+    }
+  }, [currentChatId, dispatch, updateSource]);
+
+  // Effect to handle saved prompt updates
+  useEffect(() => {
+    if (count > 0) {
+      // Set updateSource to trigger the fetch messages effect
+      setUpdateSource('savedPrompt');
+    }
+  }, [count]);
 
   const handleSendMessage = async () => {
     if (!inputMessage.trim()) return;
@@ -502,16 +589,19 @@ const Assistant = () => {
       setWelcomeState({ isWelcome: false, message: "" });
     }
 
-    const newMessage: Message = {
-      id: Date.now().toString(),
-      content: inputMessage,
+    const messageToSend = inputMessage;
+    setInputMessage("");
+
+    // Add user message immediately to UI with a temporary ID
+    const tempUserMessageId = `temp_${Date.now()}`;
+    const userMessage: Message = {
+      id: tempUserMessageId,
+      content: messageToSend,
       isUser: true,
       timestamp: new Date(),
     };
-
-    setMessages((prev) => [...prev, newMessage]);
-    const messageToSend = inputMessage;
-    setInputMessage("");
+    setMessages(prev => [...prev, userMessage]);
+    setShouldScroll(true);
 
     try {
       dispatch(openLoading());
@@ -524,7 +614,6 @@ const Assistant = () => {
         message: messageToSend,
       };
 
-      // Add chatId to payload if we're in an existing chat
       if (currentChatId) {
         payload.chat_id = Number(currentChatId);
       }
@@ -544,21 +633,64 @@ const Assistant = () => {
 
       const data = await response.json();
 
-      // Add AI response to messages
+      // Update user message with real ID from API
+      if (data.id) {
+        setMessages(prev => prev.map(msg => 
+          msg.id === tempUserMessageId 
+            ? { ...msg, id: data.id.toString() }
+            : msg
+        ));
+      }
+
+      // Add AI response to UI
       const aiMessage: Message = {
-        id: Date.now().toString(),
+        id: data.id ? data.id.toString() : `temp_ai_${Date.now()}`,
         content: data.response || "Sorry, I couldn't process your request.",
         isUser: false,
         timestamp: new Date(),
       };
+      setMessages(prev => [...prev, aiMessage]);
+      setShouldScroll(true);
 
-      setMessages((prev) => [...prev, aiMessage]);
-
-      // If this was a new chat and we got a chatId back, update the currentChatId
+      // Update currentChatId if this is a new chat
       if (!currentChatId && data.chatId) {
-        setCurrentChatId(data.chatId.toString());
+        const newChatId = data.chatId.toString();
+        setCurrentChatId(newChatId);
+        // Don't update activeChatId for first message
       }
+
+      // Fetch updated chat history after successful message exchange
+      const filterData: FilterChatDto = {
+        page: 1,
+        rowPerPage: 30,
+      };
+      const chatResponse = await getChats(filterData);
+      const chatItems = chatResponse.items || chatResponse.data || [];
+      const fallbackActiveId = (data.chatId || currentChatId || chatItems[0]?.id)?.toString();
+      const chats: ChatHistory[] = chatItems.map((chat: any) => ({
+        id: chat.id.toString(),
+        title: chat.title,
+        timestamp: new Date(chat.createdAt),
+        isActive: chat.id.toString() === fallbackActiveId,
+      }));
+
+      console.log(data, 'data chat id')
+      console.log(chats, 'chat history')
+      // setCurrentChatId(chatItems[0]?.id);
+      setUpdatedChatHistory(chats);
+
     } catch (error: any) {
+      // Add error message to UI with a temporary ID
+      const tempErrorMessageId = `temp_error_${Date.now()}`;
+      const errorMessage: Message = {
+        id: tempErrorMessageId,
+        content: error.message || "Failed to send message. Please try again.",
+        isUser: false,
+        timestamp: new Date(),
+      };
+      setMessages(prev => [...prev, errorMessage]);
+      setShouldScroll(true);
+
       dispatch(
         openAlert({
           isOpen: true,
@@ -608,7 +740,8 @@ const Assistant = () => {
         <ChatMessages 
           messages={messages}
           welcomeState={welcomeState}
-          isLoadingMessages={isLoadingMessages}
+          shouldScroll={shouldScroll}
+          isLoading={isLoading}
         />
 
         {/* Input area */}

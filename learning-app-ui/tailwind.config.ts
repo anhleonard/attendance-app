@@ -97,6 +97,7 @@ export default {
       fontFamily: {
         questrial: ["var(--font-questrial)", "sans-serif"],
         urbanist: ["Urbanist", "sans-serif"],
+        sourceSans3: ["var(--font-source-sans-3)", "sans-serif"],
       },
       // fontWeight: {
       //   thin: "100",

@@ -1,10 +1,21 @@
-import { IsNumber, IsOptional, Min } from 'class-validator';
+import { IsNumber, IsOptional, Min, IsBoolean } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class FilterMessagesDto {
   @Type(() => Number)
   @IsNumber()
-  chatId: number;
+  @IsOptional()
+  chatId?: number;
+
+  @Type(() => Boolean)
+  @IsBoolean()
+  @IsOptional()
+  isSaved?: boolean;
+
+  @Type(() => Boolean)
+  @IsBoolean()
+  @IsOptional()
+  fetchAll?: boolean = false;
 
   @Type(() => Number)
   @IsNumber()
