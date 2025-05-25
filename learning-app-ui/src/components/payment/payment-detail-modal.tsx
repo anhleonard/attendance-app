@@ -4,14 +4,59 @@ import { Dialog, DialogPanel, Transition, TransitionChild } from "@headlessui/re
 import Image from "next/image";
 import Button from "@/lib/button";
 import Html2CanvasPro from "html2canvas-pro";
+import moment from "moment";
+import { formatCurrency } from "@/config/functions";
+
+const DAYS_OF_WEEK = ['Chủ nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
 
 interface Props {
   show: boolean;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  handleCloseModal: any;
+  handleCloseModal: () => void;
+  payment?: {
+    id: number;
+    totalSessions: number;
+    totalAttend: number;
+    totalMonthAmount: number;
+    totalPayment: number;
+    paidPayment: number | null;
+    status: string;
+    paymentNote: string;
+    sentAt: string | null;
+    createdAt: string;
+    updatedAt: string;
+    studentId: number;
+    student: {
+      id: number;
+      name: string;
+      debt: number;
+    };
+    attendances: Array<{
+      id: number;
+      isAttend: boolean;
+      noteAttendance: string;
+      learningDate: string;
+      session: {
+        id: number;
+        sessionKey: string;
+        startTime: string;
+        endTime: string;
+        amount: number;
+        class: {
+          id: number;
+          name: string;
+        };
+      };
+    }>;
+    classes: number[];
+    attendanceStats: {
+      total: number;
+      attended: number;
+      absent: number;
+    };
+  };
 }
 
-const PaymentDetailModal = ({ show, handleCloseModal }: Props) => {
+const PaymentDetailModal = ({ show, handleCloseModal, payment }: Props) => {
   async function downloadBillPayment() {
     const div = document.getElementById("paymentDiv");
     if (!div) {
@@ -109,6 +154,36 @@ const PaymentDetailModal = ({ show, handleCloseModal }: Props) => {
     }
   }
 
+  // Group session amounts by day of week
+  const getSessionAmounts = () => {
+    if (!payment?.attendances?.length) return null;
+
+    const amountsByDay = new Map<string, number>();
+    const uniqueAmounts = new Set<number>();
+
+    payment.attendances
+      .filter(attendance => attendance.isAttend)
+      .forEach(attendance => {
+        const dayOfWeek = moment(attendance.learningDate).day();
+        const amount = attendance.session.amount;
+        amountsByDay.set(DAYS_OF_WEEK[dayOfWeek], amount);
+        uniqueAmounts.add(amount);
+      });
+
+    // If all sessions have the same amount, return a single value
+    if (uniqueAmounts.size === 1) {
+      return Array.from(uniqueAmounts)[0];
+    }
+
+    // Otherwise return the map of amounts by day
+    return amountsByDay;
+  };
+
+  const sessionAmounts = getSessionAmounts();
+  const attendedSessions = payment?.attendances
+    ?.filter(attendance => attendance.isAttend)
+    .sort((a, b) => moment(a.learningDate).valueOf() - moment(b.learningDate).valueOf()) || [];
+
   return (
     <Transition appear show={show} as={Fragment}>
       <Dialog as="div" className="fixed inset-0 z-50" onClose={handleCloseModal}>
@@ -148,10 +223,12 @@ const PaymentDetailModal = ({ show, handleCloseModal }: Props) => {
                     </div>
                     {/* main content */}
                     <div className="flex flex-col items-center justify-center w-full">
-                      <div className="font-bold text-lg text-grey-c900">HỌC PHÍ THÁNG 01/2024</div>
+                      <div className="font-bold text-lg text-grey-c900">
+                        HỌC PHÍ THÁNG {moment(payment?.createdAt).format("MM/YYYY")}
+                      </div>
                       <div className="font-semibold text-lg text-grey-c900">
                         <span className="text-grey-c900 text-sm font-normal pr-2">Tên:</span>
-                        <span className="text-grey-c600 text-sm font-bold font-questrial">Hoàng Đỗ Nhật Minh</span>
+                        <span className="text-grey-c600 text-sm font-bold">{payment?.student.name}</span>
                       </div>
                       <div className="grid md:grid-cols-2 w-full py-3 gap-4">
                         {/* 1. table 1 */}
@@ -160,15 +237,15 @@ const PaymentDetailModal = ({ show, handleCloseModal }: Props) => {
                             <table className="table-auto w-full text-left relative">
                               <thead className={`text-grey-c700 uppercase bg-primary-c50`}>
                                 <tr className="hover:bg-success-c50 hover:text-grey-c700 font-bold">
-                                  <th className="pl-3 py-4 font-questrial">STT</th>
-                                  <th className="px-1 py-4 font-questrial">Ngày học</th>
+                                  <th className="pl-3 py-4">STT</th>
+                                  <th className="px-1 py-4">Ngày học</th>
                                 </tr>
                               </thead>
                               <tbody>
-                                {Array.from({ length: 10 }).map((_, index) => (
-                                  <tr key={index} className="hover:bg-primary-c10 hover:text-grey-c700 text-grey-c900">
+                                {attendedSessions.map((attendance, index) => (
+                                  <tr key={attendance.id} className="hover:bg-primary-c10 hover:text-grey-c700 text-grey-c900">
                                     <th className="pl-3 py-4">{index + 1}</th>
-                                    <th className="px-1 py-4">08/01/2024</th>
+                                    <th className="px-1 py-4">{moment(attendance.learningDate).format("DD/MM/YYYY")}</th>
                                   </tr>
                                 ))}
                               </tbody>
@@ -182,42 +259,65 @@ const PaymentDetailModal = ({ show, handleCloseModal }: Props) => {
                             <table className="table-auto w-full text-left relative rounded-[10px] overflow-hidden">
                               <thead className={`text-grey-c700 uppercase bg-primary-c50`}>
                                 <tr className="hover:bg-success-c50 hover:text-grey-c700 font-bold">
-                                  <th colSpan={2} className="py-4 text-center font-questrial">
-                                    TỔNG KẾT
+                                  <th colSpan={2} className="py-4 text-center">
+                                    Summary
                                   </th>
                                 </tr>
                               </thead>
                               <tbody>
                                 <tr className="hover:bg-primary-c10 hover:text-grey-c700 text-grey-c900">
-                                  <th className="pl-3 py-4 font-questrial">Tổng số buổi</th>
-                                  <th className="px-1 py-4">7</th>
+                                  <th className="pl-3 py-4">Tổng số buổi</th>
+                                  <th className="px-1 py-4">{attendedSessions.length}</th>
                                 </tr>
                                 <tr className="hover:bg-primary-c10 hover:text-grey-c700 text-grey-c900">
-                                  <th className="pl-3 py-4 font-questrial">Học phí/buổi</th>
-                                  <th className="px-1 py-4">50.000 VND</th>
+                                  <th className="pl-3 py-4">Học phí/buổi</th>
+                                  <th className="px-1 py-4">
+                                    {typeof sessionAmounts === 'number' ? (
+                                      `${formatCurrency(sessionAmounts)} VNĐ`
+                                    ) : sessionAmounts ? (
+                                      <div className="flex flex-col gap-1">
+                                        {Array.from(sessionAmounts.entries()).map(([day, amount]) => (
+                                          <span key={day}>{day}: {formatCurrency(amount)} VNĐ/buổi</span>
+                                        ))}
+                                      </div>
+                                    ) : (
+                                      '0 VNĐ'
+                                    )}
+                                  </th>
+                                </tr>
+                                {payment?.student?.debt !== 0 && (
+                                  <>
+                                    <tr className="hover:bg-primary-c10 hover:text-grey-c700 text-grey-c900">
+                                      <th className="pl-3 py-4">Học phí tháng</th>
+                                      <th className="px-1 py-4">{formatCurrency(payment?.totalMonthAmount || 0)} VNĐ</th>
+                                    </tr>
+                                    <tr className="hover:bg-primary-c10 hover:text-grey-c700 text-grey-c900">
+                                      <th className="pl-3 py-4">Tiền nợ</th>
+                                      <th className="px-1 py-4">
+                                        <span className="font-bold text-support-c500">
+                                          {payment?.student?.debt && payment.student.debt > 0 
+                                            ? `-${formatCurrency(payment.student.debt)}` 
+                                            : `+${formatCurrency(Math.abs(payment?.student?.debt || 0))}`}
+                                          VNĐ
+                                        </span>
+                                      </th>
+                                    </tr>
+                                  </>
+                                )}
+                                <tr className="hover:bg-primary-c10 hover:text-grey-c700 text-grey-c900">
+                                  <th className="pl-3 py-4">Tổng tiền</th>
+                                  <th className="px-1 py-4">{formatCurrency(payment?.totalPayment || 0)} VNĐ</th>
                                 </tr>
                                 <tr className="hover:bg-primary-c10 hover:text-grey-c700 text-grey-c900">
-                                  <th className="pl-3 py-4 font-questrial">Học phí tháng</th>
-                                  <th className="px-1 py-4">350.000 VND</th>
-                                </tr>
-                                <tr className="hover:bg-primary-c10 hover:text-grey-c700 text-grey-c900">
-                                  <th className="pl-3 py-4 font-questrial">Tiền nợ</th>
-                                  <th className="px-1 py-4">100.000 VND</th>
-                                </tr>
-                                <tr className="hover:bg-primary-c10 hover:text-grey-c700 text-grey-c900">
-                                  <th className="pl-3 py-4 font-questrial">Tổng tiền</th>
-                                  <th className="px-1 py-4">450.000 VND</th>
-                                </tr>
-                                <tr className="hover:bg-primary-c10 hover:text-grey-c700 text-grey-c900">
-                                  <th className="pl-3 py-4 font-questrial">Ngân hàng</th>
+                                  <th className="pl-3 py-4">Ngân hàng</th>
                                   <th className="px-1 py-4">VIB</th>
                                 </tr>
                                 <tr className="hover:bg-primary-c10 hover:text-grey-c700 text-grey-c900">
-                                  <th className="pl-3 py-4 font-questrial">STK</th>
+                                  <th className="pl-3 py-4">STK</th>
                                   <th className="px-1 py-4">002122334</th>
                                 </tr>
                                 <tr className="hover:bg-primary-c10 hover:text-grey-c700 text-grey-c900">
-                                  <th className="pl-3 py-4 font-questrial">Chủ tài khoản</th>
+                                  <th className="pl-3 py-4">Chủ tài khoản</th>
                                   <th className="px-1 py-4">TRẦN THỊ TRÂM</th>
                                 </tr>
                               </tbody>

@@ -1,60 +1,58 @@
 import React from "react";
+import moment from "moment";
 
-const classes = [
-  {
-    id: 1,
-    title: "MMA Class",
-    date: "21/02/2023 - Now",
-    sessions: 123,
-    active: true,
-  },
-  {
-    id: 2,
-    title: "LLM Class",
-    date: "21/02/2023 - 21/02/2024",
-    sessions: 123,
-    active: false,
-  },
-  {
-    id: 3,
-    title: "NLP Class",
-    date: "21/02/2023 - 21/02/2024",
-    sessions: 123,
-    active: false,
-  },
-  {
-    id: 4,
-    title: "HTN Class",
-    date: "21/02/2023 - 21/02/2024",
-    sessions: 123,
-    active: false,
-  },
-];
+interface ClassData {
+  id: number;
+  name: string;
+  createdAt: string;
+  updatedAt: string;
+  totalAttendances: number;
+}
 
-const HistoryPath = () => {
+interface Props {
+  currentClass: ClassData;
+  pastClasses: ClassData[];
+}
+
+const HistoryPath: React.FC<Props> = ({ currentClass, pastClasses }) => {
+  // Sort past classes by createdAt in descending order
+  const sortedPastClasses = [...pastClasses].sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  );
+  const allClasses = [currentClass, ...sortedPastClasses];
+
   return (
     <div className="max-w-md mx-auto grid grid-cols-2 gap-8 pt-2 py-6">
-      {classes.map((item) => (
-        <div key={item.id} className="flex items-start space-x-4">
-          {/* Số thứ tự */}
-          <div
-            className={`flex items-center justify-center w-8 h-8 rounded-full text-white font-bold ${
-              item.active ? "bg-primary-c900" : "bg-grey-c200"
-            }`}
-          >
-            {item.id}
-          </div>
+      {allClasses.map((item, index) => {
+        const isCurrentClass = index === 0;
+        const isLastItem = index === allClasses.length - 1;
+        
+        return (
+          <div key={Math.random()} className="flex items-start space-x-4">
+            {/* Số thứ tự */}
+            <div
+              className={`flex items-center justify-center w-8 h-8 rounded-full text-white font-bold ${
+                isCurrentClass ? "bg-primary-c900" : "bg-grey-c200"
+              }`}
+            >
+              {index + 1}
+            </div>
 
-          {/* Nội dung */}
-          <div className="border-l-[1px] border-gray-300 pl-4 pb-8 last:pb-0">
-            <h3 className={`text-lg font-bold mb-2 ${item.active ? "text-primary-c900" : "text-grey-c400"}`}>
-              {item.title}
-            </h3>
-            <p className={`text-xs mb-2 ${item.active ? "text-primary-c900" : "text-grey-c300"}`}>{item.date}</p>
-            <p className={`text-xs ${item.active ? "text-primary-c900" : "text-grey-c300"}`}>Total sessions: {item.sessions}</p>
+            {/* Nội dung */}
+            <div className={`border-l-[1px] border-grey-c200 pl-4 ${!isLastItem ? "mb-4" : ""}`}>
+              <h3 className={`text-lg font-bold mb-2 ${isCurrentClass ? "text-primary-c900" : "text-grey-c400"}`}>
+                {item.name}
+              </h3>
+              <p className={`text-xs mb-2 ${isCurrentClass ? "text-primary-c900" : "text-grey-c300"}`}>
+                {moment(item.createdAt).format("DD/MM/YYYY")} - {isCurrentClass ? "Now" : moment(item.updatedAt).format("DD/MM/YYYY")}
+              </p>
+              <p className={`text-xs ${isCurrentClass ? "text-primary-c900" : "text-grey-c300"}`}>
+                Total sessions: {item.totalAttendances}
+              </p>
+            </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 };

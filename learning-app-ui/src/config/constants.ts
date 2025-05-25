@@ -1,7 +1,10 @@
+import { Permission } from "./enums";
+
 // define local storage keys
 export const USER_INFO = "userInfo";
 export const ACTIVE_CLASSES = "activeClasses";
 export const ACCESS_TOKEN = "accessToken";
+export const ACTIVE_STUDENTS = "activeStudents";
 
 export const MONTHS = [
   { label: "January", value: "1" },
@@ -78,6 +81,14 @@ export const Days = [
     label: "Sunday",
     value: "SUNDAY",
   },
+];
+
+export const PermissionOptions = [
+  { label: "System User Permissions", value: Permission.CREATE_USER },
+  { label: "Student Permissions", value: Permission.CREATE_STUDENT },
+  { label: "Class Permissions", value: Permission.CREATE_CLASS },
+  { label: "Attendance Permissions", value: Permission.CREATE_ATTENDANCE },
+  { label: "Payment Permissions", value: Permission.CREATE_PAYMENT },
 ];
 
 const generateTimeSlots = (startHour: number, endHour: number, intervalMinutes: number = 30) => {

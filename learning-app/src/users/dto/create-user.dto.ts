@@ -9,6 +9,11 @@ import {
 import { Permission } from 'src/utils/enums';
 import { Role } from 'src/utils/enums';
 
+export enum UserType {
+  SYSTEM_USER = 'system-user',
+  NORMAL_USER = 'normal-user',
+}
+
 export class CreateUserDto {
   @IsString()
   @IsNotEmpty()
@@ -19,14 +24,18 @@ export class CreateUserDto {
   email: string;
 
   @IsString()
-  @IsNotEmpty()
-  password: string;
+  @IsOptional()
+  password?: string;
 
   @IsEnum(Role)
   @IsOptional()
-  role: Role;
+  role?: Role;
 
   @IsArray()
   @IsOptional()
-  permissions: Permission[];
+  permissions?: Permission[];
+
+  @IsEnum(UserType)
+  @IsNotEmpty()
+  type: UserType;
 }

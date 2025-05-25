@@ -1,20 +1,22 @@
 import { Transform } from 'class-transformer';
 import {
   IsDate,
+  IsEnum,
+  IsInt,
   IsNotEmpty,
-  IsNumber,
   IsOptional,
   IsString,
 } from 'class-validator';
+import { Status } from '@prisma/client';
 
 export class UpdateStudentDto {
-  @IsNumber()
+  @IsInt()
   @IsNotEmpty()
   id: number;
 
-  @IsNumber()
-  @IsNotEmpty()
-  classId: number;
+  @IsInt()
+  @IsOptional()
+  classId?: number;
 
   @IsString()
   @IsOptional()
@@ -36,4 +38,8 @@ export class UpdateStudentDto {
   @IsString()
   @IsOptional()
   secondPhoneNumber: string;
+
+  @IsEnum(Status)
+  @IsOptional()
+  status?: Status;
 }

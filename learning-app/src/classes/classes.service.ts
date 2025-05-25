@@ -58,8 +58,10 @@ export class ClassesService {
 
       let createdNewSessions = [];
       if (sessions.length > 0 && createdClass) {
-        this.logger.log(`Creating ${sessions.length} sessions for class ${createdClass.id}`);
-        
+        this.logger.log(
+          `Creating ${sessions.length} sessions for class ${createdClass.id}`,
+        );
+
         for (const session of sessions) {
           try {
             const createdSession = await this.sessionsService.createSession(
@@ -67,7 +69,9 @@ export class ClassesService {
               session,
             );
             createdNewSessions.push(createdSession);
-            this.logger.debug(`Created session ${createdSession.id} for class ${createdClass.id}`);
+            this.logger.debug(
+              `Created session ${createdSession.id} for class ${createdClass.id}`,
+            );
           } catch (sessionError) {
             this.logger.error(
               `Failed to create session for class ${createdClass.id}: ${sessionError.message}`,
@@ -76,16 +80,18 @@ export class ClassesService {
                 classId: createdClass.id,
                 sessionData: session,
                 error: sessionError,
-              }
+              },
             );
             throw new BadRequestException(
-              `Failed to create session: ${sessionError.message}`
+              `Failed to create session: ${sessionError.message}`,
             );
           }
         }
       }
 
-      this.logger.log(`Successfully created all sessions for class ${createdClass.id}`);
+      this.logger.log(
+        `Successfully created all sessions for class ${createdClass.id}`,
+      );
       return {
         ...createdClass,
         sessions: createdNewSessions,
@@ -98,24 +104,77 @@ export class ClassesService {
           classData: createClassDto,
           userId: user.userId,
           error: error,
-        }
+        },
       );
       throw new BadRequestException(error.message);
     }
   }
 
   async updateClass(updateClassDto: UpdateClassDto) {
-    const { id: classId, sessions, ...rest } = updateClassDto;
+    const { id: classId, sessions, status, ...rest } = updateClassDto;
 
     try {
+      // Nếu đang cập nhật status thành INACTIVE, kiểm tra điều kiện
+      if (status === 'INACTIVE') {
+        // Lấy danh sách học sinh đang active trong lớp
+        const activeStudentsInClass =
+          await this.prismaService.studentClass.findMany({
+            where: {
+              classId,
+              status: 'ACTIVE',
+              student: {
+                status: 'ACTIVE', // Chỉ lấy học sinh đang active
+              },
+            },
+            include: {
+              student: true,
+            },
+          });
+
+        // Nếu có học sinh đang active trong lớp, không cho phép inactive
+        if (activeStudentsInClass.length > 0) {
+          throw new BadRequestException(
+            'Cannot disable class while there are active students in it',
+          );
+        }
+
+        // Kiểm tra xem có học sinh nào trong lớp không
+        const allStudentsInClass =
+          await this.prismaService.studentClass.findMany({
+            where: {
+              classId,
+              status: 'ACTIVE',
+            },
+            include: {
+              student: true,
+            },
+          });
+
+        // Nếu không có học sinh nào trong lớp, cho phép inactive
+        if (allStudentsInClass.length === 0) {
+          // Tiếp tục với việc update class
+        } else {
+          // Kiểm tra xem tất cả học sinh trong lớp có đều inactive không
+          const hasAllInactiveStudents = allStudentsInClass.every(
+            (sc) => sc.student.status === 'INACTIVE',
+          );
+
+          if (!hasAllInactiveStudents) {
+            throw new BadRequestException(
+              'Cannot disable class while there are active students in it',
+            );
+          }
+        }
+      }
+
       const updatedClass = await this.prismaService.class.update({
         where: { id: classId },
-        data: { ...rest },
+        data: { ...rest, status },
       });
 
       // nếu không có update sessions thì return luôn, chỉ update các thông tin khác của class
       if (!sessions) {
-        return;
+        return updatedClass;
       }
 
       // Chỉ lấy danh sách sessions đang ACTIVE của class
@@ -196,60 +255,165 @@ export class ClassesService {
         year,
       } = filterClassDto;
 
-      const sessionKeys = [
-        SessionKey.SESSION_7, // Chủ nhật
-        SessionKey.SESSION_1, // Thứ 2
-        SessionKey.SESSION_2, // Thứ 3
-        SessionKey.SESSION_3, // Thứ 4
-        SessionKey.SESSION_4, // Thứ 5
-        SessionKey.SESSION_5, // Thứ 6
-        SessionKey.SESSION_6, // Thứ 7
-      ];
+      // If no learningDate provided, use normal class search
+      if (!learningDate) {
+        const whereCondition: Prisma.ClassWhereInput = {
+          name:
+            name === ''
+              ? undefined
+              : name
+                ? { contains: name, mode: 'insensitive' }
+                : undefined,
+          status: status || undefined,
+        };
 
-      const definedStatus = learningDate
-        ? sessionKeys[new Date(learningDate).getDay()]
-        : undefined;
+        const findManyArgs: Prisma.ClassFindManyArgs = {
+          where: whereCondition,
+          include: {
+            sessions: {
+              where: { status: 'ACTIVE' },
+            },
+          },
+        };
 
-      const whereCondition: Prisma.ClassWhereInput = {
-        name:
-          name === ''
-            ? undefined
-            : name
-              ? { contains: name, mode: 'insensitive' }
-              : undefined,
-        status: status || undefined,
-        ...(definedStatus
-          ? {
-              sessions: {
-                some: {
-                  sessionKey: definedStatus,
-                  status: 'ACTIVE',
-                },
+        if (!fetchAll) {
+          findManyArgs.skip = (page - 1) * rowPerPage;
+          findManyArgs.take = rowPerPage;
+        }
+
+        const [data, total] = await Promise.all([
+          this.prismaService.class.findMany(findManyArgs),
+          this.prismaService.class.count({ where: whereCondition }),
+        ]);
+
+        return { total, data };
+      }
+
+      const currentDate = new Date();
+      currentDate.setHours(0, 0, 0, 0);
+      const targetDate = new Date(learningDate);
+      targetDate.setHours(0, 0, 0, 0);
+
+      // For future dates, use session schedule
+      if (targetDate >= currentDate) {
+        const sessionKeys = [
+          SessionKey.SESSION_7, // Chủ nhật
+          SessionKey.SESSION_1, // Thứ 2
+          SessionKey.SESSION_2, // Thứ 3
+          SessionKey.SESSION_3, // Thứ 4
+          SessionKey.SESSION_4, // Thứ 5
+          SessionKey.SESSION_5, // Thứ 6
+          SessionKey.SESSION_6, // Thứ 7
+        ];
+
+        const sessionKeyForDay = sessionKeys[targetDate.getDay()];
+
+        const whereCondition: Prisma.ClassWhereInput = {
+          name:
+            name === ''
+              ? undefined
+              : name
+                ? { contains: name, mode: 'insensitive' }
+                : undefined,
+          status: status || undefined,
+          sessions: {
+            some: {
+              sessionKey: sessionKeyForDay,
+              status: 'ACTIVE',
+            },
+          },
+        };
+
+        const findManyArgs: Prisma.ClassFindManyArgs = {
+          where: whereCondition,
+          include: {
+            sessions: {
+              where: {
+                sessionKey: sessionKeyForDay,
+                status: 'ACTIVE',
               },
-            }
-          : {}),
+            },
+          },
+        };
+
+        if (!fetchAll) {
+          findManyArgs.skip = (page - 1) * rowPerPage;
+          findManyArgs.take = rowPerPage;
+        }
+
+        const [data, total] = await Promise.all([
+          this.prismaService.class.findMany(findManyArgs),
+          this.prismaService.class.count({ where: whereCondition }),
+        ]);
+
+        return { total, data };
+      }
+
+      // For past dates, use attendance records
+      const startOfDay = new Date(targetDate);
+      startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date(targetDate);
+      endOfDay.setHours(23, 59, 59, 999);
+
+      // First get all unique class IDs that have attendance records for this date
+      const classesWithAttendance = await this.prismaService.attendance.groupBy(
+        {
+          by: ['sessionId'],
+          where: {
+            learningDate: {
+              gte: startOfDay,
+              lt: endOfDay,
+            },
+            session: {
+              class: {
+                status: status || undefined,
+                ...(name
+                  ? { name: { contains: name, mode: 'insensitive' } }
+                  : {}),
+              },
+            },
+          },
+        },
+      );
+
+      // Get the class IDs from the sessions
+      const sessions = await this.prismaService.session.findMany({
+        where: {
+          id: { in: classesWithAttendance.map((a) => a.sessionId) },
+        },
+        select: {
+          classId: true,
+        },
+      });
+
+      const classIds = [...new Set(sessions.map((s) => s.classId))];
+
+      if (classIds.length === 0) {
+        return { total: 0, data: [] };
+      }
+
+      // Then get the full class information for these classes
+      const whereCondition: Prisma.ClassWhereInput = {
+        id: { in: classIds },
+        status: status || undefined,
+        ...(name ? { name: { contains: name, mode: 'insensitive' } } : {}),
       };
 
       const findManyArgs: Prisma.ClassFindManyArgs = {
         where: whereCondition,
         include: {
           sessions: {
-            where: {
-              sessionKey: definedStatus,
-              status: 'ACTIVE',
-            },
-            include: learningDate
-              ? {
-                  attendances: {
-                    where: {
-                      learningDate: {
-                        gte: new Date(learningDate.setHours(0, 0, 0, 0)),
-                        lt: new Date(learningDate.setHours(23, 59, 59, 999)),
-                      },
-                    },
+            where: { status: 'ACTIVE' },
+            include: {
+              attendances: {
+                where: {
+                  learningDate: {
+                    gte: startOfDay,
+                    lt: endOfDay,
                   },
-                }
-              : {},
+                },
+              },
+            },
           },
         },
       };
@@ -264,10 +428,7 @@ export class ClassesService {
         this.prismaService.class.count({ where: whereCondition }),
       ]);
 
-      return {
-        total,
-        data,
-      };
+      return { total, data };
     } catch (error) {
       throw new BadRequestException(error.message);
     }

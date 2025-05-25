@@ -51,6 +51,7 @@ const RegisterPage = () => {
           fullname: values.name,
           email: values.email,
           password: values.password,
+          type: "normal-user",
         });
         router.push("/auth/login");
         dispatch(

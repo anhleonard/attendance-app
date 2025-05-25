@@ -12,6 +12,7 @@ import { Prisma } from '@prisma/client';
 import { FindDetailPaymentDto } from './dto/find-detail-payment.dto';
 import { AttendancesService } from 'src/attendances/attendances.service';
 import { FilterAttendanceDto } from 'src/attendances/dto/filter-attendance.dto';
+import { Status } from 'src/utils/enums';
 
 @Injectable()
 export class PaymentsService {
@@ -91,27 +92,42 @@ export class PaymentsService {
         learningYear,
       } = filterPaymentDto;
 
+      if (!learningMonth || !learningYear) {
+        throw new BadRequestException('Learning month and year are required');
+      }
+
       const skip = (page - 1) * rowPerPage;
       const take = rowPerPage;
+
+      // Lấy danh sách học sinh có current class là classId được chọn
+      const currentClassStudents = classId 
+        ? await this.prismaService.studentClass.findMany({
+            where: {
+              classId: classId,
+              status: Status.ACTIVE,
+            },
+            select: {
+              studentId: true,
+              createdAt: true,
+            },
+            orderBy: {
+              createdAt: 'desc',
+            },
+            distinct: ['studentId'],
+          })
+        : [];
 
       const where: Prisma.PaymentWhereInput = {
         student: {
           name: name ? { contains: name, mode: 'insensitive' } : undefined,
-          classes: classId
-            ? {
-                some: {
-                  classId,
-                },
-              }
+          id: classId 
+            ? { in: currentClassStudents.map(sc => sc.studentId) }
             : undefined,
         },
-        createdAt:
-          learningMonth && learningYear
-            ? {
-                gte: new Date(learningYear, learningMonth - 1, 1),
-                lt: new Date(learningYear, learningMonth, 1),
-              }
-            : undefined,
+        createdAt: {
+          gte: new Date(learningYear, learningMonth - 1, 1),
+          lt: new Date(learningYear, learningMonth, 1),
+        },
       };
 
       const [payments, total] = await Promise.all([
@@ -120,15 +136,66 @@ export class PaymentsService {
           take,
           skip,
           include: {
-            student: true,
+            student: {
+              select: {
+                id: true,
+                name: true,
+                debt: true,
+                classes: {
+                  where: {
+                    status: Status.ACTIVE,
+                  },
+                  select: {
+                    class: {
+                      select: {
+                        id: true,
+                        name: true,
+                      }
+                    },
+                    createdAt: true,
+                  },
+                  orderBy: {
+                    createdAt: 'desc',
+                  },
+                  take: 1,
+                },
+              },
+            },
+            attendances: {
+              include: {
+                session: true,
+              },
+            },
+          },
+          orderBy: {
+            createdAt: 'desc',
           },
         }),
         this.prismaService.payment.count({ where }),
       ]);
 
+      // Transform the data to include attendance statistics and current class
+      const transformedPayments = payments.map(payment => ({
+        ...payment,
+        student: {
+          ...payment.student,
+          currentClass: payment.student.classes[0]?.class || null,
+        },
+        attendanceStats: {
+          total: payment.attendances.length,
+          attended: payment.attendances.filter(a => a.isAttend).length,
+          absent: payment.attendances.filter(a => !a.isAttend).length,
+        },
+      }));
+
+      // Remove the classes array from student object since we only need currentClass
+      transformedPayments.forEach(payment => {
+        delete payment.student.classes;
+      });
+
       return {
         total,
-        data: payments,
+        data: transformedPayments,
       };
     } catch (error) {
       throw new BadRequestException(error.message);

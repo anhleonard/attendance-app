@@ -3,6 +3,7 @@ import {
   IsDate,
   IsNotEmpty,
   IsNumber,
+  IsOptional,
   IsString,
 } from 'class-validator';
 import { Transform } from 'class-transformer';
@@ -21,7 +22,7 @@ export class CreateAttendanceDto {
   isAttend: boolean;
 
   @IsString()
-  @IsNotEmpty()
+  @IsOptional()
   noteAttendance: string;
 
   @Transform(({ value }) => value && new Date(value))

@@ -16,14 +16,33 @@ export class HistoriesService {
     } = filterHistoryDto;
     const skip = (page - 1) * rowPerPage;
 
-    // Lấy danh sách học sinh
+    // Lấy danh sách học sinh có current class là classId được chọn
+    const currentClassStudents = classId 
+      ? await this.prismaService.studentClass.findMany({
+          where: {
+            classId: classId,
+            status: Status.ACTIVE,
+          },
+          select: {
+            studentId: true,
+            createdAt: true,
+          },
+          orderBy: {
+            createdAt: 'desc',
+          },
+          distinct: ['studentId'],
+        })
+      : [];
+
     const [students, totalStudents] = await Promise.all([
       this.prismaService.student.findMany({
         where: {
           name: studentName
             ? { contains: studentName, mode: 'insensitive' }
             : undefined,
-          classes: classId ? { some: { classId: classId } } : undefined,
+          id: classId 
+            ? { in: currentClassStudents.map(sc => sc.studentId) }
+            : undefined,
         },
         select: {
           id: true,
@@ -35,7 +54,7 @@ export class HistoriesService {
               createdAt: true,
               class: true,
             },
-            orderBy: { createdAt: 'asc' }, // Sắp xếp theo thời gian vào lớp
+            orderBy: { createdAt: 'asc' },
           },
         },
         skip,
@@ -46,7 +65,9 @@ export class HistoriesService {
           name: studentName
             ? { contains: studentName, mode: 'insensitive' }
             : undefined,
-          classes: classId ? { some: { classId: classId } } : undefined,
+          id: classId 
+            ? { in: currentClassStudents.map(sc => sc.studentId) }
+            : undefined,
         },
       }),
     ]);

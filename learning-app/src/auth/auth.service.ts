@@ -24,6 +24,13 @@ export class AuthService {
   }
 
   async login(user: User, response: Response) {
+    // Check if user is locked
+    if (user.locked) {
+      throw new UnauthorizedException(
+        'Account is locked. Please contact administrator.',
+      );
+    }
+
     const expires = new Date();
     expires.setMilliseconds(
       expires.getMilliseconds() +

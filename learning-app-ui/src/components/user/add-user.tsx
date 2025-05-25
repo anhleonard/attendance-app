@@ -2,68 +2,131 @@
 import Button from "@/lib/button";
 import TextField from "@/lib/textfield";
 import Select from "@/lib/select";
+import Checkbox from "@/lib/checkbox";
 import { closeDrawer } from "@/redux/slices/drawer-slice";
 import { useDispatch } from "react-redux";
 import { useFormik } from "formik";
 import * as Yup from "yup";
+import Image from "next/image";
+import { useState } from "react";
+import { Permission, Role } from "@/config/enums";
+import { PermissionOptions } from "@/config/constants";
+import { register } from "@/apis/services/auth";
+import { openLoading, closeLoading } from "@/redux/slices/loading-slice";
+import { openAlert } from "@/redux/slices/alert-slice";
+import { refetch } from "@/redux/slices/refetch-slice";
+
+interface WarningProps {
+  title: string;
+  subtitle: string;
+  className?: string;
+}
+
+const Warning: React.FC<WarningProps> = ({ title, subtitle, className = "" }) => {
+  return (
+    <div className={`flex items-start gap-3 p-4 rounded-lg bg-[#FFE8C7]/50 ${className}`}>
+      <div className="flex-shrink-0">
+        <Image src="/icons/warning-icon.svg" alt="warning-icon" width={24} height={24} />
+      </div>
+      <div className="flex-1">
+        <h3 className="font-semibold text-sm text-[#FE9800]">{title}</h3>
+        <p className="text-xs mt-1 text-[#FE9800]">{subtitle}</p>
+      </div>
+    </div>
+  );
+};
 
 interface AddUserFormValues {
-  username: string;
   fullName: string;
   email: string;
-  password: string;
-  confirmPassword: string;
   role: string;
+  permissions?: Permission[];
 }
 
 const validationSchema = Yup.object().shape({
-  username: Yup.string().required("Username is required").min(3, "Username must be at least 3 characters"),
   fullName: Yup.string().required("Full name is required").min(2, "Full name must be at least 2 characters"),
   email: Yup.string().required("Email is required").email("Invalid email format"),
-  password: Yup.string()
-    .required("Password is required")
-    .min(8, "Password must be at least 8 characters")
-    .matches(/[A-Z]/, "Password must contain at least one uppercase letter")
-    .matches(/[a-z]/, "Password must contain at least one lowercase letter")
-    .matches(/[0-9]/, "Password must contain at least one number"),
-  confirmPassword: Yup.string()
-    .required("Please confirm your password")
-    .oneOf([Yup.ref("password")], "Passwords must match"),
   role: Yup.string().required("Role is required").oneOf(["ADMIN", "TA"], "Please select a valid role"),
+  permissions: Yup.array()
+    .of(Yup.string().oneOf(Object.values(Permission)))
+    .when("role", {
+      is: "TA",
+      then: (schema) => schema.min(1, "Please select at least one permission"),
+      otherwise: (schema) => schema.notRequired(),
+    }),
 });
 
 const initialValues: AddUserFormValues = {
-  username: "",
   fullName: "",
   email: "",
-  password: "",
-  confirmPassword: "",
   role: "",
+  permissions: [],
 };
 
 const AddUser = () => {
   const dispatch = useDispatch();
+  const [selectedPermissions, setSelectedPermissions] = useState<string[]>([]);
 
   const formik = useFormik({
     initialValues,
     validationSchema,
-    onSubmit: (values) => {
-      // TODO: Implement add user logic
-      console.log(values);
-      dispatch(closeDrawer());
+    onSubmit: async (values) => {
+      try {
+        dispatch(openLoading());
+        await register({
+          fullname: values.fullName,
+          email: values.email,
+          role: values.role as Role,
+          permissions: values.permissions,
+          type: "system-user",
+        });
+        dispatch(refetch());
+        dispatch(closeDrawer());
+        dispatch(
+          openAlert({
+            isOpen: true,
+            title: "SUCCESS",
+            subtitle: "User has been created successfully!",
+            type: "success",
+          }),
+        );
+      } catch (error: any) {
+        dispatch(
+          openAlert({
+            isOpen: true,
+            title: "ERROR",
+            subtitle: error?.message || "Failed to create user",
+            type: "error",
+          }),
+        );
+      } finally {
+        dispatch(closeLoading());
+      }
     },
   });
 
+  const handleRoleChange = (value: string) => {
+    formik.setFieldValue("role", value);
+    if (value !== "TA") {
+      formik.setFieldValue("permissions", []);
+      setSelectedPermissions([]);
+    } else {
+      formik.validateField("permissions");
+    }
+  };
+
+  const handlePermissionChange = (value: string, checked: boolean) => {
+    const newPermissions = checked ? [...selectedPermissions, value] : selectedPermissions.filter((p) => p !== value);
+
+    setSelectedPermissions(newPermissions);
+    formik.setFieldValue("permissions", newPermissions, true);
+  };
+
   return (
     <form onSubmit={formik.handleSubmit} className="flex flex-col gap-4">
-      <TextField
-        name="username"
-        label="Username"
-        value={formik.values.username}
-        onChange={formik.handleChange}
-        onBlur={formik.handleBlur}
-        error={Boolean(formik.touched.username && formik.errors.username)}
-        helperText={formik.touched.username && formik.errors.username ? String(formik.errors.username) : undefined}
+      <Warning
+        title="Important"
+        subtitle="Please enter a valid email address. The system will send the login credentials to this email."
       />
       <TextField
         name="fullName"
@@ -85,30 +148,6 @@ const AddUser = () => {
         error={Boolean(formik.touched.email && formik.errors.email)}
         helperText={formik.touched.email && formik.errors.email ? String(formik.errors.email) : undefined}
       />
-      <TextField
-        name="password"
-        label="Password"
-        inputType="password"
-        value={formik.values.password}
-        onChange={formik.handleChange}
-        onBlur={formik.handleBlur}
-        error={Boolean(formik.touched.password && formik.errors.password)}
-        helperText={formik.touched.password && formik.errors.password ? String(formik.errors.password) : undefined}
-      />
-      <TextField
-        name="confirmPassword"
-        label="Confirm password"
-        inputType="password"
-        value={formik.values.confirmPassword}
-        onChange={formik.handleChange}
-        onBlur={formik.handleBlur}
-        error={Boolean(formik.touched.confirmPassword && formik.errors.confirmPassword)}
-        helperText={
-          formik.touched.confirmPassword && formik.errors.confirmPassword
-            ? String(formik.errors.confirmPassword)
-            : undefined
-        }
-      />
       <Select
         label="Role"
         options={[
@@ -116,10 +155,40 @@ const AddUser = () => {
           { label: "Teacher Assistant", value: "TA" },
         ]}
         defaultValue={formik.values.role}
-        onChange={(value) => formik.setFieldValue("role", value)}
+        onChange={handleRoleChange}
         error={Boolean(formik.touched.role && formik.errors.role)}
         helperText={formik.touched.role && formik.errors.role ? String(formik.errors.role) : undefined}
       />
+      {formik.values.role === "TA" && (
+        <div className="flex flex-col gap-1">
+          <div className="flex flex-col gap-3 px-4 pt-3 pb-5 border-2 border-grey-c200 rounded-[20px]">
+            <div className="flex flex-col gap-1">
+              <label className="text-sm font-semibold text-grey-c200">
+                Permissions <span className="text-support-c300">*</span>
+              </label>
+            </div>
+            <div className="flex flex-col gap-4">
+              {PermissionOptions.map((option) => (
+                <div key={option.value} className="flex items-center gap-2">
+                  <div
+                    className="flex items-center gap-2 cursor-pointer"
+                    onClick={() => handlePermissionChange(option.value, !selectedPermissions.includes(option.value))}
+                  >
+                    <Checkbox
+                      isChecked={selectedPermissions.includes(option.value)}
+                      onChange={(checked: boolean) => handlePermissionChange(option.value, checked)}
+                    />
+                    <label className="text-sm text-grey-c900 cursor-pointer">{option.label}</label>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+          {formik.touched.permissions && formik.errors.permissions && (
+            <div className="text-xs text-support-c300">{String(formik.errors.permissions)}</div>
+          )}
+        </div>
+      )}
       <Button type="submit" label="Save" className={`w-full py-3.5 mb-6`} />
     </form>
   );

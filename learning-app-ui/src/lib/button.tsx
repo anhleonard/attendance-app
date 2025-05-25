@@ -70,6 +70,18 @@ const Button: FC<Props> = ({
           {endIcon ? endIcon : null}
         </button>
       ) : null}
+
+      {status === "cancel" ? (
+        <button
+          type={type}
+          disabled={disabled}
+          className={`flex items-center justify-center gap-1 bg-grey-c100 w-fit px-4 py-1.5 rounded-full cursor-pointer hover:bg-grey-c200 active:bg-grey-c300 hover:scale-105 duration-300 transition disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 ${className}`}
+        >
+          {startIcon ? startIcon : null}
+          <div className={`text-center font-medium text-sm text-grey-c900`}>{label}</div>
+          {endIcon ? endIcon : null}
+        </button>
+      ) : null}
     </div>
   );
 };

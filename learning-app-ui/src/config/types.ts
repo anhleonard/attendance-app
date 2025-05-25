@@ -90,6 +90,7 @@ export interface Student {
   createdById: number;
   updatedById: number | null;
   classes: StudentClass[];
+  status: Status;
 }
 
 export interface Message {

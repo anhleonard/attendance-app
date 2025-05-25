@@ -4,11 +4,12 @@ import { UsersService } from './users.service';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { CurrentUser } from 'src/auth/decorators/current-user.decorator';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { FilterUsersDto } from './dto/find-users.dto';
 
 @Controller('users')
 export class UsersController {
-  constructor(private readonly usersService: UsersService) { }
-  
+  constructor(private readonly usersService: UsersService) {}
+
   @Post('/create')
   createUser(@Body() createUserDto: CreateUserDto) {
     return this.usersService.createUser(createUserDto);
@@ -22,6 +23,12 @@ export class UsersController {
   @Post('/update')
   updateUser(@Body() updateUserDto: UpdateUserDto) {
     return this.usersService.updateUser(updateUserDto);
+  }
+
+  @Post('/find-users')
+  @UseGuards(JwtAuthGuard)
+  async findAll(@Body() filterUsersDto: FilterUsersDto) {
+    return this.usersService.findUsers(filterUsersDto);
   }
 
   @Post('/profile')

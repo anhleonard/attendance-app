@@ -33,6 +33,11 @@ interface ClassResponse {
   totalStudents?: number;
   attendance?: number;
   absence?: number;
+  statistic?: {
+    total: number;
+    attended: number;
+    absent: number;
+  };
 }
 
 interface Student {
@@ -108,6 +113,7 @@ const Attendance = () => {
   const [page, setPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [notes, setNotes] = useState<{ [key: number]: string }>({});
+  const [isLoading, setIsLoading] = useState(true);
 
   const calculateDuration = (startTime: string, endTime: string): string => {
     const start = new Date(`2000-01-01T${startTime}`);
@@ -139,32 +145,43 @@ const Attendance = () => {
 
   const fetchAttendanceOrStudents = async (classId: number) => {
     try {
-      dispatch(openLoading());
-      // First try to get existing attendance
+      // Fetch attendance data directly with full page size
       const filterData: FilterAttendanceDto = {
         classId: classId,
         learningDate: moment(date, "DD-MM-YYYY").toDate(),
-        page: 1,
-        rowPerPage: 1, // Just check if there's any attendance
+        page: page,
+        rowPerPage: rowsPerPage,
       };
       const attendanceResponse = await getAttendances(filterData);
 
       if (attendanceResponse && attendanceResponse.data.length > 0) {
-        // If attendance exists, fetch full attendance data
+        // If attendance exists, use the data directly
         setIsExistingAttendance(true);
-        const fullAttendanceData = await getAttendances({
-          ...filterData,
-          page: page,
-          rowPerPage: rowsPerPage,
-        });
-        setAttendanceData(fullAttendanceData);
+        setAttendanceData(attendanceResponse);
         setStudentsData({ total: 0, data: [] }); // Clear students data
+        // Set checkedAll based on current attendance status
+        const allAttended = attendanceResponse.data.every((record: AttendanceRecord) => record.isAttend);
+        setCheckedAll(allAttended);
+
+        // Update class statistics
+        setClassesInfo((prevClasses) =>
+          prevClasses.map((classInfo) =>
+            classInfo.id === classId
+              ? {
+                  ...classInfo,
+                  statistic: attendanceResponse.statistic,
+                }
+              : classInfo,
+          ),
+        );
       } else {
         // If no attendance exists, fetch active students
         setIsExistingAttendance(false);
         const studentsResponse = await getStudents({
           classId: classId,
           status: Status.ACTIVE,
+          page: page,
+          rowPerPage: rowsPerPage,
         });
         setStudentsData(studentsResponse);
         setAttendanceData({
@@ -174,11 +191,28 @@ const Attendance = () => {
           rowPerPage: 10,
           data: [],
         }); // Clear attendance data
+        setCheckedAll(false); // Reset checkedAll for new attendance
+
+        // Update class statistics for new attendance
+        setClassesInfo((prevClasses) =>
+          prevClasses.map((classInfo) =>
+            classInfo.id === classId
+              ? {
+                  ...classInfo,
+                  statistic: {
+                    total: studentsResponse.total,
+                    attended: 0,
+                    absent: studentsResponse.total,
+                  },
+                }
+              : classInfo,
+          ),
+        );
       }
     } catch (error) {
       dispatch(openAlert({ isOpen: true, title: "ERROR", subtitle: "Error fetching data", type: "error" }));
     } finally {
-      dispatch(closeLoading());
+      setIsLoading(false);
     }
   };
 
@@ -194,8 +228,13 @@ const Attendance = () => {
       });
       setStudentsData({ total: 0, data: [] });
       setPage(1);
+      setCheckedAll(false);
+      setNotes({});
     } else {
       setSelectedClassId(classId);
+      setPage(1);
+      setCheckedAll(false);
+      setNotes({});
       if (classId) {
         fetchAttendanceOrStudents(classId);
       }
@@ -205,15 +244,62 @@ const Attendance = () => {
   const handleChangeCheckedAll = (value: boolean) => {
     setCheckedAll(value);
     if (isExistingAttendance) {
+      // Update existing attendance records
+      const updatedRecords = attendanceData.data.map((record) => ({
+        ...record,
+        isAttend: value,
+      }));
       setAttendanceData({
         ...attendanceData,
-        data: attendanceData.data.map((record) => ({ ...record, isAttend: value })),
+        data: updatedRecords,
+        statistic: {
+          ...attendanceData.statistic,
+          attended: value ? attendanceData.statistic.total : 0,
+          absent: value ? 0 : attendanceData.statistic.total,
+        },
       });
+
+      // Update class statistics
+      setClassesInfo((prevClasses) =>
+        prevClasses.map((classInfo) =>
+          classInfo.id === selectedClassId
+            ? {
+                ...classInfo,
+                statistic: {
+                  total: attendanceData.statistic.total,
+                  attended: value ? attendanceData.statistic.total : 0,
+                  absent: value ? 0 : attendanceData.statistic.total,
+                },
+              }
+            : classInfo,
+        ),
+      );
     } else {
+      // Update new attendance records
+      const updatedStudents = studentsData.data.map((student) => ({
+        ...student,
+        isAttend: value,
+      }));
       setStudentsData({
         ...studentsData,
-        data: studentsData.data.map((student) => ({ ...student, isAttend: value })),
+        data: updatedStudents,
       });
+
+      // Update class statistics for new attendance
+      setClassesInfo((prevClasses) =>
+        prevClasses.map((classInfo) =>
+          classInfo.id === selectedClassId
+            ? {
+                ...classInfo,
+                statistic: {
+                  total: studentsData.total,
+                  attended: value ? studentsData.total : 0,
+                  absent: value ? 0 : studentsData.total,
+                },
+              }
+            : classInfo,
+        ),
+      );
     }
   };
 
@@ -222,34 +308,112 @@ const Attendance = () => {
       const updatedRecords = attendanceData.data.map((record) =>
         record.id === id ? { ...record, isAttend: value } : record,
       );
+      const allChecked = updatedRecords.every((record) => record.isAttend);
+      const attendedCount = updatedRecords.filter((record) => record.isAttend).length;
+
       setAttendanceData({
         ...attendanceData,
         data: updatedRecords,
+        statistic: {
+          ...attendanceData.statistic,
+          attended: attendedCount,
+          absent: attendanceData.statistic.total - attendedCount,
+        },
       });
-      const allChecked = updatedRecords.every((record) => record.isAttend);
+
+      // Update class statistics
+      setClassesInfo((prevClasses) =>
+        prevClasses.map((classInfo) =>
+          classInfo.id === selectedClassId
+            ? {
+                ...classInfo,
+                statistic: {
+                  total: attendanceData.statistic.total,
+                  attended: attendedCount,
+                  absent: attendanceData.statistic.total - attendedCount,
+                },
+              }
+            : classInfo,
+        ),
+      );
       setCheckedAll(allChecked);
     } else {
       const updatedStudents = studentsData.data.map((student) =>
         student.id === id ? { ...student, isAttend: value } : student,
       );
+      const allChecked = updatedStudents.every((student) => student.isAttend);
+      const attendedCount = updatedStudents.filter((student) => student.isAttend).length;
+
       setStudentsData({
         ...studentsData,
         data: updatedStudents,
       });
-      const allChecked = updatedStudents.every((student) => student.isAttend);
+
+      // Update class statistics for new attendance
+      setClassesInfo((prevClasses) =>
+        prevClasses.map((classInfo) =>
+          classInfo.id === selectedClassId
+            ? {
+                ...classInfo,
+                statistic: {
+                  total: studentsData.total,
+                  attended: attendedCount,
+                  absent: studentsData.total - attendedCount,
+                },
+              }
+            : classInfo,
+        ),
+      );
       setCheckedAll(allChecked);
     }
   };
 
   const handlePageChange = (newPage: number, newRowsPerPage: number) => {
-    if (newRowsPerPage !== rowsPerPage) {
+    const shouldResetPage = newRowsPerPage !== rowsPerPage;
+    if (shouldResetPage) {
       setRowsPerPage(newRowsPerPage);
       setPage(1);
     } else {
       setPage(newPage);
     }
+
     if (selectedClassId) {
-      fetchAttendanceOrStudents(selectedClassId);
+      // Use the new values for the API call
+      const currentPage = shouldResetPage ? 1 : newPage;
+      const currentRowsPerPage = newRowsPerPage;
+
+      if (isExistingAttendance) {
+        const filterData: FilterAttendanceDto = {
+          classId: selectedClassId,
+          learningDate: moment(date, "DD-MM-YYYY").toDate(),
+          page: currentPage,
+          rowPerPage: currentRowsPerPage,
+        };
+        getAttendances(filterData)
+          .then((response) => {
+            setAttendanceData(response);
+          })
+          .catch((error) => {
+            dispatch(
+              openAlert({ isOpen: true, title: "ERROR", subtitle: "Error fetching attendance data", type: "error" }),
+            );
+          });
+      } else {
+        getStudents({
+          classId: selectedClassId,
+          status: Status.ACTIVE,
+          page: currentPage,
+          rowPerPage: currentRowsPerPage,
+        })
+          .then((response) => {
+            setStudentsData(response);
+          })
+          .catch((error) => {
+            dispatch(
+              openAlert({ isOpen: true, title: "ERROR", subtitle: "Error fetching students data", type: "error" }),
+            );
+          });
+      }
     }
   };
 
@@ -330,6 +494,23 @@ const Attendance = () => {
     }
   };
 
+  const handleDateChange = (value: string) => {
+    setDate(value);
+    // Reset all states when date changes
+    setSelectedClassId(null);
+    setCheckedAll(false);
+    setNotes({});
+    setPage(1);
+    setAttendanceData({
+      statistic: { total: 0, attended: 0, absent: 0 },
+      total: 0,
+      page: 1,
+      rowPerPage: 10,
+      data: [],
+    });
+    setStudentsData({ total: 0, data: [] });
+  };
+
   return (
     <div className="p-5">
       <div className="flex flex-row items-center gap-2 mb-8">
@@ -342,13 +523,7 @@ const Attendance = () => {
 
           {/* filter class */}
           <div className="grid grid-cols-4 gap-3 mb-6 mt-4">
-            <DatePicker
-              onChange={(value: string) => {
-                setDate(value);
-              }}
-              defaultDate={date}
-              label="Select date"
-            />
+            <DatePicker onChange={handleDateChange} defaultDate={date} label="Select date" />
             <Select
               label="Select class"
               options={[
@@ -401,9 +576,9 @@ const Attendance = () => {
                           ? calculateDuration(classInfo.sessions[0].startTime, classInfo.sessions[0].endTime)
                           : "0 hours"}
                       </th>
-                      <th className="px-1 py-4">{attendanceData.statistic.total || "--"}</th>
-                      <th className="px-1 py-4">{attendanceData.statistic.attended || "--"}</th>
-                      <th className="px-1 py-4">{attendanceData.statistic.absent || "--"}</th>
+                      <th className="px-1 py-4">{classInfo.statistic?.total || "--"}</th>
+                      <th className="px-1 py-4">{classInfo.statistic?.attended || "--"}</th>
+                      <th className="px-1 py-4">{classInfo.statistic?.absent || "--"}</th>
                       <th className="px-1 py-4 text-center">
                         <Checkbox
                           isChecked={selectedClassId === classInfo.id}
@@ -417,21 +592,70 @@ const Attendance = () => {
             </div>
           </div>
         </div>
-        <div className="flex flex-col gap-3">
-          <div className="flex flex-row items-center justify-between">
-            <div className="font-bold text-base">2. Students</div>
-            <div className="flex flex-row items-center gap-2">
-              <Checkbox isChecked={checkedAll} onChange={handleChangeCheckedAll} />
-              <div>All</div>
+        {selectedClassId && (
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-row items-center justify-between">
+              <div className="font-bold text-base">2. Students</div>
+              <div className="flex flex-row items-center gap-2">
+                <Checkbox isChecked={checkedAll} onChange={handleChangeCheckedAll} />
+                <div>All</div>
+              </div>
             </div>
-          </div>
-          {/* table 2 */}
-          <div className="max-w-[100%] rounded-[10px] overflow-hidden">
-            <div className="overflow-x-auto">
-              {isExistingAttendance ? (
-                // Render attendance records
-                attendanceData.data.length === 0 ? (
-                  <div className="text-center py-4">No attendance records found</div>
+            {/* table 2 */}
+            <div className="max-w-[100%] rounded-[10px] overflow-hidden">
+              <div className="overflow-x-auto">
+                {isLoading ? (
+                  <div className="text-center py-4 w-full flex justify-center items-center">
+                    <Image
+                      src="/images/solid-loading.svg"
+                      alt="solid-loading"
+                      width={28}
+                      height={28}
+                      className="animate-spin"
+                    />
+                  </div>
+                ) : isExistingAttendance ? (
+                  attendanceData.data.length === 0 ? (
+                    <div className="text-center py-4">No attendance records found</div>
+                  ) : (
+                    <table className="table-auto w-full text-left">
+                      <thead className={`text-grey-c700 uppercase bg-primary-c50 font-bold`}>
+                        <tr className="hover:bg-success-c50 hover:text-grey-c700">
+                          <th className="pl-3 py-4">STT</th>
+                          <th className="px-1 py-4">Name</th>
+                          <th className="px-1 py-4">Date</th>
+                          <th className="px-1 py-4">Status</th>
+                          <th className="px-1 py-4">Note</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {attendanceData.data.map((record, index) => (
+                          <tr key={record.id} className="hover:bg-primary-c10">
+                            <th className="pl-3 py-4">{(page - 1) * rowsPerPage + index + 1}</th>
+                            <th className="px-1 py-4">{record.student.name}</th>
+                            <th className="px-1 py-4">{moment(record.learningDate).format("D/M/YYYY")}</th>
+                            <th className="px-1 py-4">
+                              <Checkbox
+                                isChecked={record.isAttend}
+                                onChange={(value: boolean) => handleChangeAttendanceChecked(record.id, value)}
+                              />
+                            </th>
+                            <th className="px-1 py-4">
+                              <TextArea
+                                rows={2}
+                                label="Note of this student"
+                                inputClassName="font-questrial"
+                                value={notes[record.id] || record.noteAttendance || ""}
+                                onChange={(value: string) => handleNoteChange(record.id, value)}
+                              />
+                            </th>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )
+                ) : studentsData.data.length === 0 ? (
+                  <div className="text-center py-4">No students found</div>
                 ) : (
                   <table className="table-auto w-full text-left">
                     <thead className={`text-grey-c700 uppercase bg-primary-c50 font-bold`}>
@@ -444,15 +668,15 @@ const Attendance = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {attendanceData.data.map((record, index) => (
-                        <tr key={record.id} className="hover:bg-primary-c10">
-                          <th className="pl-3 py-4">{(page - 1) * rowsPerPage + index + 1}</th>
-                          <th className="px-1 py-4 font-questrial text-grey-c900 text-[15px]">{record.student.name}</th>
-                          <th className="px-1 py-4">{moment(record.learningDate).format("D/M/YYYY")}</th>
+                      {studentsData.data.map((student, index) => (
+                        <tr key={student.id} className="hover:bg-primary-c10">
+                          <th className="pl-3 py-4">{index + 1}</th>
+                          <th className="px-1 py-4">{student.name}</th>
+                          <th className="px-1 py-4">{moment(date, "DD-MM-YYYY").format("D/M/YYYY")}</th>
                           <th className="px-1 py-4">
                             <Checkbox
-                              isChecked={record.isAttend}
-                              onChange={(value: boolean) => handleChangeAttendanceChecked(record.id, value)}
+                              isChecked={student.isAttend || false}
+                              onChange={(value: boolean) => handleChangeAttendanceChecked(student.id, value)}
                             />
                           </th>
                           <th className="px-1 py-4">
@@ -460,70 +684,29 @@ const Attendance = () => {
                               rows={2}
                               label="Note of this student"
                               inputClassName="font-questrial"
-                              value={notes[record.id] || record.noteAttendance || ""}
-                              onChange={(value: string) => handleNoteChange(record.id, value)}
+                              value={notes[student.id] || ""}
+                              onChange={(value: string) => handleNoteChange(student.id, value)}
                             />
                           </th>
                         </tr>
                       ))}
                     </tbody>
                   </table>
-                )
-              ) : // Render students list
-              studentsData.data.length === 0 ? (
-                <div className="text-center py-4">No students found</div>
-              ) : (
-                <table className="table-auto w-full text-left">
-                  <thead className={`text-grey-c700 uppercase bg-primary-c50 font-bold`}>
-                    <tr className="hover:bg-success-c50 hover:text-grey-c700">
-                      <th className="pl-3 py-4">STT</th>
-                      <th className="px-1 py-4">Name</th>
-                      <th className="px-1 py-4">Date</th>
-                      <th className="px-1 py-4">Status</th>
-                      <th className="px-1 py-4">Note</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {studentsData.data.map((student, index) => (
-                      <tr key={student.id} className="hover:bg-primary-c10">
-                        <th className="pl-3 py-4">{index + 1}</th>
-                        <th className="px-1 py-4 font-questrial text-grey-c900 text-[15px]">{student.name}</th>
-                        <th className="px-1 py-4">{moment(date, "DD-MM-YYYY").format("D/M/YYYY")}</th>
-                        <th className="px-1 py-4">
-                          <Checkbox
-                            isChecked={student.isAttend || false}
-                            onChange={(value: boolean) => handleChangeAttendanceChecked(student.id, value)}
-                          />
-                        </th>
-                        <th className="px-1 py-4">
-                          <TextArea
-                            rows={2}
-                            label="Note of this student"
-                            inputClassName="font-questrial"
-                            value={notes[student.id] || ""}
-                            onChange={(value: string) => handleNoteChange(student.id, value)}
-                          />
-                        </th>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
+                )}
+              </div>
             </div>
-          </div>
-          {/* end table */}
-          <div className="flex items-center gap-8 justify-end mt-2">
-            <Button label="Save" className="!py-2.5 !px-5" status="success" onClick={handleSaveAttendance} />
-            {isExistingAttendance && (
+            {/* end table */}
+            <div className="flex items-center gap-8 justify-end mt-2">
+              <Button label="Save" className="!py-2.5 !px-5" status="success" onClick={handleSaveAttendance} />
               <Pagination
-                totalItems={attendanceData.total}
+                totalItems={isExistingAttendance ? attendanceData.total : studentsData.total}
                 rowsEachPage={rowsPerPage}
                 nowPage={page}
                 onPageChange={handlePageChange}
               />
-            )}
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );

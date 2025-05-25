@@ -17,6 +17,14 @@ export class UpdateUserDto {
   @IsOptional()
   fullname: string;
 
+  @IsString()
+  @IsOptional()
+  email: string;
+
+  @IsString()
+  @IsOptional()
+  role: string;
+
   @IsArray()
   @IsOptional()
   permissions: Permission[];

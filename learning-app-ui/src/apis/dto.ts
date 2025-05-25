@@ -8,9 +8,10 @@ export interface LoginDto {
 export interface RegisterDto {
   fullname: string;
   email: string;
-  password: string;
+  password?: string;
   role?: Role;
   permissions?: Permission[];
+  type?: "normal-user" | "system-user";
 }
 
 export interface CreateSessionDto {
@@ -130,4 +131,56 @@ export interface FilterMessageDto {
 export interface UpdateMessageDto {
   messageId: number;
   isSaved: boolean;
+}
+
+export interface FilterPaymentDto {
+  name?: string; // the name of student
+  page?: number;
+  rowPerPage?: number;
+  classId?: number;
+  learningMonth?: number;
+  learningYear?: number;
+}
+
+export interface FilterHistoryDto {
+  studentName?: string;
+  classId?: number;
+  page?: number;
+  rowPerPage?: number;
+}
+
+export interface FilterUsersDto {
+  page?: number;
+  limit?: number;
+  fullname?: string;
+  role?: Role;
+}
+
+export interface UserResponse {
+  id: number;
+  email: string;
+  fullname: string;
+  role: Role;
+  locked: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface UsersResponse {
+  data: UserResponse[];
+  meta: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
+}
+
+export interface UpdateUserDto {
+  id: number;
+  fullname?: string;
+  email?: string;
+  role?: Role;
+  permissions?: Permission[];
+  locked?: boolean;
 }

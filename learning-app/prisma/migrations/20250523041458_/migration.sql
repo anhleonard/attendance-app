@@ -112,6 +112,7 @@ CREATE TABLE "Attendance" (
 CREATE TABLE "Payment" (
     "id" SERIAL NOT NULL,
     "totalSessions" INTEGER NOT NULL,
+    "totalAttend" INTEGER NOT NULL,
     "totalMonthAmount" INTEGER NOT NULL,
     "totalPayment" INTEGER NOT NULL,
     "paidPayment" INTEGER,

@@ -88,6 +88,7 @@ model Student {
   phoneNumber       String
   secondPhoneNumber String?
   debt              Int      @default(0) // còn nợ bao nhiêu cho đến nay
+  status            Status   @default(ACTIVE)
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
@@ -166,13 +167,14 @@ model Attendance {
 
 model Payment {
   id               Int           @id @default(autoincrement())
-  totalSessions    Int
-  totalMonthAmount Int // tiền của tháng này
-  totalPayment     Int // tổng phải trả = totalMonthAmount + debt (lấy ở student)
-  paidPayment      Int? // số tiền đã trả
+  totalSessions    Int          // tổng số buổi đã được điểm danh (có thể là tham gia hoặc không tham gia)
+  totalAttend      Int          // số buổi đã tham gia
+  totalMonthAmount Int          // tiền của tháng này
+  totalPayment     Int          // tổng phải trả = totalMonthAmount + debt (lấy ở student)
+  paidPayment      Int?         // số tiền đã trả
   status           PaymentStatus @default(SAVED) // Sent, Paid, Saved
   paymentNote      String        @default("") // default: Sent via Zalo //maybe null
-  sentAt           DateTime? // Sent lúc nào?? //chỉ update khi status = sent
+  sentAt           DateTime?     // Sent lúc nào?? //chỉ update khi status = sent
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
 

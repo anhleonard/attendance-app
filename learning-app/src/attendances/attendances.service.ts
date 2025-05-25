@@ -69,60 +69,75 @@ export class AttendancesService {
       // TASK: update payment based on attendance //
       const { isAttend } = createdAttendance;
 
-      // Nếu học sinh không tham gia, không cập nhật payment
-      if (!isAttend) return createdAttendance;
-
       // Xác định tháng và năm của buổi học từ learningDate
-      const attendanceMonth = learningDate.getMonth() + 1;
-      const attendanceYear = learningDate.getFullYear();
+      const attendanceDate = new Date(learningDate);
+      const attendanceMonth = attendanceDate.getMonth() + 1;
+      const attendanceYear = attendanceDate.getFullYear();
 
       // Lấy Payment hiện tại của tháng
       let payment = await this.prismaService.payment.findFirst({
         where: {
           studentId,
           createdAt: {
-            gte: new Date(attendanceYear, attendanceMonth - 1, 1), // Ngày đầu tháng
-            lt: new Date(attendanceYear, attendanceMonth, 1), // Ngày đầu tháng sau
+            gte: new Date(attendanceYear, attendanceMonth - 1, 1),
+            lt: new Date(attendanceYear, attendanceMonth, 1),
           },
         },
       });
 
       if (!payment) {
         // Nếu chưa có Payment, tạo mới
-        payment = await this.prismaService.payment.create({
-          data: {
-            totalSessions: 1,
-            totalMonthAmount: foundSession.amount,
-            totalPayment: foundSession.amount + studentClass.student.debt,
-            status: 'SAVED',
-            student: { connect: { id: studentId } },
-          },
-        });
-      } else {
-        // Nếu đã có Payment, chỉ cộng thêm buổi học mới và số tiền mới
-        payment = await this.prismaService.payment.update({
-          where: { id: payment.id },
-          data: {
-            totalSessions: { increment: 1 }, // Cộng thêm 1 buổi học
-            totalMonthAmount: { increment: foundSession.amount }, // Cộng thêm tiền buổi học mới
-            totalPayment: {
-              increment: foundSession.amount, // Cộng dồn vào tổng tiền cần thanh toán, chỗ này do cộng dồn với payment nên không có debt ở đây
+        try {
+          payment = await this.prismaService.payment.create({
+            data: {
+              totalSessions: 1, // Tăng tổng số buổi đã điểm danh (bất kể đi học hay không)
+              totalAttend: isAttend ? 1 : 0, // Tăng số buổi tham gia (chỉ khi đi học)
+              totalMonthAmount: isAttend ? foundSession.amount : 0, // Chỉ tính tiền nếu đi học
+              totalPayment: isAttend
+                ? foundSession.amount + studentClass.student.debt
+                : studentClass.student.debt,
+              status: 'SAVED',
+              student: { connect: { id: studentId } },
             },
-          },
-        });
+          });
+        } catch (error) {
+          console.error('Error creating payment:', error);
+          throw error;
+        }
+      } else {
+        // Nếu đã có Payment, cập nhật thêm buổi học mới
+        try {
+          const updateData = {
+            totalSessions: { increment: 1 }, // Luôn tăng tổng số buổi đã điểm danh
+            totalAttend: { increment: isAttend ? 1 : 0 }, // Chỉ tăng số buổi tham gia nếu đi học
+            totalMonthAmount: { increment: isAttend ? foundSession.amount : 0 }, // Chỉ cộng tiền nếu đi học
+            totalPayment: {
+              increment: isAttend ? foundSession.amount : 0, // Chỉ cộng tiền nếu đi học
+            },
+          };
+
+          payment = await this.prismaService.payment.update({
+            where: { id: payment.id },
+            data: updateData,
+          });
+        } catch (error) {
+          console.error('Error updating payment:', error);
+          throw error;
+        }
       }
 
       // Cập nhật attendance với paymentId
-      await this.prismaService.attendance.update({
+      const updatedAttendance = await this.prismaService.attendance.update({
         where: { id: createdAttendance.id },
         data: { payment: { connect: { id: payment.id } } },
       });
 
       return {
-        createdAttendance,
+        createdAttendance: updatedAttendance,
         payment: payment ?? 'No payment updated',
       };
     } catch (error) {
+      console.error('Error in createAttendance:', error);
       throw new BadRequestException(error.message);
     }
   }
@@ -146,18 +161,30 @@ export class AttendancesService {
       throw new NotFoundException('Attendance not found');
     }
 
-    if (rest.isAttend === foundAttendance.isAttend) {
-      return rest.noteAttendance !== foundAttendance.noteAttendance
-        ? await this.prismaService.attendance.update({
-            where: { id: attendanceId },
-            data: {
-              noteAttendance: rest.noteAttendance,
-              updatedBy: { connect: { id: user.userId } },
-            },
-          })
-        : {
-            message: 'Nothing to update',
-          };
+    // Check if there are any changes to update
+    const hasChanges =
+      rest.isAttend !== foundAttendance.isAttend ||
+      (rest.noteAttendance !== undefined &&
+        rest.noteAttendance !== foundAttendance.noteAttendance);
+
+    if (!hasChanges) {
+      return {
+        message: 'Nothing to update',
+      };
+    }
+
+    // If only noteAttendance changed and isAttend remains the same
+    if (
+      rest.isAttend === foundAttendance.isAttend &&
+      rest.noteAttendance !== undefined
+    ) {
+      return await this.prismaService.attendance.update({
+        where: { id: attendanceId },
+        data: {
+          noteAttendance: rest.noteAttendance,
+          updatedBy: { connect: { id: user.userId } },
+        },
+      });
     }
 
     // no permission to update for previous months
@@ -344,27 +371,34 @@ export class AttendancesService {
         throw new NotFoundException('Class not found');
       }
 
-      // Lấy danh sách học sinh đang học trong lớp
-      const activeStudents = await this.prismaService.studentClass.findMany({
-        where: {
-          classId,
-          status: 'ACTIVE',
-        },
-        include: {
-          student: true,
-        },
-      });
+      // Chỉ kiểm tra học sinh đang học trong lớp nếu learningDate là ngày tương lai
+      const currentDate = new Date();
+      currentDate.setHours(0, 0, 0, 0);
+      const targetDate = new Date(learningDate);
+      targetDate.setHours(0, 0, 0, 0);
 
-      const activeStudentIds = new Set(
-        activeStudents.map((sc) => sc.studentId),
-      );
+      let activeStudentIds: Set<number>;
+      if (targetDate > currentDate) {
+        // Lấy danh sách học sinh đang học trong lớp chỉ khi là ngày tương lai
+        const activeStudents = await this.prismaService.studentClass.findMany({
+          where: {
+            classId,
+            status: 'ACTIVE',
+          },
+          include: {
+            student: true,
+          },
+        });
+
+        activeStudentIds = new Set(activeStudents.map((sc) => sc.studentId));
+      }
 
       // Kiểm tra và cập nhật từng điểm danh
       const updatePromises = attendances.map(async (attendance) => {
         const { studentId, sessionId, attendanceId } = attendance;
 
-        // Kiểm tra học sinh có thuộc lớp không
-        if (!activeStudentIds.has(studentId)) {
+        // Chỉ kiểm tra học sinh có thuộc lớp không nếu là ngày tương lai
+        if (targetDate > currentDate && !activeStudentIds.has(studentId)) {
           throw new BadRequestException(
             `Student ${studentId} does not belong to this class`,
           );

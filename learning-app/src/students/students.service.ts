@@ -28,12 +28,26 @@ export class StudentsService {
         name: name
           ? ({ contains: name, mode: 'insensitive' } as Prisma.StringFilter)
           : undefined,
-        classes: {
-          some: {
-            classId: classId || undefined,
-            status: status || undefined,
-          },
-        },
+        ...(status && { status }),
+        // Nếu có classId và status là ACTIVE, chỉ lấy học sinh đang học trong lớp đó
+        ...(classId && status === 'ACTIVE'
+          ? {
+              classes: {
+                some: {
+                  classId,
+                  status: 'ACTIVE',
+                },
+              },
+            }
+          : classId
+            ? {
+                classes: {
+                  some: {
+                    classId,
+                  },
+                },
+              }
+            : {}),
       };
 
       const [data, total] = await Promise.all([
@@ -43,6 +57,10 @@ export class StudentsService {
           take: rowPerPage,
           include: {
             classes: {
+              where:
+                classId && status === 'ACTIVE'
+                  ? { classId, status: 'ACTIVE' }
+                  : { status: 'ACTIVE' },
               include: {
                 class: true,
               },
@@ -137,7 +155,7 @@ export class StudentsService {
 
   async updateStudent(updateStudentDto: UpdateStudentDto, user: TokenPayload) {
     try {
-      const { id: studentId, classId, ...rest } = updateStudentDto;
+      const { id: studentId, classId, status, ...rest } = updateStudentDto;
 
       // Kiểm tra xem student có tồn tại hay không
       const existingStudent = await this.prismaService.student.findUnique({
@@ -166,15 +184,15 @@ export class StudentsService {
         }
       }
 
-      // Kiểm tra xem tên mới có bị trùng với học sinh khác trong lớp không
-      if (targetClassId) {
+      // Chỉ kiểm tra tên trùng lặp nếu có thay đổi tên
+      if (rest.name && rest.name !== existingStudent.name && targetClassId) {
         const existingStudentClass =
           await this.prismaService.studentClass.findFirst({
             where: {
               classId: targetClassId,
               student: {
-                name: rest.name, // Kiểm tra tên mới
-                NOT: { id: studentId }, // Loại trừ học sinh đang cập nhật
+                name: rest.name,
+                NOT: { id: studentId },
               },
               status: 'ACTIVE',
             },
@@ -192,6 +210,8 @@ export class StudentsService {
         where: { id: studentId },
         data: {
           ...rest,
+          status: status || existingStudent.status,
+          updatedById: user.userId,
         },
       });
 
@@ -210,6 +230,14 @@ export class StudentsService {
             classId,
             status: 'ACTIVE',
           },
+        });
+      }
+
+      // Nếu status của học sinh là INACTIVE, cập nhật tất cả các lớp của học sinh đó thành INACTIVE
+      if (status === 'INACTIVE') {
+        await this.prismaService.studentClass.updateMany({
+          where: { studentId, status: 'ACTIVE' },
+          data: { status: 'INACTIVE' },
         });
       }
 

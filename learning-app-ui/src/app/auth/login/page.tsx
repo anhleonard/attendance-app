@@ -1,5 +1,5 @@
 "use client";
-import { Class, ModalState } from "@/config/types";
+import { Class, ModalState, Student } from "@/config/types";
 import Button from "@/lib/button";
 import TextField from "@/lib/textfield";
 import { openModal } from "@/redux/slices/modal-slice";
@@ -14,10 +14,11 @@ import { login } from "@/apis/services/auth";
 import { LoginDto } from "@/apis/dto";
 import { closeLoading, openLoading } from "@/redux/slices/loading-slice";
 import { openAlert } from "@/redux/slices/alert-slice";
-import { ACTIVE_CLASSES, USER_INFO, ACCESS_TOKEN } from "@/config/constants";
+import { ACTIVE_CLASSES, USER_INFO, ACCESS_TOKEN, ACTIVE_STUDENTS } from "@/config/constants";
 import { getUserInfo } from "@/apis/services/users";
 import { getClasses } from "@/apis/services/classes";
 import { Status } from "@/config/enums";
+import { getStudents } from "@/apis/services/students";
 
 const validationSchema = Yup.object({
   email: Yup.string().email("Invalid email format").required("Email is required"),
@@ -47,8 +48,15 @@ const LoginPage = () => {
 
         if (response?.token) {
           localStorage.setItem(ACCESS_TOKEN, response.token);
+          // get user info
           const userInfo = await getUserInfo();
+          // get active classes
           const activeClasses = await getClasses({
+            fetchAll: true,
+            status: Status.ACTIVE,
+          });
+          // get active students
+          const studentList = await getStudents({
             fetchAll: true,
             status: Status.ACTIVE,
           });
@@ -58,6 +66,13 @@ const LoginPage = () => {
               value: cls.id.toString(),
             }));
             localStorage.setItem(ACTIVE_CLASSES, JSON.stringify(mappedActiveClasses));
+          }
+          if (studentList?.data?.length > 0) {
+            const mappedActiveStudents = studentList?.data?.map((student: Student) => ({
+              label: student.name,
+              value: student.id.toString(),
+            }));
+            localStorage.setItem(ACTIVE_STUDENTS, JSON.stringify(mappedActiveStudents));
           }
           localStorage.setItem(USER_INFO, JSON.stringify(userInfo));
           router.push("/calendar");
@@ -75,7 +90,7 @@ const LoginPage = () => {
           openAlert({
             isOpen: true,
             title: "ERROR",
-            subtitle: "Something went wrong. Please try again.",
+            subtitle: error?.message || "Something went wrong. Please try again.",
             type: "error",
           }),
         );

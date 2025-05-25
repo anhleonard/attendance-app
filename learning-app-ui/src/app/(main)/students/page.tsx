@@ -1,5 +1,6 @@
 "use client";
-import { getStudents } from "@/apis/services/students";
+import { getStudents, updateStudent } from "@/apis/services/students";
+import { UpdateStudentDto } from "@/apis/dto";
 import AddStudent from "@/components/student/add-student";
 import EditStudent from "@/components/student/edit-student";
 import { ConfirmState, ModalState, Student, StudentClass } from "@/config/types";
@@ -7,7 +8,7 @@ import Button from "@/lib/button";
 import Pagination from "@/lib/pagination";
 import Select from "@/lib/select";
 import TextField from "@/lib/textfield";
-import { openConfirm } from "@/redux/slices/confirm-slice";
+import { openConfirm, closeConfirm } from "@/redux/slices/confirm-slice";
 import { openDrawer } from "@/redux/slices/drawer-slice";
 import Image from "next/image";
 import React, { useEffect, useState } from "react";
@@ -20,6 +21,7 @@ import { Status } from "@/config/enums";
 import { closeLoading } from "@/redux/slices/loading-slice";
 import { openLoading } from "@/redux/slices/loading-slice";
 import { openAlert } from "@/redux/slices/alert-slice";
+import Label from "@/lib/label";
 
 interface StudentsResponse {
   total: number;
@@ -31,6 +33,8 @@ const Students = () => {
   const [studentsData, setStudentsData] = useState<StudentsResponse>({ total: 0, data: [] });
   const [page, setPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [filterName, setFilterName] = useState("");
+  const [filterStatus, setFilterStatus] = useState<Status | undefined>(undefined);
   const refetchCount = useSelector((state: RootState) => state.refetch.count);
 
   const fetchStudents = async (currentPage: number, currentRowsPerPage: number) => {
@@ -39,6 +43,8 @@ const Students = () => {
       const response = await getStudents({
         page: currentPage,
         rowPerPage: currentRowsPerPage,
+        name: filterName,
+        ...(filterStatus && { status: filterStatus }),
       });
       if (response) {
         setStudentsData(response);
@@ -60,6 +66,57 @@ const Students = () => {
   useEffect(() => {
     fetchStudents(page, rowsPerPage);
   }, [page, rowsPerPage, refetchCount]);
+
+  const handleFilter = () => {
+    setPage(1); // Reset to first page when filtering
+    fetchStudents(1, rowsPerPage);
+  };
+
+  const handleResetFilter = () => {
+    // Reset states first
+    setFilterName("");
+    setFilterStatus(undefined);
+    setPage(1);
+    
+    // Call API with empty filters
+    dispatch(openLoading());
+    getStudents({
+      page: 1,
+      rowPerPage: rowsPerPage,
+      name: "",
+      status: undefined,
+    })
+      .then((response) => {
+        if (response) {
+          setStudentsData(response);
+        }
+      })
+      .catch((err: any) => {
+        dispatch(
+          openAlert({
+            isOpen: true,
+            title: "ERROR",
+            subtitle: err?.message || "Failed to reset students list",
+            type: "error",
+          }),
+        );
+      })
+      .finally(() => {
+        dispatch(closeLoading());
+      });
+  };
+
+  const handleNameChange = (value: string | React.ChangeEvent<HTMLInputElement>) => {
+    if (typeof value === 'string') {
+      setFilterName(value);
+    } else {
+      setFilterName(value.target.value);
+    }
+  };
+
+  const handleStatusChange = (value: string) => {
+    setFilterStatus(value as Status);
+  };
 
   const handlePageChange = (newPage: number, newRowsPerPage: number) => {
     if (newRowsPerPage !== rowsPerPage) {
@@ -90,13 +147,44 @@ const Students = () => {
     dispatch(openDrawer(drawer));
   };
 
-  const handleOpenConfirmDelete = () => {
+  const handleOpenConfirmChangeStatus = (student: Student) => {
     const confirm: ConfirmState = {
       isOpen: true,
       title: "Are you sure?",
-      subtitle: "This action cannot be undone. All values associated in this student will be lost.",
-      titleAction: "Delete",
-      handleAction: () => {},
+      subtitle: `Are you sure you want to ${student?.status === Status.ACTIVE ? "disable" : "enable"} this student?`,
+      titleAction: student?.status === Status.ACTIVE ? "Disable" : "Enable",
+      handleAction: async () => {
+        try {
+          dispatch(openLoading());
+          const studentData = {
+            id: student?.id,
+            status: student?.status === Status.ACTIVE ? Status.INACTIVE : Status.ACTIVE,
+          } as UpdateStudentDto;
+
+          await updateStudent(studentData);
+          dispatch(
+            openAlert({
+              isOpen: true,
+              title: "SUCCESS",
+              subtitle: `Student ${student?.status === Status.ACTIVE ? "disabled" : "enabled"} successfully!`,
+              type: "success",
+            }),
+          );
+        } catch (error: any) {
+          dispatch(
+            openAlert({
+              isOpen: true,
+              title: "ERROR",
+              subtitle: error?.message || "Failed to update student",
+              type: "error",
+            }),
+          );
+        } finally {
+          dispatch(closeLoading());
+          dispatch(closeConfirm());
+          dispatch(refetch());
+        }
+      },
     };
 
     dispatch(openConfirm(confirm));
@@ -121,15 +209,35 @@ const Students = () => {
         <div className="grid grid-cols-6 gap-3 mb-5 mt-4">
           <div className="col-span-4 grid sm:grid-cols-4 sm:gap-3">
             <div className="sm:col-span-2">
-              <TextField label="Search name" />
+              <TextField 
+                label="Search name" 
+                value={filterName}
+                onChange={handleNameChange}
+              />
             </div>
             <Select
               label="Status"
+              defaultValue={filterStatus}
+              onChange={handleStatusChange}
               options={[
-                { label: "Active", value: "ACTIVE" },
-                { label: "Inactive", value: "INACTIVE" },
+                { label: "Active", value: Status.ACTIVE },
+                { label: "Inactive", value: Status.INACTIVE },
               ]}
             />
+            <div className="flex flex-row gap-3">
+              <Button 
+                label="Filter" 
+                className="py-[13px] px-8" 
+                status="success" 
+                onClick={handleFilter}
+              />
+              <Button 
+                label="Cancel" 
+                className="py-[13px] px-8" 
+                status="cancel" 
+                onClick={handleResetFilter}
+              />
+            </div>
           </div>
           <div className="col-span-2 text-end">
             {/* put item center when use grid */}
@@ -158,6 +266,7 @@ const Students = () => {
                   <th className="px-1 py-4">Parent</th>
                   <th className="px-1 py-4">Phone number</th>
                   <th className="px-1 py-4">Secondary</th>
+                  <th className="px-1 py-4">Status</th>
                   <th className="px-1 py-4 text-center">Actions</th>
                 </tr>
               </thead>
@@ -165,12 +274,18 @@ const Students = () => {
                 {studentsData?.data?.map((student, index) => (
                   <tr key={student.id} className="hover:bg-primary-c10 hover:text-grey-c700">
                     <th className="pl-3 py-4">{(page - 1) * rowsPerPage + index + 1}</th>
-                    <th className="px-1 py-4 font-questrial text-grey-c900 text-[15px]">{student.name}</th>
+                    <th className="px-1 py-4">{student.name}</th>
                     <th className="px-1 py-4">{moment(student.dob).format("DD/MM/YYYY")}</th>
                     <th className="px-1 py-4">{getActiveClassName(student.classes)}</th>
-                    <th className="px-1 py-4 font-questrial text-grey-c900 text-[15px]">{student.parent}</th>
+                    <th className="px-1 py-4">{student.parent}</th>
                     <th className="px-1 py-4">{student.phoneNumber}</th>
                     <th className="px-1 py-4">{student.secondPhoneNumber || "-"}</th>
+                    <th className="px-1 py-4">
+                      <Label
+                        status={student.status === Status.ACTIVE ? "success" : "error"}
+                        label={student.status}
+                      />
+                    </th>
                     <th className="px-1 py-4 text-center">
                       <div className="flex justify-center items-center gap-3">
                         <button
@@ -183,13 +298,17 @@ const Students = () => {
                         <Tooltip id={`edit-icon-${student?.id}`} />
 
                         <button
-                          data-tooltip-id={`delete-icon-${student?.id}`}
-                          data-tooltip-content="Delete"
-                          onClick={handleOpenConfirmDelete}
+                          data-tooltip-id={`confirm-icon-${student?.id}`}
+                          data-tooltip-content={student?.status === Status.ACTIVE ? "Disable" : "Enable"}
+                          onClick={() => handleOpenConfirmChangeStatus(student)}
                         >
-                          <Image src="/icons/delete-icon.svg" alt="delete-icon" width={24} height={24} />
+                          {student?.status === Status.ACTIVE ? (
+                            <Image src="/icons/disabled-icon.svg" alt="disabled-icon" width={22} height={22} />
+                          ) : (
+                            <Image src={"/icons/enabled-icon.svg"} alt="enabled-icon" width={23} height={23} />
+                          )}
                         </button>
-                        <Tooltip id={`delete-icon-${student?.id}`} />
+                        <Tooltip id={`confirm-icon-${student?.id}`} />
                       </div>
                     </th>
                   </tr>

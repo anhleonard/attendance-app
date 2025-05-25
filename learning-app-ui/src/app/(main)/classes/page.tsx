@@ -34,6 +34,8 @@ const Classes = () => {
   const [classesData, setClassesData] = useState<ClassesResponse>({ total: 0, data: [] });
   const [page, setPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [filterName, setFilterName] = useState("");
+  const [filterStatus, setFilterStatus] = useState<Status | undefined>(undefined);
   const refetchCount = useSelector((state: RootState) => state.refetch.count);
 
   const fetchClasses = async (currentPage: number, currentRowsPerPage: number) => {
@@ -42,6 +44,8 @@ const Classes = () => {
       const response = await getClasses({
         page: currentPage,
         rowPerPage: currentRowsPerPage,
+        name: filterName,
+        status: filterStatus,
       });
       setClassesData(response);
     } catch (err: any) {
@@ -61,6 +65,57 @@ const Classes = () => {
   useEffect(() => {
     fetchClasses(page, rowsPerPage);
   }, [page, rowsPerPage, refetchCount]);
+
+  const handleFilter = () => {
+    setPage(1); // Reset to first page when filtering
+    fetchClasses(1, rowsPerPage);
+  };
+
+  const handleResetFilter = () => {
+    // Reset states first
+    setFilterName("");
+    setFilterStatus(undefined);
+    setPage(1);
+    
+    // Call API with empty filters
+    dispatch(openLoading());
+    getClasses({
+      page: 1,
+      rowPerPage: rowsPerPage,
+      name: "",
+      status: undefined,
+    })
+      .then((response) => {
+        if (response) {
+          setClassesData(response);
+        }
+      })
+      .catch((err: any) => {
+        dispatch(
+          openAlert({
+            isOpen: true,
+            title: "ERROR",
+            subtitle: err?.message || "Failed to reset classes list",
+            type: "error",
+          }),
+        );
+      })
+      .finally(() => {
+        dispatch(closeLoading());
+      });
+  };
+
+  const handleNameChange = (value: string | React.ChangeEvent<HTMLInputElement>) => {
+    if (typeof value === 'string') {
+      setFilterName(value);
+    } else {
+      setFilterName(value.target.value);
+    }
+  };
+
+  const handleStatusChange = (value: string) => {
+    setFilterStatus(value as Status);
+  };
 
   const handlePageChange = (newPage: number, newRowsPerPage: number) => {
     if (newRowsPerPage !== rowsPerPage) {
@@ -158,15 +213,35 @@ const Classes = () => {
         <div className="grid grid-cols-6 gap-3 mb-5 mt-4">
           <div className="col-span-4 grid sm:grid-cols-4 sm:gap-3">
             <div className="sm:col-span-2">
-              <TextField label="Search class" />
+              <TextField 
+                label="Search class" 
+                value={filterName}
+                onChange={handleNameChange}
+              />
             </div>
             <Select
               label="Status"
+              defaultValue={filterStatus}
+              onChange={handleStatusChange}
               options={[
-                { label: "Active", value: "ACTIVE" },
-                { label: "Inactive", value: "INACTIVE" },
+                { label: "Active", value: Status.ACTIVE },
+                { label: "Inactive", value: Status.INACTIVE },
               ]}
             />
+            <div className="flex flex-row gap-3">
+              <Button 
+                label="Filter" 
+                className="py-[13px] px-8" 
+                status="success" 
+                onClick={handleFilter}
+              />
+              <Button 
+                label="Cancel" 
+                className="py-[13px] px-8" 
+                status="cancel" 
+                onClick={handleResetFilter}
+              />
+            </div>
           </div>
           <div className="col-span-2 text-end">
             {/* put item center when use grid */}
@@ -191,7 +266,7 @@ const Classes = () => {
                   <th className="pl-3 py-4">STT</th>
                   <th className="px-1 py-4">Name</th>
                   <th className="px-1 py-4">Created at</th>
-                  <th className="px-1 py-4">Total sessions</th>
+                  <th className="px-1 py-4">Sessions</th>
                   <th className="px-1 py-4">Average amount</th>
                   <th className="px-1 py-4">Status</th>
                   <th className="px-1 py-4 text-center">Actions</th>
