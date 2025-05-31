@@ -2,7 +2,7 @@
 import Image from "next/image";
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import TextArea from "@/lib/textarea";
+import TextArea, { TextAreaRef } from "@/lib/textarea";
 import { useRouter } from "next/navigation";
 import { Tooltip } from "react-tooltip";
 import { openModal } from "@/redux/slices/modal-slice";
@@ -18,6 +18,7 @@ import { FilterChatDto, FilterMessageDto, UpdateChatDto, UpdateMessageDto } from
 import { getMessages, updateMessage } from "@/apis/services/messages";
 import { RootState } from "@/redux/store";
 import { refetch } from "@/redux/slices/refetch-slice";
+import debounce from "lodash.debounce";
 
 interface MessageResponse {
   data: Array<{
@@ -101,9 +102,9 @@ const ChatHistoryItem = ({ chat, onEdit, onDelete }: ChatHistoryItemProps) => {
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
+    if (e.key === "Enter") {
       handleSaveEdit();
-    } else if (e.key === 'Escape') {
+    } else if (e.key === "Escape") {
       setIsEditing(false);
       setEditedTitle(chat.title);
     }
@@ -112,7 +113,7 @@ const ChatHistoryItem = ({ chat, onEdit, onDelete }: ChatHistoryItemProps) => {
   const handleDelete = () => {
     const confirm: ConfirmState = {
       isOpen: true,
-      title: 'Delete chat',
+      title: "Delete chat",
       subtitle: "Are you sure you want to delete this chat? This action cannot be undone.",
       titleAction: "Delete",
       handleAction: () => {
@@ -146,7 +147,9 @@ const ChatHistoryItem = ({ chat, onEdit, onDelete }: ChatHistoryItemProps) => {
         ) : (
           <div className="font-medium text-[15px] text-black/90 mb-1 truncate pr-16">{chat.title}</div>
         )}
-        <div className="text-[12px] text-grey-c500">{chat.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</div>
+        <div className="text-[12px] text-grey-c500">
+          {chat.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+        </div>
       </div>
       {!isEditing && (
         <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -211,135 +214,137 @@ const groupChatHistory = (chats: ChatHistory[]): GroupedChatHistory[] => {
 };
 
 // Add new ChatMessages component
-const ChatMessages = React.memo(({ 
-  messages, 
-  welcomeState, 
-  shouldScroll,
-  isLoading
-}: { 
-  messages: Message[], 
-  welcomeState: WelcomeState,
-  shouldScroll: boolean,
-  isLoading: boolean
-}) => {
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const dispatch = useDispatch();
+const ChatMessages = React.memo(
+  ({
+    messages,
+    welcomeState,
+    shouldScroll,
+    isLoading,
+  }: {
+    messages: Message[];
+    welcomeState: WelcomeState;
+    shouldScroll: boolean;
+    isLoading: boolean;
+  }) => {
+    const messagesEndRef = useRef<HTMLDivElement>(null);
+    const dispatch = useDispatch();
 
-  useEffect(() => {
-    if (shouldScroll && messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
-    }
-  }, [shouldScroll, messages]);
+    useEffect(() => {
+      if (shouldScroll && messagesEndRef.current) {
+        messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+      }
+    }, [shouldScroll, messages]);
 
-  const handleSavePrompt = async (message: Message) => {
-    // Only allow saving if the message has a numeric ID (not a temporary one)
-    if (message.id.startsWith('temp_')) {
-      dispatch(
-        openAlert({
-          isOpen: true,
-          title: "ERROR",
-          subtitle: "Cannot save this message. Please try again.",
-          type: "error",
-        })
-      );
-      return;
-    }
+    const handleSavePrompt = async (message: Message) => {
+      // Only allow saving if the message has a numeric ID (not a temporary one)
+      if (message.id.startsWith("temp_")) {
+        dispatch(
+          openAlert({
+            isOpen: true,
+            title: "ERROR",
+            subtitle: "Cannot save this message. Please try again.",
+            type: "error",
+          }),
+        );
+        return;
+      }
 
-    try {
-      dispatch(openLoading());
-      const updateData: UpdateMessageDto = {
-        messageId: Number(message.id),
-        isSaved: true
-      };
+      try {
+        dispatch(openLoading());
+        const updateData: UpdateMessageDto = {
+          messageId: Number(message.id),
+          isSaved: true,
+        };
 
-      await updateMessage(updateData);
-      dispatch(refetch());
+        await updateMessage(updateData);
+        dispatch(refetch());
 
-      dispatch(
-        openAlert({
-          isOpen: true,
-          title: "SUCCESS",
-          subtitle: "Prompt saved successfully!",
-          type: "success",
-        })
-      );
-    } catch (error: any) {
-      dispatch(
-        openAlert({
-          isOpen: true,
-          title: "ERROR",
-          subtitle: error.message || "Failed to save prompt. Please try again.",
-          type: "error",
-        })
-      );
-    } finally {
-      dispatch(closeLoading());
-    }
-  };
+        dispatch(
+          openAlert({
+            isOpen: true,
+            title: "SUCCESS",
+            subtitle: "Prompt saved successfully!",
+            type: "success",
+          }),
+        );
+      } catch (error: any) {
+        dispatch(
+          openAlert({
+            isOpen: true,
+            title: "ERROR",
+            subtitle: error.message || "Failed to save prompt. Please try again.",
+            type: "error",
+          }),
+        );
+      } finally {
+        dispatch(closeLoading());
+      }
+    };
 
-  if (welcomeState.isWelcome) {
-    return (
-      <div className="flex-1 flex items-center justify-center">
-        <div className="max-w-[70%] rounded-lg p-8 bg-grey-c50 text-grey-c900 text-center text-lg font-medium shadow-sm animate-[zoom-out_0.5s_ease-out_forwards]">
-          {welcomeState.message}
-        </div>
-      </div>
-    );
-  }
-
-  if (isLoading) {
-    return (
-      <div className="flex-1 flex items-center justify-center">
-        <Image src="/images/solid-loading.svg" alt="solid-loading" width={28} height={28} className="animate-spin" />
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex-1 overflow-y-auto p-5 space-y-4">
-      {messages.map((message) => (
-        <div key={message.id} className={`flex w-full ${message.isUser ? "justify-end" : "justify-start"}`}>
-          <div className={`relative group ${message.isUser ? "w-full flex justify-end" : ""}`}>
-            <div
-              className={`rounded-lg p-3 whitespace-pre-wrap font-questrial text-[15px] relative ${
-                message.isUser 
-                  ? "bg-primary-c900 text-white max-w-[70%] ml-auto" 
-                  : "bg-grey-c50 text-grey-c900 max-w-[70%]"
-              }`}
-            >
-              {message.content}
-              {message.isUser && (
-                message.isSaved ? (
-                  <div className="absolute -bottom-3 right-6 translate-x-1/2 p-0 bg-white rounded-full shadow-[0px_4px_16px_rgba(17,17,26,0.1),_0px_8px_24px_rgba(17,17,26,0.1),_0px_16px_56px_rgba(17,17,26,0.1)]">
-                    <Image src="/icons/saved-heart.svg" alt="saved-prompt" width={24} height={24} />
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => handleSavePrompt(message)}
-                    className="absolute -bottom-4 right-6 translate-x-1/2 p-1.5 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-support-c10 rounded-full bg-white shadow-[0px_4px_16px_rgba(17,17,26,0.1),_0px_8px_24px_rgba(17,17,26,0.1),_0px_16px_56px_rgba(17,17,26,0.1)]"
-                    data-tooltip-id={`save-prompt-${message.id}`}
-                    data-tooltip-content="Save prompt"
-                  >
-                    <Image src="/icons/heart-icon.svg" alt="save-prompt" width={16} height={16} />
-                    <Tooltip id={`save-prompt-${message.id}`} />
-                  </button>
-                )
-              )}
-            </div>
+    if (welcomeState.isWelcome) {
+      return (
+        <div className="flex-1 flex items-center justify-center">
+          <div className="max-w-[70%] rounded-lg p-8 bg-grey-c50 text-grey-c900 text-center text-lg font-medium shadow-sm animate-[zoom-out_0.5s_ease-out_forwards]">
+            {welcomeState.message}
           </div>
         </div>
-      ))}
-      <div ref={messagesEndRef} />
-    </div>
-  );
-});
+      );
+    }
 
-ChatMessages.displayName = 'ChatMessages';
+    if (isLoading) {
+      return (
+        <div className="flex-1 flex items-center justify-center">
+          <Image src="/images/solid-loading.svg" alt="solid-loading" width={28} height={28} className="animate-spin" />
+        </div>
+      );
+    }
+
+    return (
+      <div className="flex-1 overflow-y-auto p-5 space-y-4">
+        {messages.map((message) => (
+          <div key={message.id} className={`flex w-full ${message.isUser ? "justify-end" : "justify-start"}`}>
+            <div className={`relative group ${message.isUser ? "w-full flex justify-end" : ""}`}>
+              <div
+                className={`rounded-lg p-3 whitespace-pre-wrap font-questrial text-[15px] relative ${
+                  message.isUser
+                    ? "bg-primary-c900 text-white max-w-[70%] ml-auto"
+                    : "bg-grey-c50 text-grey-c900 max-w-[70%]"
+                }`}
+              >
+                {message.content}
+                {message.isUser &&
+                  (message.isSaved ? (
+                    <div className="absolute -bottom-3 right-6 translate-x-1/2 p-0 bg-white rounded-full shadow-[0px_4px_16px_rgba(17,17,26,0.1),_0px_8px_24px_rgba(17,17,26,0.1),_0px_16px_56px_rgba(17,17,26,0.1)]">
+                      <Image src="/icons/saved-heart.svg" alt="saved-prompt" width={24} height={24} />
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => handleSavePrompt(message)}
+                      className="absolute -bottom-4 right-6 translate-x-1/2 p-1.5 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-support-c10 rounded-full bg-white shadow-[0px_4px_16px_rgba(17,17,26,0.1),_0px_8px_24px_rgba(17,17,26,0.1),_0px_16px_56px_rgba(17,17,26,0.1)]"
+                      data-tooltip-id={`save-prompt-${message.id}`}
+                      data-tooltip-content="Save prompt"
+                    >
+                      <Image src="/icons/heart-icon.svg" alt="save-prompt" width={16} height={16} />
+                      <Tooltip id={`save-prompt-${message.id}`} />
+                    </button>
+                  ))}
+              </div>
+            </div>
+          </div>
+        ))}
+        <div ref={messagesEndRef} />
+      </div>
+    );
+  },
+);
+
+ChatMessages.displayName = "ChatMessages";
 
 const Assistant = () => {
   const dispatch = useDispatch();
   const router = useRouter();
-  const [inputMessage, setInputMessage] = useState("");
+  const inputRef = useRef<TextAreaRef>(null);
+  const [debouncedInputMessage, setDebouncedInputMessage] = useState("");
   const [currentChatId, setCurrentChatId] = useState<string | null>(null);
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
   const count = useSelector((state: RootState) => state.refetch.count);
@@ -351,7 +356,29 @@ const Assistant = () => {
     message: "Chào mừng tới với AI Assistant",
   });
   const [updatedChatHistory, setUpdatedChatHistory] = useState<ChatHistory[]>([]);
-  const [updateSource, setUpdateSource] = useState<'initial' | 'newChat' | 'newMessage' | 'savedPrompt'>('initial');
+  const [updateSource, setUpdateSource] = useState<"initial" | "newChat" | "newMessage" | "savedPrompt">("initial");
+
+  console.log(currentChatId, "currentChatId");
+
+  // Create debounced update function
+  const debouncedSetInputMessage = useCallback(
+    debounce((value: string) => {
+      setDebouncedInputMessage(value);
+    }, 500),
+    [],
+  );
+
+  // Only update debounced value
+  const handleInputChange = (value: string) => {
+    debouncedSetInputMessage(value);
+  };
+
+  // Cleanup debounce on unmount
+  useEffect(() => {
+    return () => {
+      debouncedSetInputMessage.cancel();
+    };
+  }, [debouncedSetInputMessage]);
 
   // Fetch chats only once when component mounts
   useEffect(() => {
@@ -361,7 +388,7 @@ const Assistant = () => {
           page: 1,
           rowPerPage: 30,
         };
-        
+
         const response = await getChats(filterData);
         const chatItems = response.items || response.data || [];
         const chats: ChatHistory[] = chatItems.map((chat: any) => ({
@@ -379,7 +406,7 @@ const Assistant = () => {
             title: "ERROR",
             subtitle: error.message || "Failed to fetch chats. Please try again.",
             type: "error",
-          })
+          }),
         );
       }
     };
@@ -389,11 +416,11 @@ const Assistant = () => {
 
   // Update chat history with active state
   useEffect(() => {
-    setUpdatedChatHistory(prev => 
-      prev.map(chat => ({
+    setUpdatedChatHistory((prev) =>
+      prev.map((chat) => ({
         ...chat,
         isActive: chat.id === activeChatId,
-      }))
+      })),
     );
   }, [activeChatId]);
 
@@ -404,15 +431,11 @@ const Assistant = () => {
         chatId: Number(chatId), // Convert string to number since API expects number
         title: newTitle,
       };
-      
+
       await updateChat(updateData);
 
       // Update local state after successful API call
-      setUpdatedChatHistory(prev => 
-        prev.map(chat => 
-          chat.id === chatId ? { ...chat, title: newTitle } : chat
-        )
-      );
+      setUpdatedChatHistory((prev) => prev.map((chat) => (chat.id === chatId ? { ...chat, title: newTitle } : chat)));
     } catch (error: any) {
       dispatch(
         openAlert({
@@ -420,7 +443,7 @@ const Assistant = () => {
           title: "ERROR",
           subtitle: error.message || "Failed to update chat title. Please try again.",
           type: "error",
-        })
+        }),
       );
     } finally {
       dispatch(closeLoading());
@@ -447,11 +470,11 @@ const Assistant = () => {
       }
 
       // Update local state after successful API call
-      setUpdatedChatHistory(prev => prev.filter(chat => chat.id !== chatId));
-      
+      setUpdatedChatHistory((prev) => prev.filter((chat) => chat.id !== chatId));
+
       // If the deleted chat was active, redirect to the main assistant page
       if (chatId === currentChatId) {
-        router.push('/assistant');
+        router.push("/assistant");
       }
     } catch (error: any) {
       dispatch(
@@ -460,7 +483,7 @@ const Assistant = () => {
           title: "ERROR",
           subtitle: error.message || "Failed to delete chat. Please try again.",
           type: "error",
-        })
+        }),
       );
     } finally {
       dispatch(closeLoading());
@@ -475,7 +498,7 @@ const Assistant = () => {
       setCurrentChatId(chatId);
       setMessages([]);
       setWelcomeState({ isWelcome: false, message: "" });
-      setUpdateSource('newChat');
+      setUpdateSource("newChat");
     });
   }, []);
 
@@ -490,7 +513,7 @@ const Assistant = () => {
         isWelcome: true,
         message: "Chào mừng tới với AI Assistant",
       });
-      setUpdateSource('newChat');
+      setUpdateSource("newChat");
     });
   }, []);
 
@@ -504,11 +527,7 @@ const Assistant = () => {
         <div className="divide-y divide-grey-c100">
           {group.chats.map((chat) => (
             <div key={chat.id} onClick={() => handleChatSelect(chat.id)}>
-              <ChatHistoryItem 
-                chat={chat} 
-                onEdit={handleEditChatTitle}
-                onDelete={handleDeleteChat}
-              />
+              <ChatHistoryItem chat={chat} onEdit={handleEditChatTitle} onDelete={handleDeleteChat} />
             </div>
           ))}
         </div>
@@ -548,16 +567,16 @@ const Assistant = () => {
         }));
 
         setMessages(messages);
-        setShouldScroll(updateSource === 'newChat');
+        setShouldScroll(updateSource === "newChat");
       } catch (error: any) {
-        console.error('Error fetching messages:', error);
+        console.error("Error fetching messages:", error);
         dispatch(
           openAlert({
             isOpen: true,
             title: "ERROR",
             subtitle: error.message || "Failed to fetch messages. Please try again.",
             type: "error",
-          })
+          }),
         );
       } finally {
         setIsLoading(false);
@@ -568,7 +587,7 @@ const Assistant = () => {
     // 1. Switching chats (newChat)
     // 2. Initial load (initial)
     // 3. After saving/unsaving a prompt (savedPrompt)
-    if (updateSource === 'newChat' || updateSource === 'initial' || updateSource === 'savedPrompt') {
+    if (updateSource === "newChat" || updateSource === "initial" || updateSource === "savedPrompt") {
       fetchMessages();
     }
   }, [currentChatId, dispatch, updateSource]);
@@ -577,20 +596,23 @@ const Assistant = () => {
   useEffect(() => {
     if (count > 0) {
       // Set updateSource to trigger the fetch messages effect
-      setUpdateSource('savedPrompt');
+      setUpdateSource("savedPrompt");
     }
   }, [count]);
 
   const handleSendMessage = async () => {
-    if (!inputMessage.trim()) return;
+    const currentValue = inputRef.current?.getValue() || "";
+    if (!currentValue.trim()) return;
 
     // Clear welcome state when user sends first message
     if (welcomeState.isWelcome) {
       setWelcomeState({ isWelcome: false, message: "" });
     }
 
-    const messageToSend = inputMessage;
-    setInputMessage("");
+    const messageToSend = currentValue;
+    // Clear input using the new clear method
+    inputRef.current?.clear();
+    debouncedSetInputMessage.cancel();
 
     // Add user message immediately to UI with a temporary ID
     const tempUserMessageId = `temp_${Date.now()}`;
@@ -600,7 +622,7 @@ const Assistant = () => {
       isUser: true,
       timestamp: new Date(),
     };
-    setMessages(prev => [...prev, userMessage]);
+    setMessages((prev) => [...prev, userMessage]);
     setShouldScroll(true);
 
     try {
@@ -635,11 +657,9 @@ const Assistant = () => {
 
       // Update user message with real ID from API
       if (data.id) {
-        setMessages(prev => prev.map(msg => 
-          msg.id === tempUserMessageId 
-            ? { ...msg, id: data.id.toString() }
-            : msg
-        ));
+        setMessages((prev) =>
+          prev.map((msg) => (msg.id === tempUserMessageId ? { ...msg, id: data.id.toString() } : msg)),
+        );
       }
 
       // Add AI response to UI
@@ -649,12 +669,12 @@ const Assistant = () => {
         isUser: false,
         timestamp: new Date(),
       };
-      setMessages(prev => [...prev, aiMessage]);
+      setMessages((prev) => [...prev, aiMessage]);
       setShouldScroll(true);
 
       // Update currentChatId if this is a new chat
-      if (!currentChatId && data.chatId) {
-        const newChatId = data.chatId.toString();
+      if (!currentChatId && data?.data?.chat_id) {
+        const newChatId = data?.data?.chat_id?.toString();
         setCurrentChatId(newChatId);
         // Don't update activeChatId for first message
       }
@@ -674,11 +694,7 @@ const Assistant = () => {
         isActive: chat.id.toString() === fallbackActiveId,
       }));
 
-      console.log(data, 'data chat id')
-      console.log(chats, 'chat history')
-      // setCurrentChatId(chatItems[0]?.id);
       setUpdatedChatHistory(chats);
-
     } catch (error: any) {
       // Add error message to UI with a temporary ID
       const tempErrorMessageId = `temp_error_${Date.now()}`;
@@ -688,7 +704,7 @@ const Assistant = () => {
         isUser: false,
         timestamp: new Date(),
       };
-      setMessages(prev => [...prev, errorMessage]);
+      setMessages((prev) => [...prev, errorMessage]);
       setShouldScroll(true);
 
       dispatch(
@@ -715,8 +731,15 @@ const Assistant = () => {
   };
 
   const handleSelectPrompt = (prompt: { content: string }) => {
-    setInputMessage(prompt.content);
-    // Close the modal after selection
+    if (inputRef.current) {
+      inputRef.current.clear();
+      const event = new Event("input", { bubbles: true });
+      const textarea = document.querySelector("textarea");
+      if (textarea) {
+        textarea.value = prompt.content;
+        textarea.dispatchEvent(event);
+      }
+    }
     dispatch(closeModal());
   };
 
@@ -737,7 +760,7 @@ const Assistant = () => {
           </button>
         </div>
 
-        <ChatMessages 
+        <ChatMessages
           messages={messages}
           welcomeState={welcomeState}
           shouldScroll={shouldScroll}
@@ -748,8 +771,9 @@ const Assistant = () => {
         <div className="px-4 pb-4 pt-2">
           <div className="flex items-center gap-2">
             <TextArea
-              value={inputMessage}
-              onChange={(value) => setInputMessage(value)}
+              ref={inputRef}
+              defaultValue=""
+              onChange={handleInputChange}
               onKeyDown={(event) => {
                 if (event.key === "Enter" && !event.shiftKey) {
                   event.preventDefault();

@@ -14,6 +14,8 @@ import { QueueModule } from './queue/queue.module';
 import { HistoriesModule } from './histories/histories.module';
 import { ChatsModule } from './chats/chats.module';
 import { MessagesModule } from './messages/messages.module';
+import { UploadModule } from './upload/upload.module';
+import { NotificationsModule } from './notifications/notifications.module';
 
 @Module({
   imports: [
@@ -30,6 +32,8 @@ import { MessagesModule } from './messages/messages.module';
     HistoriesModule,
     ChatsModule,
     MessagesModule,
+    UploadModule,
+    NotificationsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

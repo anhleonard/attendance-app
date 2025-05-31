@@ -1,6 +1,5 @@
 "use client";
 import DetailHistoryModal from "@/components/history/detail-history";
-import { ACTIVE_CLASSES, ACTIVE_STUDENTS } from "@/config/constants";
 import { ConfirmState, ModalState } from "@/config/types";
 import Label from "@/lib/label";
 import Pagination from "@/lib/pagination";
@@ -13,8 +12,9 @@ import { openAlert } from "@/redux/slices/alert-slice";
 import { getHistories } from "@/apis/services/histories";
 import Image from "next/image";
 import React, { useState, useEffect } from "react";
-import { useDispatch } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import { Tooltip } from "react-tooltip";
+import { RootState } from "@/redux/store";
 
 interface HistoryResponse {
   total: number;
@@ -51,8 +51,36 @@ const Histories = () => {
   const [historiesData, setHistoriesData] = useState<HistoryResponse>({ total: 0, data: [] });
   const [selectedStudent, setSelectedStudent] = useState<string | null>(null);
   const [selectedClass, setSelectedClass] = useState<number | null>(null);
-  const activeStudents = JSON.parse(localStorage.getItem(ACTIVE_STUDENTS) || "[]");
-  const activeClasses = JSON.parse(localStorage.getItem(ACTIVE_CLASSES) || "[]");
+  const activeStudentsFromStore: any = useSelector((state: RootState) => state.system.activeStudents) || [];
+  const activeClassesFromStore: any = useSelector((state: RootState) => state.system.activeClasses) || [];
+
+  // Transform activeStudents to the correct format for Select component
+  const activeStudents = React.useMemo(() => {
+    if (!activeStudentsFromStore?.length) return [];
+    // Check if the data is already in the correct format
+    if (activeStudentsFromStore[0]?.label && activeStudentsFromStore[0]?.value) {
+      return activeStudentsFromStore;
+    }
+    // Transform Student objects to Select options format
+    return activeStudentsFromStore.map((student: any) => ({
+      label: student.name,
+      value: student.id.toString(),
+    }));
+  }, [activeStudentsFromStore]);
+
+  // Transform activeClasses to the correct format for Select component
+  const activeClasses = React.useMemo(() => {
+    if (!activeClassesFromStore?.length) return [];
+    // Check if the data is already in the correct format
+    if (activeClassesFromStore[0]?.label && activeClassesFromStore[0]?.value) {
+      return activeClassesFromStore;
+    }
+    // Transform Class objects to Select options format
+    return activeClassesFromStore.map((cls: any) => ({
+      label: cls.name,
+      value: cls.id.toString(),
+    }));
+  }, [activeClassesFromStore]);
 
   const fetchHistories = async (currentPage: number, currentRowsPerPage: number) => {
     try {
@@ -60,7 +88,9 @@ const Histories = () => {
       const filterData = {
         page: currentPage,
         rowPerPage: currentRowsPerPage,
-        ...(selectedStudent && { studentName: activeStudents.find((student: any) => student.value === selectedStudent)?.label }),
+        ...(selectedStudent && {
+          studentName: activeStudents.find((student: any) => student.value === selectedStudent)?.label,
+        }),
         ...(selectedClass && { classId: selectedClass }),
       };
       const response = await getHistories(filterData);
@@ -99,7 +129,7 @@ const Histories = () => {
     fetchHistories(1, rowsPerPage);
   };
 
-  const handleOpenViewModal = (history: HistoryResponse['data'][0]) => {
+  const handleOpenViewModal = (history: HistoryResponse["data"][0]) => {
     const modal: ModalState = {
       isOpen: true,
       title: "History detail",
@@ -175,12 +205,16 @@ const Histories = () => {
                     <th className="px-1 py-4">{history.name}</th>
                     <th className="px-1 py-4">{history.currentClass.name}</th>
                     <th className="px-1 py-4">
-                      {history.pastClasses.length > 0 
-                        ? [...history.pastClasses]
-                            .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0].name
+                      {history.pastClasses.length > 0
+                        ? [...history.pastClasses].sort(
+                            (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+                          )[0].name
                         : "--"}
                     </th>
-                    <th className="px-1 py-4">{history.currentClass.totalAttendances + history.pastClasses.reduce((sum, pastClass) => sum + pastClass.totalAttendances, 0)}</th>
+                    <th className="px-1 py-4">
+                      {history.currentClass.totalAttendances +
+                        history.pastClasses.reduce((sum, pastClass) => sum + pastClass.totalAttendances, 0)}
+                    </th>
                     <th className="px-1 py-4">
                       <Label status="success" label={history.currentClass.status} />
                     </th>

@@ -1,20 +1,27 @@
 "use client";
-import { USER_INFO } from "@/config/constants";
 import Divider from "@/lib/divider";
+import { RootState } from "@/redux/store";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import React from "react";
+import { useSelector } from "react-redux";
 
 const Sidebar = () => {
   const pathname = usePathname();
   const router = useRouter();
-  const userInfo = JSON.parse(localStorage.getItem(USER_INFO) || "{}");
+  const { profile } = useSelector((state: RootState) => state.system);
 
   return (
     <div className="w-[260px] h-full bg-white border-r border-grey-c100 overflow-y-auto hidden md:block">
       <div className="flex flex-col gap-2 justify-center items-center py-6">
-        <Image src={"/images/avatar-user.jpg"} alt="User avatar" width={60} height={60} className="rounded-full" />
-        <div className="font-bold text-grey-c900 text-base">{userInfo?.fullname}</div>
+        {profile?.avatar ? (
+          <Image src={profile.avatar} alt="User avatar" width={60} height={60} className="rounded-full" />
+        ) : (
+          <div className="w-[60px] h-[60px] rounded-full bg-primary-c50 text-primary-c900 flex items-center justify-center font-semibold text-lg">
+            {profile?.fullname?.substring(0, 2).toUpperCase()}
+          </div>
+        )}
+        <div className="font-bold text-grey-c900 text-base">{profile?.fullname}</div>
       </div>
       <Divider />
       <div className="flex flex-col p-3 gap-3">

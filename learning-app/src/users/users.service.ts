@@ -9,13 +9,17 @@ import { SALT } from 'src/utils/constants';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { FilterUsersDto } from './dto/find-users.dto';
-import { Role, Permission } from 'src/utils/enums';
+import { Role, Permission, Status } from 'src/utils/enums';
 import { generateRandomPassword } from 'src/utils/functions';
 import axios from 'axios';
+import { MinioService } from 'src/upload/minio.service';
 
 @Injectable()
 export class UsersService {
-  constructor(private readonly prismaService: PrismaService) {}
+  constructor(
+    private readonly prismaService: PrismaService,
+    private readonly minioService: MinioService,
+  ) {}
 
   async createUser(createUserDto: CreateUserDto) {
     try {
@@ -94,7 +98,10 @@ export class UsersService {
     }
   }
 
-  async updateUser(updateUserDto: UpdateUserDto) {
+  async updateUser(
+    updateUserDto: UpdateUserDto,
+    avatarFile?: Express.Multer.File,
+  ) {
     try {
       // First check if user exists
       const existingUser = await this.prismaService.user.findUnique({
@@ -126,6 +133,15 @@ export class UsersService {
           }
           updateData.email = updateUserDto.email;
         }
+      }
+
+      // Handle avatar upload if file is provided
+      if (avatarFile) {
+        const uploadResult = await this.minioService.uploadFile(
+          'avatars',
+          avatarFile,
+        );
+        updateData.avatar = uploadResult.url;
       }
 
       if (updateUserDto.role !== undefined) {
@@ -164,6 +180,11 @@ export class UsersService {
         updateData.locked = updateUserDto.locked;
       }
 
+      // Handle password update
+      if (updateUserDto.password !== undefined) {
+        updateData.password = await bcrypt.hash(updateUserDto.password, SALT);
+      }
+
       // Only update if there are changes
       if (Object.keys(updateData).length === 0) {
         return existingUser;
@@ -177,6 +198,7 @@ export class UsersService {
           id: true,
           email: true,
           fullname: true,
+          avatar: true,
           role: true,
           locked: true,
           permissions: true,
@@ -199,8 +221,14 @@ export class UsersService {
 
   async findUsers(filterUsersDto: FilterUsersDto) {
     try {
-      const { page = 1, limit = 10, fullname, role } = filterUsersDto;
-      const skip = (page - 1) * limit;
+      const {
+        page = 1,
+        limit = 10,
+        fullname,
+        role,
+        fetchAll,
+        status,
+      } = filterUsersDto;
 
       const where = {
         ...(fullname && {
@@ -210,8 +238,41 @@ export class UsersService {
           },
         }),
         ...(role && { role: role as Role }),
+        ...(status && { locked: status === Status.ACTIVE ? false : true }),
       };
 
+      // If fetchAll is true, get all users without pagination
+      if (fetchAll) {
+        const users = await this.prismaService.user.findMany({
+          where,
+          select: {
+            id: true,
+            email: true,
+            fullname: true,
+            role: true,
+            locked: true,
+            permissions: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+          orderBy: {
+            createdAt: 'desc',
+          },
+        });
+
+        return {
+          data: users,
+          meta: {
+            total: users.length,
+            page: 1,
+            limit: users.length,
+            totalPages: 1,
+          },
+        };
+      }
+
+      // Normal pagination logic
+      const skip = (page - 1) * limit;
       const [users, total] = await Promise.all([
         this.prismaService.user.findMany({
           where,

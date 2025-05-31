@@ -1,9 +1,11 @@
-import { Controller, Post, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, Post, Res, UseGuards } from '@nestjs/common';
 import { LocalAuthGuard } from './guards/local-auth.guard';
 import { CurrentUser } from './decorators/current-user.decorator';
 import { Response } from 'express';
 import { User } from '@prisma/client';
 import { AuthService } from './auth.service';
+import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { TokenPayload } from './token-payload/token-payload.auth';
 
 @Controller('auth')
 export class AuthController {
@@ -27,5 +29,14 @@ export class AuthController {
     });
 
     return response.send({ message: 'Logged out successfully' });
+  }
+
+  @Post('change-password')
+  @UseGuards(JwtAuthGuard)
+  changePassword(
+    @Body() payload: { currentPassword: string; newPassword: string },
+    @CurrentUser() user: TokenPayload,
+  ) {
+    return this.authService.changePassword(payload, user);
   }
 }

@@ -7,7 +7,7 @@ const API_DOMAIN = process.env.NEXT_PUBLIC_HTTP_API_DOMAIN;
 export const createStudent = async (data: CreateStudentDto) => {
   try {
     const response = await axiosInstance.post(`${API_DOMAIN}/students/create`, data);
-    return response.data;
+    return response.data?.createdStudent;
   } catch (error: any) {
     throw error?.response?.data || error.message;
   }

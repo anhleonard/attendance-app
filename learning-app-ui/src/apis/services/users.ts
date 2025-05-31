@@ -19,10 +19,27 @@ export const getSystemUsers = async (filterUsersDto: FilterUsersDto) => {
   }
 };
 
-export const updateUser = async (updateUserDto: UpdateUserDto) => {
+export const updateUser = async (updateUserDto: UpdateUserDto, avatarFile?: File) => {
   try {
-    const response = await axiosInstance.post("/users/update", updateUserDto);
-    return response.data;
+    if (avatarFile) {
+      const formData = new FormData();
+      formData.append("avatar", avatarFile);
+      formData.append("id", updateUserDto.id.toString());
+      if (updateUserDto.fullname) {
+        formData.append("fullname", updateUserDto.fullname);
+      }
+
+      const response = await axiosInstance.post("/users/update", formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
+      return response.data;
+    } else {
+      // Send the entire updateUserDto when no avatar
+      const response = await axiosInstance.post("/users/update", updateUserDto);
+      return response.data;
+    }
   } catch (error: any) {
     throw error?.response?.data || error.message;
   }

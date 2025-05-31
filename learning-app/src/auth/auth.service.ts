@@ -1,4 +1,8 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { UsersService } from 'src/users/users.service';
 import * as bcrypt from 'bcrypt';
 import { User } from '@prisma/client';
@@ -56,5 +60,38 @@ export class AuthService {
       tokenPayload,
       token,
     };
+  }
+
+  async changePassword(
+    payload: {
+      currentPassword: string;
+      newPassword: string;
+    },
+    user: TokenPayload,
+  ) {
+    try {
+      const { currentPassword, newPassword } = payload;
+
+      const foundUser = await this.usersService.findOne(user.email);
+
+      const isMatch = await bcrypt.compare(currentPassword, foundUser.password);
+      if (!isMatch)
+        throw new UnauthorizedException('Current password is not correct');
+
+      await this.usersService.updateUser({
+        id: foundUser.id,
+        password: newPassword,
+      });
+
+      return { message: 'Password changed successfully' };
+    } catch (error) {
+      if (
+        error instanceof UnauthorizedException ||
+        error instanceof BadRequestException
+      ) {
+        throw error;
+      }
+      throw new BadRequestException(error.message);
+    }
   }
 }

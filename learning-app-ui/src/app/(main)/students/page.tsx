@@ -1,6 +1,7 @@
 "use client";
 import { getStudents, updateStudent } from "@/apis/services/students";
-import { UpdateStudentDto } from "@/apis/dto";
+import { getClasses } from "@/apis/services/classes";
+import { UpdateStudentDto, FilterClassDto } from "@/apis/dto";
 import AddStudent from "@/components/student/add-student";
 import EditStudent from "@/components/student/edit-student";
 import { ConfirmState, ModalState, Student, StudentClass } from "@/config/types";
@@ -28,6 +29,11 @@ interface StudentsResponse {
   data: Student[];
 }
 
+interface ClassesResponse {
+  total: number;
+  data: StudentClass[];
+}
+
 const Students = () => {
   const dispatch = useDispatch();
   const [studentsData, setStudentsData] = useState<StudentsResponse>({ total: 0, data: [] });
@@ -35,7 +41,9 @@ const Students = () => {
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [filterName, setFilterName] = useState("");
   const [filterStatus, setFilterStatus] = useState<Status | undefined>(undefined);
+  const [filterClassId, setFilterClassId] = useState<number | undefined>(undefined);
   const refetchCount = useSelector((state: RootState) => state.refetch.count);
+  const activeClasses: any = useSelector((state: RootState) => state.system.activeClasses) || [];
 
   const fetchStudents = async (currentPage: number, currentRowsPerPage: number) => {
     try {
@@ -45,6 +53,10 @@ const Students = () => {
         rowPerPage: currentRowsPerPage,
         name: filterName,
         ...(filterStatus && { status: filterStatus }),
+        ...(filterClassId && {
+          classId: filterClassId,
+          studentClassStatus: Status.ACTIVE,
+        }),
       });
       if (response) {
         setStudentsData(response);
@@ -76,8 +88,9 @@ const Students = () => {
     // Reset states first
     setFilterName("");
     setFilterStatus(undefined);
+    setFilterClassId(undefined);
     setPage(1);
-    
+
     // Call API with empty filters
     dispatch(openLoading());
     getStudents({
@@ -85,6 +98,7 @@ const Students = () => {
       rowPerPage: rowsPerPage,
       name: "",
       status: undefined,
+      classId: undefined,
     })
       .then((response) => {
         if (response) {
@@ -107,7 +121,7 @@ const Students = () => {
   };
 
   const handleNameChange = (value: string | React.ChangeEvent<HTMLInputElement>) => {
-    if (typeof value === 'string') {
+    if (typeof value === "string") {
       setFilterName(value);
     } else {
       setFilterName(value.target.value);
@@ -116,6 +130,10 @@ const Students = () => {
 
   const handleStatusChange = (value: string) => {
     setFilterStatus(value as Status);
+  };
+
+  const handleClassChange = (value: string) => {
+    setFilterClassId(value ? parseInt(value) : undefined);
   };
 
   const handlePageChange = (newPage: number, newRowsPerPage: number) => {
@@ -205,52 +223,38 @@ const Students = () => {
       <div className="flex flex-col">
         <div className="font-bold text-base">1. Student list</div>
 
-        {/* filter class */}
-        <div className="grid grid-cols-6 gap-3 mb-5 mt-4">
-          <div className="col-span-4 grid sm:grid-cols-4 sm:gap-3">
-            <div className="sm:col-span-2">
-              <TextField 
-                label="Search name" 
-                value={filterName}
-                onChange={handleNameChange}
-              />
-            </div>
-            <Select
-              label="Status"
-              defaultValue={filterStatus}
-              onChange={handleStatusChange}
-              options={[
-                { label: "Active", value: Status.ACTIVE },
-                { label: "Inactive", value: Status.INACTIVE },
-              ]}
-            />
-            <div className="flex flex-row gap-3">
-              <Button 
-                label="Filter" 
-                className="py-[13px] px-8" 
-                status="success" 
-                onClick={handleFilter}
-              />
-              <Button 
-                label="Cancel" 
-                className="py-[13px] px-8" 
-                status="cancel" 
-                onClick={handleResetFilter}
-              />
-            </div>
+        {/* filter students */}
+        <div className="grid grid-cols-4 gap-3 mb-5 mt-4">
+          <TextField label="Search name" value={filterName} onChange={handleNameChange} />
+          <Select
+            label="Select class"
+            defaultValue={filterClassId?.toString()}
+            onChange={handleClassChange}
+            options={activeClasses}
+          />
+          <Select
+            label="Status"
+            defaultValue={filterStatus}
+            onChange={handleStatusChange}
+            options={[
+              { label: "Active", value: Status.ACTIVE },
+              { label: "Inactive", value: Status.INACTIVE },
+            ]}
+          />
+          <div className="flex flex-row gap-3">
+            <Button label="Filter" className="py-[13px] px-8" status="success" onClick={handleFilter} />
+            <Button label="Cancel" className="py-[13px] px-8" status="cancel" onClick={handleResetFilter} />
           </div>
-          <div className="col-span-2 text-end">
-            {/* put item center when use grid */}
-            <div className="inline-grid justify-center items-center">
-              <Button
-                label="Add student"
-                status="success"
-                className="py-3 px-4"
-                startIcon={<Image src={"/icons/add-icon.svg"} alt="add-icon" width={20} height={20} />}
-                onClick={handleOpenDrawer}
-              />
-            </div>
-          </div>
+        </div>
+
+        <div className="inline-grid justify-end items-center mb-2">
+          <Button
+            label="Add student"
+            status="success"
+            className="py-2.5 px-4"
+            startIcon={<Image src={"/icons/add-icon.svg"} alt="add-icon" width={20} height={20} />}
+            onClick={handleOpenDrawer}
+          />
         </div>
 
         {/* table 1 */}
@@ -281,10 +285,7 @@ const Students = () => {
                     <th className="px-1 py-4">{student.phoneNumber}</th>
                     <th className="px-1 py-4">{student.secondPhoneNumber || "-"}</th>
                     <th className="px-1 py-4">
-                      <Label
-                        status={student.status === Status.ACTIVE ? "success" : "error"}
-                        label={student.status}
-                      />
+                      <Label status={student.status === Status.ACTIVE ? "success" : "error"} label={student.status} />
                     </th>
                     <th className="px-1 py-4 text-center">
                       <div className="flex justify-center items-center gap-3">

@@ -6,14 +6,15 @@ import TextField from "@/lib/textfield";
 import React from "react";
 import { useFormik } from "formik";
 import * as Yup from "yup";
-import { ACTIVE_CLASSES } from "@/config/constants";
-import { useDispatch } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import { closeLoading, openLoading } from "@/redux/slices/loading-slice";
 import { CreateStudentDto } from "@/apis/dto";
 import { createStudent } from "@/apis/services/students";
 import { openAlert } from "@/redux/slices/alert-slice";
 import { refetch } from "@/redux/slices/refetch-slice";
 import { closeDrawer } from "@/redux/slices/drawer-slice";
+import { RootState } from "@/redux/store";
+import { updateSystemInfo } from "@/redux/slices/system-slice";
 
 interface AddStudentFormValues {
   studentName: string;
@@ -65,7 +66,8 @@ const initialValues: AddStudentFormValues = {
 
 const AddStudent = () => {
   const dispatch = useDispatch();
-  const activeClasses = JSON.parse(localStorage.getItem(ACTIVE_CLASSES) || "[]");
+  const activeClasses: any = useSelector((state: RootState) => state.system.activeClasses) || [];
+  const activeStudents: any = useSelector((state: RootState) => state.system.activeStudents) || [];
 
   const formik = useFormik({
     initialValues,
@@ -84,7 +86,24 @@ const AddStudent = () => {
           phoneNumber: values.phoneNumber,
           secondPhoneNumber: values.secondaryPhoneNumber || undefined,
         };
-        await createStudent(studentData);
+        const newStudent = await createStudent(studentData);
+
+        // Add new student to list
+        const updatedStudents = [
+          ...activeStudents,
+          {
+            label: studentData.name,
+            value: newStudent.id.toString(),
+          },
+        ];
+
+        // Update redux store
+        dispatch(
+          updateSystemInfo({
+            activeStudents: updatedStudents,
+          }),
+        );
+
         dispatch(
           openAlert({
             isOpen: true,
@@ -191,12 +210,7 @@ const AddStudent = () => {
         <Divider />
       </div>
 
-      <Button
-        type="submit"
-        label="Save"
-        className="w-full py-3.5 mt-2 mb-6"
-        // disabled={!formik.isValid || formik.isSubmitting}
-      />
+      <Button type="submit" label="Save" className="w-full py-3.5 mt-2 mb-6" />
     </form>
   );
 };

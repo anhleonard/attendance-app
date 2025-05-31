@@ -21,6 +21,10 @@ export class FilterStudentDto {
   @IsOptional()
   status: Status;
 
+  @IsEnum(Status)
+  @IsOptional()
+  studentClassStatus: Status;
+
   @IsNumber()
   @IsOptional()
   page: number;

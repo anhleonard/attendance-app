@@ -1,8 +1,16 @@
+"use client";
+
 import React from "react";
 import Sidebar from "../sidebar";
 import Header from "../header";
+import { useWebSocket } from "@/hooks/useWebSocket";
+import { useSelector } from "react-redux";
+import { RootState } from "@/redux/store";
 
 const MainLayout = ({ children }: { children: React.ReactNode }) => {
+  const { profile } = useSelector((state: RootState) => state.system);
+  useWebSocket(profile?.id);
+
   return (
     <div className="h-screen flex flex-col">
       <Header />

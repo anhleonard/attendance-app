@@ -1,8 +1,10 @@
 "use client";
 import "./globals.css";
+import { useEffect } from "react";
 import localFont from "next/font/local";
 import { Provider } from "react-redux";
-import { store } from "@/redux/store";
+import { PersistGate } from "redux-persist/integration/react";
+import { store, persistor } from "@/redux/store";
 import Modal from "@/components/modal";
 import Drawer from "@/lib/drawer";
 import ConfirmModal from "@/components/confirm-modal";
@@ -57,12 +59,14 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning className={`${sourceSans3.className} ${sourceSans3.variable}`}>
       <body suppressHydrationWarning className="font-normal">
         <Provider store={store}>
-          <div>{children}</div>
-          <Modal />
-          <Drawer />
-          <ConfirmModal />
-          <Loading />
-          <Alert />
+          <PersistGate loading={null} persistor={persistor}>
+            <div>{children}</div>
+            <Modal />
+            <Drawer />
+            <ConfirmModal />
+            <Loading />
+            <Alert />
+          </PersistGate>
         </Provider>
       </body>
     </html>

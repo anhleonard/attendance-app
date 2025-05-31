@@ -1,3 +1,6 @@
+import { Permission, Role } from './enums';
+import { Role as PrismaRole } from '@prisma/client';
+
 export interface CreateAttendance {
   studentId: number;
   sessionId: number;
@@ -5,6 +8,34 @@ export interface CreateAttendance {
   noteAttendance: string;
 }
 
-export interface AttendanceJob {
-    
+export interface User {
+  id: number;
+  email?: string;
+  fullname?: string;
+  avatar?: string;
+  role?: Role;
+  permissions?: Permission[];
+  createdAt?: string;
+  updatedAt?: string;
+  locked?: boolean;
+}
+
+export interface NotificationPayload {
+  id: number;
+  title: string;
+  message: string;
+  createdAt: Date;
+  updatedAt: Date;
+  createdById: number;
+  createdBy: {
+    id: number;
+    fullname: string;
+    role: PrismaRole;
+  };
+  receivers: Array<{
+    notificationId: number;
+    userId: number;
+    fullname: string;
+    isRead: boolean;
+  }>;
 }

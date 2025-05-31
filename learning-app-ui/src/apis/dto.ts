@@ -75,6 +75,7 @@ export interface FilterStudentDto {
   page?: number;
   rowPerPage?: number;
   status?: Status;
+  studentClassStatus?: Status;
   fetchAll?: boolean;
 }
 
@@ -154,6 +155,8 @@ export interface FilterUsersDto {
   limit?: number;
   fullname?: string;
   role?: Role;
+  fetchAll?: boolean;
+  status?: Status;
 }
 
 export interface UserResponse {
@@ -183,4 +186,31 @@ export interface UpdateUserDto {
   role?: Role;
   permissions?: Permission[];
   locked?: boolean;
+}
+
+export interface ChangePasswordDto {
+  currentPassword: string;
+  newPassword: string;
+}
+
+export interface FilterNotificationsDto {
+  page?: number;
+  limit?: number;
+  isRead?: boolean;
+  fetchAll?: boolean;
+  userId?: number; // the user id of the receiver
+  createdById?: number; // the user id of the sender
+}
+
+export interface UpdateNotificationDto {
+  id: number;
+  title?: string;
+  message?: string;
+  isRead?: boolean;
+}
+
+export interface CreateNotificationDto {
+  title: string;
+  message: string;
+  receiverIds: number[];
 }

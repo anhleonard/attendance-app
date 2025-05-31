@@ -813,7 +813,8 @@ async def chat(request: ChatRequest, authorization: Optional[str] = Header(None)
                 data={
                     "api_calls": convert_proto_to_dict(api_calls),
                     "api_responses": convert_proto_to_dict(api_responses),
-                    "function_call_count": function_call_count
+                    "function_call_count": function_call_count,
+                    "chat_id": user_chat_id
                 }
             )
 

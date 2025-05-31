@@ -1,12 +1,8 @@
 "use client";
+import { OptionState } from "@/config/types";
 import Image from "next/image";
 import { useState, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
-
-interface Option {
-  value: string;
-  label: string;
-}
 
 interface Position {
   top?: number;
@@ -16,7 +12,7 @@ interface Position {
 }
 
 interface SelectProps {
-  options: Option[];
+  options: OptionState[];
   label?: string;
   defaultValue?: string;
   onChange?: (value: string) => void;
@@ -206,10 +202,26 @@ const Select = ({
   };
 
   const getSelectedLabel = () => {
-    if (!selected && selected !== "") return "";
+    if (!selected) return "";
 
     const selectedOption = options?.find((opt) => opt?.value === selected);
     return selectedOption ? selectedOption.label : "";
+  };
+
+  const renderSelectedContent = () => {
+    const label = getSelectedLabel();
+    if (typeof label === "string") {
+      return (
+        <span
+          className={`block w-full font-medium ${
+            selected ? "text-gray-800" : "text-grey-c200"
+          } truncate overflow-hidden whitespace-nowrap text-ellipsis`}
+        >
+          {label}
+        </span>
+      );
+    }
+    return <div className="w-full">{label}</div>;
   };
 
   const handleOptionClick = (e: React.MouseEvent, value: string) => {
@@ -285,13 +297,7 @@ const Select = ({
           aria-controls="select-options"
         >
           <div className="h-5 w-full flex items-center gap-2">
-            <span
-              className={`block w-full font-medium ${
-                selected ? "text-gray-800" : "text-grey-c200"
-              } truncate overflow-hidden whitespace-nowrap text-ellipsis`}
-            >
-              {getSelectedLabel()}
-            </span>
+            {renderSelectedContent()}
             <span
               className={`block text-sm transition-transform ${isOpen && isRotateIcon ? "rotate-180" : ""}`}
               aria-hidden="true"

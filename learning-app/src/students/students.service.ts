@@ -9,10 +9,14 @@ import { TokenPayload } from 'src/auth/token-payload/token-payload.auth';
 import { UpdateStudentDto } from './dto/update-student.dto';
 import { FilterStudentDto } from './dto/filter-student.dto';
 import { Prisma } from '@prisma/client';
+import { NotificationsService } from 'src/notifications/notifications.service';
 
 @Injectable()
 export class StudentsService {
-  constructor(private readonly prismaService: PrismaService) {}
+  constructor(
+    private readonly prismaService: PrismaService,
+    private readonly notificationsService: NotificationsService,
+  ) {}
 
   // find the number of students
   async findStudents(filterStudentDto: FilterStudentDto) {
@@ -22,6 +26,7 @@ export class StudentsService {
       page = 1,
       rowPerPage = 10,
       classId,
+      studentClassStatus, // status of student in class
     } = filterStudentDto;
     try {
       const whereCondition: Prisma.StudentWhereInput = {
@@ -30,12 +35,12 @@ export class StudentsService {
           : undefined,
         ...(status && { status }),
         // Nếu có classId và status là ACTIVE, chỉ lấy học sinh đang học trong lớp đó
-        ...(classId && status === 'ACTIVE'
+        ...(classId && studentClassStatus
           ? {
               classes: {
                 some: {
                   classId,
-                  status: 'ACTIVE',
+                  status: studentClassStatus,
                 },
               },
             }
@@ -142,7 +147,34 @@ export class StudentsService {
           classId,
           status: 'ACTIVE',
         },
+        include: {
+          class: true,
+        },
       });
+
+      // Send notification to all admin users except current admin
+      const adminUsers = await this.prismaService.user.findMany({
+        where: {
+          role: 'ADMIN',
+          NOT: {
+            id: user.userId, // Exclude current admin user
+          },
+        },
+        select: {
+          id: true,
+        },
+      });
+      const adminIds = adminUsers.map((user) => user.id);
+      if (adminIds.length > 0) {
+        await this.notificationsService.createNotification(
+          {
+            title: `Student "${createdStudent.name}" has been created`,
+            message: `Student "${createdStudent.name}" has been created and assigned to class: ${assignedStudent.class.name}\n\n📝 Student details:\n\n\t\t🎓 Name: ${createdStudent.name}\n\n\t\t👥 Parent: ${createdStudent.parent || '--'}\n\n\t\t🎂 Date of birth: ${createdStudent.dob.toLocaleDateString() || '--'}\n\n\t\t📱 Phone: ${createdStudent.phoneNumber || '--'}\n\n\t\t📱 Second phone: ${createdStudent.secondPhoneNumber || '--'}`,
+            receiverIds: adminIds,
+          },
+          user,
+        );
+      }
 
       return {
         createdStudent,

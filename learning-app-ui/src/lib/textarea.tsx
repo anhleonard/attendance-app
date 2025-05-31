@@ -1,5 +1,5 @@
 "use client";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, forwardRef, useImperativeHandle } from "react";
 
 interface TextAreaProps {
   label?: string;
@@ -17,85 +17,118 @@ interface TextAreaProps {
   placeholder?: string;
 }
 
-const TextArea = ({
-  label,
-  defaultValue = "",
-  onChange,
-  onKeyDown,
-  className = "",
-  cols = 4,
-  rows = 3,
-  error = false,
-  helperText = "",
-  inputClassName = "",
-  value: controlledValue,
-  onBlur,
-  placeholder,
-}: TextAreaProps) => {
-  const [isFocused, setIsFocused] = useState(false);
-  const [internalValue, setInternalValue] = useState(defaultValue);
-  const inputRef = useRef<HTMLTextAreaElement>(null);
+export interface TextAreaRef {
+  clear: () => void;
+  focus: () => void;
+  getValue: () => string;
+}
 
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (inputRef.current && !inputRef.current.contains(event.target as Node)) {
-        setIsFocused(false);
+const TextArea = forwardRef<TextAreaRef, TextAreaProps>(
+  (
+    {
+      label,
+      defaultValue = "",
+      onChange,
+      onKeyDown,
+      className = "",
+      cols = 4,
+      rows = 3,
+      error = false,
+      helperText = "",
+      inputClassName = "",
+      value: controlledValue,
+      onBlur,
+      placeholder,
+    },
+    ref,
+  ) => {
+    const [isFocused, setIsFocused] = useState(false);
+    const [internalValue, setInternalValue] = useState(defaultValue);
+    const internalRef = useRef<HTMLTextAreaElement>(null);
+
+    useImperativeHandle(ref, () => ({
+      clear: () => {
+        setInternalValue("");
+        if (internalRef.current) {
+          internalRef.current.value = "";
+          internalRef.current.style.height = "auto";
+        }
+        onChange?.("");
+      },
+      focus: () => internalRef.current?.focus(),
+      getValue: () => internalRef.current?.value || internalValue,
+    }));
+
+    // Update internal value when defaultValue changes
+    useEffect(() => {
+      if (controlledValue === undefined) {
+        setInternalValue(defaultValue);
       }
+    }, [defaultValue, controlledValue]);
+
+    useEffect(() => {
+      const handleClickOutside = (event: MouseEvent) => {
+        const textareaElement = internalRef.current;
+        if (textareaElement && !textareaElement.contains(event.target as Node)) {
+          setIsFocused(false);
+        }
+      };
+
+      document.addEventListener("mousedown", handleClickOutside);
+      return () => {
+        document.removeEventListener("mousedown", handleClickOutside);
+      };
+    }, []);
+
+    const handleChange = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
+      const newValue = event.target.value;
+      if (controlledValue === undefined) {
+        setInternalValue(newValue);
+      }
+      onChange?.(newValue);
     };
 
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
+    const handleBlur = () => {
+      setIsFocused(false);
+      onBlur?.();
     };
-  }, []);
 
-  const handleChange = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const newValue = event.target.value;
-    setInternalValue(newValue);
-    onChange?.(newValue);
-  };
+    const handleLabelClick = () => {
+      setIsFocused(true);
+      internalRef.current?.focus();
+    };
 
-  const handleBlur = () => {
-    setIsFocused(false);
-    onBlur?.();
-  };
+    // Use controlled value if provided, otherwise use internal state
+    const displayValue = controlledValue !== undefined ? controlledValue : internalValue;
 
-  const handleLabelClick = () => {
-    setIsFocused(true);
-    inputRef.current?.focus();
-  };
-
-  // Use controlled value if provided, otherwise use internal state
-  const displayValue = controlledValue ?? internalValue;
-
-  return (
-    <div className={`relative w-full group ${className}`}>
-      {/* Label */}
-      {label && (
-        <label
-          onClick={handleLabelClick}
-          className={`absolute left-4 text-sm font-semibold transition-all duration-300 z-10 cursor-text
+    return (
+      <div className={`relative w-full group ${className}`}>
+        {/* Label */}
+        {label && (
+          <label
+            onClick={handleLabelClick}
+            className={`absolute left-4 text-sm font-semibold transition-all duration-300 z-10 cursor-text
             ${isFocused || displayValue ? "-top-[8px] bg-white px-1 text-xs" : "left-4 top-[14px]"} 
             ${isFocused ? "text-primary-c900" : "text-grey-c200"}
             ${error ? "bg-gradient-to-b from-transparent to-support-c10" : ""}
           `}
-        >
-          {label}
-        </label>
-      )}
+          >
+            {label}
+          </label>
+        )}
 
-      {/* Input Box */}
-      <textarea
-        cols={cols}
-        rows={rows}
-        ref={inputRef}
-        value={displayValue}
-        onChange={handleChange}
-        onKeyDown={onKeyDown}
-        onFocus={() => setIsFocused(true)}
-        onBlur={handleBlur}
-        placeholder={placeholder}
-        className={`w-full border-2 rounded-[20px] px-4 py-3 outline-none transition-all focus:border-primary-c900
+        {/* Input Box */}
+        <textarea
+          cols={cols}
+          rows={rows}
+          ref={internalRef}
+          value={displayValue}
+          onChange={handleChange}
+          onKeyDown={onKeyDown}
+          onFocus={() => setIsFocused(true)}
+          onBlur={handleBlur}
+          placeholder={placeholder}
+          className={`w-full border-2 rounded-[20px] px-4 py-3 outline-none transition-all focus:border-primary-c900
           ${
             isFocused && !error
               ? "border-primary-c900"
@@ -105,10 +138,13 @@ const TextArea = ({
           }
           ${inputClassName}
         `}
-      />
-      {helperText ? <div className="text-xs pl-1 text-support-c300">{helperText}</div> : null}
-    </div>
-  );
-};
+        />
+        {helperText ? <div className="text-xs pl-1 text-support-c300">{helperText}</div> : null}
+      </div>
+    );
+  },
+);
+
+TextArea.displayName = "TextArea";
 
 export default TextArea;

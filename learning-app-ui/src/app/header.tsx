@@ -1,22 +1,41 @@
 "use client";
 import PasswordSetting from "@/components/header/password-setting";
 import ProfileSetting from "@/components/header/profile-setting";
-import { ModalState } from "@/config/types";
+import { ModalState, Notification } from "@/config/types";
 import { openModal } from "@/redux/slices/modal-slice";
 import React, { useState, useEffect, useRef } from "react";
-import { useDispatch } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
+import { RootState } from "@/redux/store";
+import moment from "moment";
+import NotificationDetailModal from "./(main)/notifications/notification-detail-modal";
+import { updateNotification, getNotifications } from "@/apis/services/notifications";
+import { UpdateNotificationDto } from "@/apis/dto";
+import { updateSystemInfo } from "@/redux/slices/system-slice";
+import MakeRequestModal from "@/components/header/make-request-modal";
 
 const Header = () => {
   const dispatch = useDispatch();
   const router = useRouter();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const notificationRef = useRef<HTMLDivElement>(null);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+
+  const {
+    notifications: { data: notifications, page, total },
+    profile,
+  } = useSelector((state: RootState) => state.system);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setIsDropdownOpen(false);
+      }
+      if (notificationRef.current && !notificationRef.current.contains(event.target as Node)) {
+        setIsNotificationOpen(false);
       }
     };
 
@@ -48,10 +67,75 @@ const Header = () => {
     dispatch(openModal(modal));
   };
 
+  const handleOpenMakeRequestModal = () => {
+    const modal: ModalState = {
+      isOpen: true,
+      title: "Make request",
+      content: <MakeRequestModal />,
+      className: "max-w-xl",
+    };
+    setIsDropdownOpen(!isDropdownOpen);
+    dispatch(openModal(modal));
+  };
   const handleLogout = () => {
     // TODO: Add your logout logic here (clear tokens, etc)
     setIsDropdownOpen(false);
     router.push("/auth/login");
+  };
+
+  const handleMarkNotification = async (notification: Notification) => {
+    const data: UpdateNotificationDto = {
+      id: notification.id,
+      isRead: true,
+    };
+    await updateNotification(data);
+  };
+
+  const handleOpenNotification = async (notification: Notification) => {
+    try {
+      if (!notification.receivers[0]?.isRead) {
+        await handleMarkNotification(notification);
+        // update local notifications state to mark the viewed notification as read
+        const updatedNotifications = notifications?.map((n) => {
+          if (n.id === notification.id) {
+            return {
+              ...n,
+              receivers: n.receivers.map((r) => ({ ...r, isRead: true })),
+            };
+          }
+          return n;
+        });
+        dispatch(updateSystemInfo({ notifications: { data: updatedNotifications || [], page, total } }));
+      }
+    } catch (error) {
+    } finally {
+      setIsNotificationOpen(false);
+      dispatch(
+        openModal({
+          isOpen: true,
+          title: "Detail notification",
+          content: <NotificationDetailModal notification={notification} />,
+          className: "max-w-xl",
+        }),
+      );
+    }
+  };
+
+  const loadMoreNotifications = async () => {
+    try {
+      setIsLoadingMore(true);
+      const nextPage = page + 1;
+      const response = await getNotifications({ page: nextPage, userId: profile?.id });
+      if (response?.data) {
+        // Append new notifications to existing ones
+        const updatedNotifications = [...(notifications || []), ...response.data];
+        dispatch(updateSystemInfo({ notifications: { data: updatedNotifications, page: nextPage, total } }));
+      }
+    } catch (error) {
+      console.error("Error loading more notifications:", error);
+    } finally {
+      setIsLoadingMore(false);
+    }
   };
 
   return (
@@ -59,24 +143,99 @@ const Header = () => {
       <div className="w-full flex flex-row items-center justify-between">
         <div className="font-bold text-grey-c900 text-lg">Attendance Tool</div>
         <div className="flex flex-row items-center gap-2">
-          <button className="p-2 rounded-full bg-primary-c50 hover:bg-primary-c100 text-grey-c900 hover:text-primary-c900 duration-300 transition-all">
-            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path
-                d="M2.10832 12.3084C1.93082 13.4701 2.72332 14.2759 3.69332 14.6776C7.41248 16.2192 12.5875 16.2192 16.3067 14.6776C17.2767 14.2759 18.0692 13.4692 17.8917 12.3084C17.7833 11.5942 17.2442 11.0001 16.845 10.4192C16.3225 9.64925 16.2708 8.81008 16.27 7.91675C16.2708 4.46508 13.4642 1.66675 9.99998 1.66675C6.53582 1.66675 3.72915 4.46508 3.72915 7.91675C3.72915 8.81008 3.67748 9.65008 3.15415 10.4192C2.75582 11.0001 2.21748 11.5942 2.10832 12.3084Z"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-              <path
-                d="M6.66663 15.8335C7.04829 17.271 8.39663 18.3335 9.99996 18.3335C11.6041 18.3335 12.9508 17.271 13.3333 15.8335"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          </button>
+          <div className="relative" ref={notificationRef}>
+            <button
+              onClick={() => setIsNotificationOpen(!isNotificationOpen)}
+              className="p-2 rounded-full bg-primary-c50 hover:bg-primary-c100 text-grey-c900 hover:text-primary-c900 duration-300 transition-all relative"
+            >
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path
+                  d="M2.10832 12.3084C1.93082 13.4701 2.72332 14.2759 3.69332 14.6776C7.41248 16.2192 12.5875 16.2192 16.3067 14.6776C17.2767 14.2759 18.0692 13.4692 17.8917 12.3084C17.7833 11.5942 17.2442 11.0001 16.845 10.4192C16.3225 9.64925 16.2708 8.81008 16.27 7.91675C16.2708 4.46508 13.4642 1.66675 9.99998 1.66675C6.53582 1.66675 3.72915 4.46508 3.72915 7.91675C3.72915 8.81008 3.67748 9.65008 3.15415 10.4192C2.75582 11.0001 2.21748 11.5942 2.10832 12.3084Z"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+                <path
+                  d="M6.66663 15.8335C7.04829 17.271 8.39663 18.3335 9.99996 18.3335C11.6041 18.3335 12.9508 17.271 13.3333 15.8335"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+              {notifications &&
+                notifications.reduce((count, notification) => {
+                  return count + (notification.receivers[0]?.isRead ? 0 : 1);
+                }, 0) > 0 && (
+                  <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full text-white text-xs flex items-center justify-center">
+                    {notifications.reduce((count, notification) => {
+                      return count + (notification.receivers[0]?.isRead ? 0 : 1);
+                    }, 0)}
+                  </span>
+                )}
+            </button>
+
+            {/* Notification Dropdown Menu */}
+            <div
+              className={`z-[999] absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-lg border border-grey-c100 overflow-hidden transition-all duration-200 transform origin-top-right ${
+                isNotificationOpen
+                  ? "opacity-100 scale-100 translate-y-0"
+                  : "opacity-0 scale-95 -translate-y-2 pointer-events-none"
+              }`}
+            >
+              <div className="max-h-96 overflow-y-auto">
+                {notifications && notifications?.length > 0 ? (
+                  notifications?.map((notification) => {
+                    const isRead = notification.receivers[0]?.isRead;
+                    return (
+                      <div
+                        key={notification.id}
+                        onClick={() => handleOpenNotification(notification)}
+                        className="p-3 border-b border-grey-c100 hover:bg-primary-c50 cursor-pointer transition-colors duration-200 flex flex-col items-start"
+                      >
+                        <div className="flex items-start gap-3">
+                          <div
+                            className={`w-2 h-2 mt-2 rounded-full ${isRead ? "bg-grey-c200/60" : "bg-primary-c700"}`}
+                          ></div>
+                          <div>
+                            <p className={`text-sm font-semibold ${isRead ? "text-grey-c600" : "text-black/90"}`}>
+                              {notification.title}
+                            </p>
+                            <p className="text-xs font-medium text-primary-c900 mt-1">
+                              {notification.createdBy?.fullname}
+                            </p>
+                            <div className="flex flex-col items-start gap-1 mt-1">
+                              <p className="text-xs text-grey-c500 flex flex-row items-center gap-1">
+                                <Image src="/icons/noti-time.svg" alt="noti-time" width={14} height={14} />
+                                <span>{moment(notification.createdAt)?.format("DD/MM/YYYY HH:mm")}</span>
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="p-4 text-center text-grey-c500 flex flex-col items-center gap-2">
+                    <Image src="/icons/no-noti.svg" alt="no-noti" width={28} height={28} />
+                    <div>No notifications</div>
+                  </div>
+                )}
+              </div>
+              {notifications && notifications?.length > 0 && (
+                <div className="p-1 border-t border-grey-c100">
+                  <button
+                    onClick={loadMoreNotifications}
+                    disabled={isLoadingMore || notifications.length >= total}
+                    className="w-full text-center text-sm font-semibold text-primary-c900 hover:text-primary-c700 py-1.5 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {notifications.length >= total ? "No more notifications" : "View more"}
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
           <div className="relative" ref={dropdownRef}>
             <button
               onClick={() => setIsDropdownOpen(!isDropdownOpen)}
@@ -143,6 +302,21 @@ const Header = () => {
                   />
                 </svg>
                 <div>Change password</div>
+              </button>
+              <button
+                onClick={handleOpenMakeRequestModal}
+                className="flex flex-row items-center gap-2 w-full px-4 py-2.5 text-left text-grey-c900 hover:bg-primary-c50 active:bg-primary-c100 hover:text-primary-c900 transition-colors duration-200"
+              >
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path
+                    d="M12.5 5.83335H5.83333M8.33333 10H5.83333M2.5 9.16669C2.5 6.04169 2.5 4.47919 3.29583 3.38419C3.55255 3.03058 3.86329 2.71956 4.21667 2.46252C5.3125 1.66669 6.87583 1.66669 10 1.66669C13.1242 1.66669 14.6875 1.66669 15.7825 2.46252C16.1362 2.71949 16.4472 3.03052 16.7042 3.38419C17.5 4.47919 17.5 6.04252 17.5 9.16669V10.8334C17.5 13.9584 17.5 15.5209 16.7042 16.6159C16.4472 16.9695 16.1362 17.2806 15.7825 17.5375C14.6875 18.3334 13.1242 18.3334 10 18.3334C6.87583 18.3334 5.3125 18.3334 4.2175 17.5375C3.86383 17.2806 3.5528 16.9695 3.29583 16.6159C2.5 15.5209 2.5 13.9575 2.5 10.8334V9.16669Z"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+                <div>Make request</div>
               </button>
               <button
                 onClick={handleLogout}

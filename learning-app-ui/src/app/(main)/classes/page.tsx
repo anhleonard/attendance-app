@@ -210,51 +210,45 @@ const Classes = () => {
         <div className="font-bold text-base">1. Class list</div>
 
         {/* filter class */}
-        <div className="grid grid-cols-6 gap-3 mb-5 mt-4">
-          <div className="col-span-4 grid sm:grid-cols-4 sm:gap-3">
-            <div className="sm:col-span-2">
-              <TextField 
-                label="Search class" 
-                value={filterName}
-                onChange={handleNameChange}
-              />
-            </div>
-            <Select
-              label="Status"
-              defaultValue={filterStatus}
-              onChange={handleStatusChange}
-              options={[
-                { label: "Active", value: Status.ACTIVE },
-                { label: "Inactive", value: Status.INACTIVE },
-              ]}
+        <div className="grid grid-cols-4 gap-3 mb-5 mt-4">
+          <TextField 
+            label="Search class" 
+            value={filterName}
+            onChange={handleNameChange}
+          />
+          <Select
+            label="Status"
+            defaultValue={filterStatus}
+            onChange={handleStatusChange}
+            options={[
+              { label: "Active", value: Status.ACTIVE },
+              { label: "Inactive", value: Status.INACTIVE },
+            ]}
+          />
+          <div className="flex flex-row gap-3">
+            <Button 
+              label="Filter" 
+              className="py-[13px] px-8" 
+              status="success" 
+              onClick={handleFilter}
             />
-            <div className="flex flex-row gap-3">
-              <Button 
-                label="Filter" 
-                className="py-[13px] px-8" 
-                status="success" 
-                onClick={handleFilter}
-              />
-              <Button 
-                label="Cancel" 
-                className="py-[13px] px-8" 
-                status="cancel" 
-                onClick={handleResetFilter}
-              />
-            </div>
+            <Button 
+              label="Cancel" 
+              className="py-[13px] px-8" 
+              status="cancel" 
+              onClick={handleResetFilter}
+            />
           </div>
-          <div className="col-span-2 text-end">
-            {/* put item center when use grid */}
-            <div className="inline-grid justify-center items-center">
-              <Button
-                label="Add class"
-                status="success"
-                className="py-3 px-4"
-                onClick={handleOpenDrawer}
-                startIcon={<Image src={"/icons/add-icon.svg"} alt="add-icon" width={20} height={20} />}
-              />
-            </div>
-          </div>
+        </div>
+
+        <div className="inline-grid justify-end items-center mb-2">
+          <Button
+            label="Add class"
+            status="success"
+            className="py-2.5 px-4"
+            startIcon={<Image src={"/icons/add-icon.svg"} alt="add-icon" width={20} height={20} />}
+            onClick={handleOpenDrawer}
+          />
         </div>
 
         {/* table 1 */}

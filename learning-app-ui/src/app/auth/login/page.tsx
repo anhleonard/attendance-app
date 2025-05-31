@@ -1,5 +1,5 @@
 "use client";
-import { Class, ModalState, Student } from "@/config/types";
+import { Class, ModalState, Student, User } from "@/config/types";
 import Button from "@/lib/button";
 import TextField from "@/lib/textfield";
 import { openModal } from "@/redux/slices/modal-slice";
@@ -14,11 +14,13 @@ import { login } from "@/apis/services/auth";
 import { LoginDto } from "@/apis/dto";
 import { closeLoading, openLoading } from "@/redux/slices/loading-slice";
 import { openAlert } from "@/redux/slices/alert-slice";
-import { ACTIVE_CLASSES, USER_INFO, ACCESS_TOKEN, ACTIVE_STUDENTS } from "@/config/constants";
-import { getUserInfo } from "@/apis/services/users";
+import { ACCESS_TOKEN } from "@/config/constants";
+import { getSystemUsers, getUserInfo } from "@/apis/services/users";
 import { getClasses } from "@/apis/services/classes";
 import { Status } from "@/config/enums";
 import { getStudents } from "@/apis/services/students";
+import { updateSystemInfo } from "@/redux/slices/system-slice";
+import { getNotifications } from "@/apis/services/notifications";
 
 const validationSchema = Yup.object({
   email: Yup.string().email("Invalid email format").required("Email is required"),
@@ -51,30 +53,61 @@ const LoginPage = () => {
           // get user info
           const userInfo = await getUserInfo();
           // get active classes
-          const activeClasses = await getClasses({
+          let activeClasses = await getClasses({
             fetchAll: true,
             status: Status.ACTIVE,
           });
           // get active students
-          const studentList = await getStudents({
+          let studentList = await getStudents({
             fetchAll: true,
             status: Status.ACTIVE,
           });
+          // get notifications
+          const notifications = await getNotifications({
+            userId: userInfo?.id,
+          });
+          // get system users
+          let systemUsers = await getSystemUsers({
+            fetchAll: true,
+            status: Status.ACTIVE,
+          });
+
           if (activeClasses?.data?.length > 0) {
             const mappedActiveClasses = activeClasses?.data?.map((cls: Class) => ({
               label: cls.name,
               value: cls.id.toString(),
             }));
-            localStorage.setItem(ACTIVE_CLASSES, JSON.stringify(mappedActiveClasses));
+            activeClasses = mappedActiveClasses;
           }
           if (studentList?.data?.length > 0) {
             const mappedActiveStudents = studentList?.data?.map((student: Student) => ({
               label: student.name,
               value: student.id.toString(),
             }));
-            localStorage.setItem(ACTIVE_STUDENTS, JSON.stringify(mappedActiveStudents));
+            studentList = mappedActiveStudents;
           }
-          localStorage.setItem(USER_INFO, JSON.stringify(userInfo));
+          if (systemUsers?.data?.length > 0) {
+            const mappedSystemUsers = systemUsers?.data?.map((user: User) => ({
+              label: user.fullname,
+              value: user.id.toString(),
+              role: user.role,
+            }));
+            systemUsers = mappedSystemUsers;
+          }
+
+          dispatch(
+            updateSystemInfo({
+              profile: userInfo,
+              activeClasses: activeClasses || activeClasses?.data || [],
+              activeStudents: studentList || studentList?.data || [],
+              notifications: {
+                data: notifications?.data || [],
+                page: 1,
+                total: notifications?.total || 0,
+              },
+              systemUsers: systemUsers || systemUsers?.data || [],
+            }),
+          );
           router.push("/calendar");
           dispatch(
             openAlert({

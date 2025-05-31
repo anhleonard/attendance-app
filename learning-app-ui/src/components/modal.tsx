@@ -2,13 +2,7 @@
 import React, { Fragment } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { RootState } from "@/redux/store";
-import {
-  Dialog,
-  DialogPanel,
-  DialogTitle,
-  Transition,
-  TransitionChild,
-} from "@headlessui/react";
+import { Dialog, DialogPanel, DialogTitle, Transition, TransitionChild } from "@headlessui/react";
 import { closeModal } from "@/redux/slices/modal-slice";
 import Image from "next/image";
 
@@ -22,11 +16,7 @@ const Modal = () => {
 
   return (
     <Transition appear show={modalData?.isOpen} as={Fragment}>
-      <Dialog
-        as="div"
-        className="fixed inset-0 z-50"
-        onClose={handleCloseModal}
-      >
+      <Dialog as="div" className="fixed inset-0 z-[9999]" onClose={handleCloseModal}>
         <div className="fixed inset-0 overflow-y-auto">
           <div className="flex min-h-full items-center justify-center p-4 text-center">
             <TransitionChild
@@ -64,18 +54,11 @@ const Modal = () => {
                       className="hover:bg-grey-c50 p-1.5 rounded-full active:bg-grey-c100 transition-transform duration-300"
                       onClick={handleCloseModal}
                     >
-                      <Image
-                        src="/icons/close-icon.svg"
-                        alt="close-icon"
-                        width={20}
-                        height={20}
-                      />
+                      <Image src="/icons/close-icon.svg" alt="close-icon" width={20} height={20} />
                     </button>
                   </span>
                 </div>
-                <div className="w-full max-h-[75vh] overflow-auto px-4 py-3 text-sm">
-                  {modalData?.content}
-                </div>
+                <div className="w-full max-h-[75vh] overflow-auto px-4 py-3 text-sm">{modalData?.content}</div>
               </DialogPanel>
             </TransitionChild>
           </div>

@@ -6,6 +6,9 @@ export const ACTIVE_CLASSES = "activeClasses";
 export const ACCESS_TOKEN = "accessToken";
 export const ACTIVE_STUDENTS = "activeStudents";
 
+// websocket
+export const NEW_NOTIFICATION = "new_notification";
+
 export const MONTHS = [
   { label: "January", value: "1" },
   { label: "February", value: "2" },

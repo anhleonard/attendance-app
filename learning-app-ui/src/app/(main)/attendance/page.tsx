@@ -258,22 +258,6 @@ const Attendance = () => {
           absent: value ? 0 : attendanceData.statistic.total,
         },
       });
-
-      // Update class statistics
-      setClassesInfo((prevClasses) =>
-        prevClasses.map((classInfo) =>
-          classInfo.id === selectedClassId
-            ? {
-                ...classInfo,
-                statistic: {
-                  total: attendanceData.statistic.total,
-                  attended: value ? attendanceData.statistic.total : 0,
-                  absent: value ? 0 : attendanceData.statistic.total,
-                },
-              }
-            : classInfo,
-        ),
-      );
     } else {
       // Update new attendance records
       const updatedStudents = studentsData.data.map((student) => ({
@@ -284,22 +268,6 @@ const Attendance = () => {
         ...studentsData,
         data: updatedStudents,
       });
-
-      // Update class statistics for new attendance
-      setClassesInfo((prevClasses) =>
-        prevClasses.map((classInfo) =>
-          classInfo.id === selectedClassId
-            ? {
-                ...classInfo,
-                statistic: {
-                  total: studentsData.total,
-                  attended: value ? studentsData.total : 0,
-                  absent: value ? 0 : studentsData.total,
-                },
-              }
-            : classInfo,
-        ),
-      );
     }
   };
 
@@ -320,50 +288,17 @@ const Attendance = () => {
           absent: attendanceData.statistic.total - attendedCount,
         },
       });
-
-      // Update class statistics
-      setClassesInfo((prevClasses) =>
-        prevClasses.map((classInfo) =>
-          classInfo.id === selectedClassId
-            ? {
-                ...classInfo,
-                statistic: {
-                  total: attendanceData.statistic.total,
-                  attended: attendedCount,
-                  absent: attendanceData.statistic.total - attendedCount,
-                },
-              }
-            : classInfo,
-        ),
-      );
       setCheckedAll(allChecked);
     } else {
       const updatedStudents = studentsData.data.map((student) =>
         student.id === id ? { ...student, isAttend: value } : student,
       );
       const allChecked = updatedStudents.every((student) => student.isAttend);
-      const attendedCount = updatedStudents.filter((student) => student.isAttend).length;
 
       setStudentsData({
         ...studentsData,
         data: updatedStudents,
       });
-
-      // Update class statistics for new attendance
-      setClassesInfo((prevClasses) =>
-        prevClasses.map((classInfo) =>
-          classInfo.id === selectedClassId
-            ? {
-                ...classInfo,
-                statistic: {
-                  total: studentsData.total,
-                  attended: attendedCount,
-                  absent: studentsData.total - attendedCount,
-                },
-              }
-            : classInfo,
-        ),
-      );
       setCheckedAll(allChecked);
     }
   };
@@ -471,6 +406,27 @@ const Attendance = () => {
         await createBatchAttendance(createData);
       }
 
+      // After successful save, update the class statistics
+      const attendedCount = isExistingAttendance
+        ? attendanceData.data.filter((record) => record.isAttend).length
+        : studentsData.data.filter((student) => student.isAttend).length;
+      const totalCount = isExistingAttendance ? attendanceData.statistic.total : studentsData.total;
+
+      setClassesInfo((prevClasses) =>
+        prevClasses.map((classInfo) =>
+          classInfo.id === selectedClassId
+            ? {
+                ...classInfo,
+                statistic: {
+                  total: totalCount,
+                  attended: attendedCount,
+                  absent: totalCount - attendedCount,
+                },
+              }
+            : classInfo,
+        ),
+      );
+
       dispatch(
         openAlert({ isOpen: true, title: "SUCCESS", subtitle: "Attendance saved successfully", type: "success" }),
       );
@@ -497,6 +453,24 @@ const Attendance = () => {
   const handleDateChange = (value: string) => {
     setDate(value);
     // Reset all states when date changes
+    setSelectedClassId(null);
+    setCheckedAll(false);
+    setNotes({});
+    setPage(1);
+    setAttendanceData({
+      statistic: { total: 0, attended: 0, absent: 0 },
+      total: 0,
+      page: 1,
+      rowPerPage: 10,
+      data: [],
+    });
+    setStudentsData({ total: 0, data: [] });
+  };
+
+  const handleCancel = () => {
+    // Reset date to today
+    setDate(moment().format("DD-MM-YYYY"));
+    // Clear selected class and reset states
     setSelectedClassId(null);
     setCheckedAll(false);
     setNotes({});
@@ -539,8 +513,7 @@ const Attendance = () => {
               }}
             />
             <div className="flex flex-row gap-3">
-              <Button label="Filter" className="py-[13px] px-8" status="success" />
-              <Button label="Cancel" className="py-[13px] px-8" status="cancel" />
+              <Button label="Cancel" className="py-[13px] px-8" status="cancel" onClick={handleCancel} />
             </div>
           </div>
 
@@ -629,28 +602,30 @@ const Attendance = () => {
                         </tr>
                       </thead>
                       <tbody>
-                        {attendanceData.data.map((record, index) => (
-                          <tr key={record.id} className="hover:bg-primary-c10">
-                            <th className="pl-3 py-4">{(page - 1) * rowsPerPage + index + 1}</th>
-                            <th className="px-1 py-4">{record.student.name}</th>
-                            <th className="px-1 py-4">{moment(record.learningDate).format("D/M/YYYY")}</th>
-                            <th className="px-1 py-4">
-                              <Checkbox
-                                isChecked={record.isAttend}
-                                onChange={(value: boolean) => handleChangeAttendanceChecked(record.id, value)}
-                              />
-                            </th>
-                            <th className="px-1 py-4">
-                              <TextArea
-                                rows={2}
-                                label="Note of this student"
-                                inputClassName="font-questrial"
-                                value={notes[record.id] || record.noteAttendance || ""}
-                                onChange={(value: string) => handleNoteChange(record.id, value)}
-                              />
-                            </th>
-                          </tr>
-                        ))}
+                        {[...attendanceData.data]
+                          .sort((a, b) => a.student.name.localeCompare(b.student.name))
+                          .map((record, index) => (
+                            <tr key={record.id} className="hover:bg-primary-c10">
+                              <th className="pl-3 py-4">{(page - 1) * rowsPerPage + index + 1}</th>
+                              <th className="px-1 py-4">{record.student.name}</th>
+                              <th className="px-1 py-4">{moment(record.learningDate).format("D/M/YYYY")}</th>
+                              <th className="px-1 py-4">
+                                <Checkbox
+                                  isChecked={record.isAttend}
+                                  onChange={(value: boolean) => handleChangeAttendanceChecked(record.id, value)}
+                                />
+                              </th>
+                              <th className="px-1 py-4">
+                                <TextArea
+                                  rows={2}
+                                  label="Note of this student"
+                                  inputClassName="font-questrial"
+                                  value={notes[record.id] || record.noteAttendance || ""}
+                                  onChange={(value: string) => handleNoteChange(record.id, value)}
+                                />
+                              </th>
+                            </tr>
+                          ))}
                       </tbody>
                     </table>
                   )
@@ -668,28 +643,30 @@ const Attendance = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {studentsData.data.map((student, index) => (
-                        <tr key={student.id} className="hover:bg-primary-c10">
-                          <th className="pl-3 py-4">{index + 1}</th>
-                          <th className="px-1 py-4">{student.name}</th>
-                          <th className="px-1 py-4">{moment(date, "DD-MM-YYYY").format("D/M/YYYY")}</th>
-                          <th className="px-1 py-4">
-                            <Checkbox
-                              isChecked={student.isAttend || false}
-                              onChange={(value: boolean) => handleChangeAttendanceChecked(student.id, value)}
-                            />
-                          </th>
-                          <th className="px-1 py-4">
-                            <TextArea
-                              rows={2}
-                              label="Note of this student"
-                              inputClassName="font-questrial"
-                              value={notes[student.id] || ""}
-                              onChange={(value: string) => handleNoteChange(student.id, value)}
-                            />
-                          </th>
-                        </tr>
-                      ))}
+                      {[...studentsData.data]
+                        .sort((a, b) => a.name.localeCompare(b.name))
+                        .map((student, index) => (
+                          <tr key={student.id} className="hover:bg-primary-c10">
+                            <th className="pl-3 py-4">{index + 1}</th>
+                            <th className="px-1 py-4">{student.name}</th>
+                            <th className="px-1 py-4">{moment(date, "DD-MM-YYYY").format("D/M/YYYY")}</th>
+                            <th className="px-1 py-4">
+                              <Checkbox
+                                isChecked={student.isAttend || false}
+                                onChange={(value: boolean) => handleChangeAttendanceChecked(student.id, value)}
+                              />
+                            </th>
+                            <th className="px-1 py-4">
+                              <TextArea
+                                rows={2}
+                                label="Note of this student"
+                                inputClassName="font-questrial"
+                                value={notes[student.id] || ""}
+                                onChange={(value: string) => handleNoteChange(student.id, value)}
+                              />
+                            </th>
+                          </tr>
+                        ))}
                     </tbody>
                   </table>
                 )}

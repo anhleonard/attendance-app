@@ -63,6 +63,7 @@ model User {
   email       String       @unique
   password    String
   fullname    String
+  avatar      String? // URL to avatar image
   role        Role         @default(ADMIN)
   permissions Permission[]
   createdAt   DateTime     @default(now())
@@ -78,6 +79,10 @@ model User {
 
   chats   Chat[]
   Message Message[]
+
+  // Add relations for notifications
+  createdNotifications  Notification[]         @relation("NotificationCreator")
+  receivedNotifications NotificationReceiver[] @relation("NotificationReceiver")
 }
 
 model Student {
@@ -167,14 +172,14 @@ model Attendance {
 
 model Payment {
   id               Int           @id @default(autoincrement())
-  totalSessions    Int          // tổng số buổi đã được điểm danh (có thể là tham gia hoặc không tham gia)
-  totalAttend      Int          // số buổi đã tham gia
-  totalMonthAmount Int          // tiền của tháng này
-  totalPayment     Int          // tổng phải trả = totalMonthAmount + debt (lấy ở student)
-  paidPayment      Int?         // số tiền đã trả
+  totalSessions    Int // tổng số buổi đã được điểm danh (có thể là tham gia hoặc không tham gia)
+  totalAttend      Int // số buổi đã tham gia
+  totalMonthAmount Int // tiền của tháng này
+  totalPayment     Int // tổng phải trả = totalMonthAmount + debt (lấy ở student)
+  paidPayment      Int? // số tiền đã trả
   status           PaymentStatus @default(SAVED) // Sent, Paid, Saved
   paymentNote      String        @default("") // default: Sent via Zalo //maybe null
-  sentAt           DateTime?     // Sent lúc nào?? //chỉ update khi status = sent
+  sentAt           DateTime? // Sent lúc nào?? //chỉ update khi status = sent
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
 
@@ -212,4 +217,35 @@ model Message {
   // Relation với Chat turn
   chatId Int
   chat   Chat @relation(fields: [chatId], references: [id])
+}
+
+model Notification {
+  id        Int      @id @default(autoincrement())
+  title     String
+  message   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relation with User to know who created the notification
+  createdById Int
+  createdBy   User @relation("NotificationCreator", fields: [createdById], references: [id])
+
+  // Many-to-many relation with User for receivers
+  receivers NotificationReceiver[]
+}
+
+// New join table for notification receivers
+model NotificationReceiver {
+  id        Int      @id @default(autoincrement())
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  notificationId Int
+  notification   Notification @relation(fields: [notificationId], references: [id])
+
+  userId Int
+  user   User @relation("NotificationReceiver", fields: [userId], references: [id])
+
+  @@unique([notificationId, userId])
 }

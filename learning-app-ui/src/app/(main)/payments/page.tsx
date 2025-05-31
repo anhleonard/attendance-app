@@ -1,6 +1,6 @@
 "use client";
 import PaymentDetailModal from "@/components/payment/payment-detail-modal";
-import { ACTIVE_CLASSES, ACTIVE_STUDENTS, MONTHS } from "@/config/constants";
+import { MONTHS } from "@/config/constants";
 import { formatCurrency } from "@/config/functions";
 import Button from "@/lib/button";
 import Label from "@/lib/label";
@@ -21,7 +21,6 @@ import { FilterPaymentDto } from "@/apis/dto";
 import { openLoading, closeLoading } from "@/redux/slices/loading-slice";
 import { openAlert } from "@/redux/slices/alert-slice";
 import { RootState } from "@/redux/store";
-import { refetch } from "@/redux/slices/refetch-slice";
 import moment from "moment";
 
 interface PaymentResponse {
@@ -77,7 +76,7 @@ interface PaymentResponse {
 const Payments = () => {
   const dispatch = useDispatch();
   const [show, setShow] = useState(false);
-  const [selectedPayment, setSelectedPayment] = useState<PaymentResponse['data'][0] | null>(null);
+  const [selectedPayment, setSelectedPayment] = useState<PaymentResponse["data"][0] | null>(null);
   const [page, setPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [paymentsData, setPaymentsData] = useState<PaymentResponse>({ total: 0, data: [] });
@@ -87,8 +86,8 @@ const Payments = () => {
   const currentYear = moment().format("YYYY");
   const [selectedMonth, setSelectedMonth] = useState<string>(currentMonth);
   const refetchCount = useSelector((state: RootState) => state.refetch.count);
-  const activeStudents = JSON.parse(localStorage.getItem(ACTIVE_STUDENTS) || "[]");
-  const activeClasses = JSON.parse(localStorage.getItem(ACTIVE_CLASSES) || "[]");
+  const activeStudents: any = useSelector((state: RootState) => state.system.activeStudents) || [];
+  const activeClasses: any = useSelector((state: RootState) => state.system.activeClasses) || [];
 
   const fetchPayments = async (currentPage: number, currentRowsPerPage: number) => {
     try {
@@ -96,7 +95,9 @@ const Payments = () => {
       const filterData: FilterPaymentDto = {
         page: currentPage,
         rowPerPage: currentRowsPerPage,
-        ...(selectedStudent && { name: activeStudents.find((student: any) => student.value === selectedStudent)?.label }),
+        ...(selectedStudent && {
+          name: activeStudents.find((student: any) => student.value === selectedStudent)?.label,
+        }),
         ...(selectedClass && { classId: selectedClass }),
         learningMonth: parseInt(selectedMonth),
         learningYear: parseInt(currentYear),
@@ -130,11 +131,6 @@ const Payments = () => {
     }
   };
 
-  const handleFilter = () => {
-    setPage(1); // Reset to first page when applying new filters
-    fetchPayments(1, rowsPerPage);
-  };
-
   const handleCancel = () => {
     setSelectedStudent(null);
     setSelectedClass(null);
@@ -143,7 +139,7 @@ const Payments = () => {
     fetchPayments(1, rowsPerPage);
   };
 
-  const handleOpenModal = (payment: PaymentResponse['data'][0]) => {
+  const handleOpenModal = (payment: PaymentResponse["data"][0]) => {
     setSelectedPayment(payment);
     setShow(true);
   };
@@ -255,9 +251,9 @@ const Payments = () => {
             defaultValue={selectedClass?.toString() || ""}
             onChange={(value) => setSelectedClass(value ? parseInt(value) : null)}
           />
-          <Select 
-            label="Select month" 
-            options={MONTHS} 
+          <Select
+            label="Select month"
+            options={MONTHS}
             defaultValue={selectedMonth}
             onChange={(value) => setSelectedMonth(value)}
           />
@@ -300,7 +296,7 @@ const Payments = () => {
                   <tr key={payment.id} className="hover:bg-primary-c10">
                     <th className="pl-3 py-4">{(page - 1) * rowsPerPage + index + 1}</th>
                     <th className="px-1 py-4">{payment.student.name}</th>
-                    <th className="px-1 py-4">{payment.student.currentClass?.name || '-'}</th>
+                    <th className="px-1 py-4">{payment.student.currentClass?.name || "-"}</th>
                     <th className="px-1 py-4 text-center">{payment.totalAttend}</th>
                     <th className="px-1 py-4">
                       <span className="font-bold text-[#FE9800]">{formatCurrency(payment.totalMonthAmount)} VNĐ</span>
@@ -310,7 +306,9 @@ const Payments = () => {
                         <span className="font-bold text-success-c700">0 VNĐ</span>
                       ) : (
                         <span className="font-bold text-support-c500">
-                          {payment.student.debt > 0 ? `-${formatCurrency(payment.student.debt)}` : `+${formatCurrency(payment.student.debt * -1)}`}
+                          {payment.student.debt > 0
+                            ? `-${formatCurrency(payment.student.debt)}`
+                            : `+${formatCurrency(payment.student.debt * -1)}`}
                           VNĐ
                         </span>
                       )}

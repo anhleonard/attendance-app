@@ -1,4 +1,14 @@
-import { Body, Controller, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Post,
+  UseGuards,
+  UseInterceptors,
+  UploadedFile,
+} from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { diskStorage } from 'multer';
+import { extname } from 'path';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
@@ -21,8 +31,23 @@ export class UsersController {
   }
 
   @Post('/update')
-  updateUser(@Body() updateUserDto: UpdateUserDto) {
-    return this.usersService.updateUser(updateUserDto);
+  @UseInterceptors(
+    FileInterceptor('avatar', {
+      storage: diskStorage({
+        destination: './uploads',
+        filename: (req, file, cb) => {
+          const uniqueSuffix =
+            Date.now() + '-' + Math.round(Math.random() * 1e9);
+          cb(null, `${uniqueSuffix}${extname(file.originalname)}`);
+        },
+      }),
+    }),
+  )
+  updateUser(
+    @Body() updateUserDto: UpdateUserDto,
+    @UploadedFile() avatarFile?: Express.Multer.File,
+  ) {
+    return this.usersService.updateUser(updateUserDto, avatarFile);
   }
 
   @Post('/find-users')

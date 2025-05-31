@@ -1,6 +1,13 @@
-import { IsNumber, IsOptional, Min, IsString, IsEnum } from 'class-validator';
+import {
+  IsNumber,
+  IsOptional,
+  Min,
+  IsString,
+  IsEnum,
+  IsBoolean,
+} from 'class-validator';
 import { Type } from 'class-transformer';
-import { Role } from 'src/utils/enums';
+import { Role, Status } from 'src/utils/enums';
 
 export class FilterUsersDto {
   @IsOptional()
@@ -22,4 +29,12 @@ export class FilterUsersDto {
   @IsOptional()
   @IsEnum(Role)
   role?: Role;
+
+  @IsOptional()
+  @IsBoolean()
+  fetchAll?: boolean;
+
+  @IsOptional()
+  @IsEnum(Status)
+  status?: Status;
 }

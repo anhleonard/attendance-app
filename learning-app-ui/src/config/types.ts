@@ -1,5 +1,5 @@
 import { MouseEventHandler } from "react";
-import { Status, SessionKey } from "./enums";
+import { Status, SessionKey, Role, Permission } from "./enums";
 
 export type ModalState = {
   isOpen?: boolean;
@@ -27,6 +27,18 @@ export interface AlertState {
 
 export interface RefetchState {
   count: number;
+}
+
+export interface User {
+  id: number;
+  email: string;
+  fullname: string;
+  avatar?: string;
+  role: Role;
+  permissions: Permission[];
+  createdAt: string;
+  updatedAt: string;
+  locked: boolean;
 }
 
 export interface Attendance {
@@ -104,4 +116,39 @@ export interface Message {
 export interface ClassesResponse {
   total: number;
   data: Class[];
+}
+
+export interface NotificationReceiver {
+  id: number; // the id of the notification
+  isRead: boolean;
+  createdAt: string;
+  updatedAt: string;
+  notificationId: number;
+  userId: number; // the id of the user who received
+}
+
+export interface Notification {
+  id: number;
+  title: string;
+  message: string;
+  createdAt: Date;
+  updatedAt: Date;
+  createdById: number;
+  createdBy: {
+    id: number;
+    fullname: string;
+    role: Role;
+  };
+  receivers: Array<{
+    notificationId: number;
+    userId: number;
+    fullname: string;
+    isRead: boolean;
+  }>;
+}
+
+export interface OptionState {
+  value: string;
+  label: string | React.ReactNode;
+  role?: Role; // dùng trong trường hợp là system users
 }

@@ -25,6 +25,7 @@ CREATE TABLE "User" (
     "email" TEXT NOT NULL,
     "password" TEXT NOT NULL,
     "fullname" TEXT NOT NULL,
+    "avatar" TEXT,
     "role" "Role" NOT NULL DEFAULT 'ADMIN',
     "permissions" "Permission"[],
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -43,6 +44,7 @@ CREATE TABLE "Student" (
     "phoneNumber" TEXT NOT NULL,
     "secondPhoneNumber" TEXT,
     "debt" INTEGER NOT NULL DEFAULT 0,
+    "status" "Status" NOT NULL DEFAULT 'ACTIVE',
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
     "createdById" INTEGER NOT NULL,
@@ -151,6 +153,20 @@ CREATE TABLE "Message" (
     CONSTRAINT "Message_pkey" PRIMARY KEY ("id")
 );
 
+-- CreateTable
+CREATE TABLE "Notification" (
+    "id" SERIAL NOT NULL,
+    "title" TEXT NOT NULL,
+    "message" TEXT NOT NULL,
+    "isRead" BOOLEAN NOT NULL DEFAULT false,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "receiverId" INTEGER NOT NULL,
+    "createdById" INTEGER NOT NULL,
+
+    CONSTRAINT "Notification_pkey" PRIMARY KEY ("id")
+);
+
 -- CreateIndex
 CREATE UNIQUE INDEX "User_email_key" ON "User"("email");
 
@@ -198,3 +214,9 @@ ALTER TABLE "Message" ADD CONSTRAINT "Message_userId_fkey" FOREIGN KEY ("userId"
 
 -- AddForeignKey
 ALTER TABLE "Message" ADD CONSTRAINT "Message_chatId_fkey" FOREIGN KEY ("chatId") REFERENCES "Chat"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Notification" ADD CONSTRAINT "Notification_receiverId_fkey" FOREIGN KEY ("receiverId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Notification" ADD CONSTRAINT "Notification_createdById_fkey" FOREIGN KEY ("createdById") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;

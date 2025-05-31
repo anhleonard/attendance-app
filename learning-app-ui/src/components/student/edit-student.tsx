@@ -1,16 +1,14 @@
-import { ConfirmState, ModalState, Student } from "@/config/types";
+import { Student } from "@/config/types";
 import Button from "@/lib/button";
 import DatePicker from "@/lib/date-picker";
 import Divider from "@/lib/divider";
 import Select from "@/lib/select";
 import TextField from "@/lib/textfield";
-import { openConfirm } from "@/redux/slices/confirm-slice";
 import { closeLoading, openLoading } from "@/redux/slices/loading-slice";
 import React from "react";
-import { useDispatch } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import { useFormik } from "formik";
 import * as Yup from "yup";
-import { ACTIVE_CLASSES } from "@/config/constants";
 import { UpdateStudentDto } from "@/apis/dto";
 import { updateStudent } from "@/apis/services/students";
 import { openAlert } from "@/redux/slices/alert-slice";
@@ -18,18 +16,10 @@ import { refetch } from "@/redux/slices/refetch-slice";
 import { closeDrawer } from "@/redux/slices/drawer-slice";
 import moment from "moment";
 import { Status } from "@/config/enums";
+import { RootState } from "@/redux/store";
 
 interface Props {
   student: Student;
-}
-
-interface EditStudentFormValues {
-  studentName: string;
-  dateOfBirth: string;
-  class: string;
-  parentName: string;
-  phoneNumber: string;
-  secondaryPhoneNumber: string;
 }
 
 const validationSchema = Yup.object().shape({
@@ -62,18 +52,9 @@ const validationSchema = Yup.object().shape({
     .nullable(),
 });
 
-const initialValues: EditStudentFormValues = {
-  studentName: "",
-  dateOfBirth: "",
-  class: "",
-  parentName: "",
-  phoneNumber: "",
-  secondaryPhoneNumber: "",
-};
-
 const EditStudent = ({ student }: Props) => {
   const dispatch = useDispatch();
-  const activeClasses = JSON.parse(localStorage.getItem(ACTIVE_CLASSES) || "[]");
+  const activeClasses: any = useSelector((state: RootState) => state.system.activeClasses) || [];
 
   const formik = useFormik({
     initialValues: {
