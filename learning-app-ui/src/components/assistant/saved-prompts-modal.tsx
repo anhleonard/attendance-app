@@ -17,11 +17,7 @@ interface SavedPrompt {
   timestamp: Date;
 }
 
-interface Props {
-  onSelectPrompt: (prompt: { content: string }) => void;
-}
-
-const SavedPromptsModal = ({ onSelectPrompt }: Props) => {
+const SavedPromptsModal = () => {
   const dispatch = useDispatch();
   const [savedPrompts, setSavedPrompts] = useState<SavedPrompt[]>([]);
   const [page, setPage] = useState(1);
@@ -61,7 +57,7 @@ const SavedPromptsModal = ({ onSelectPrompt }: Props) => {
       setHasMore(meta.page < meta.totalPages);
 
       if (isLoadMore) {
-        setSavedPrompts(prev => [...prev, ...prompts]);
+        setSavedPrompts((prev) => [...prev, ...prompts]);
       } else {
         setSavedPrompts(prompts);
       }
@@ -72,7 +68,7 @@ const SavedPromptsModal = ({ onSelectPrompt }: Props) => {
           title: "ERROR",
           subtitle: error.message || "Failed to fetch saved prompts. Please try again.",
           type: "error",
-        })
+        }),
       );
     } finally {
       if (!isLoadMore) {
@@ -100,7 +96,7 @@ const SavedPromptsModal = ({ onSelectPrompt }: Props) => {
   const handleDeletePrompt = async (promptId: string) => {
     const confirm = {
       isOpen: true,
-      title: 'Delete saved prompt',
+      title: "Delete saved prompt",
       subtitle: "Are you sure you want to remove this prompt from saved list?",
       titleAction: "Delete",
       handleAction: async () => {
@@ -121,7 +117,7 @@ const SavedPromptsModal = ({ onSelectPrompt }: Props) => {
               title: "SUCCESS",
               subtitle: "Prompt removed from saved list!",
               type: "success",
-            })
+            }),
           );
         } catch (error: any) {
           dispatch(
@@ -130,7 +126,7 @@ const SavedPromptsModal = ({ onSelectPrompt }: Props) => {
               title: "ERROR",
               subtitle: error.message || "Failed to remove prompt. Please try again.",
               type: "error",
-            })
+            }),
           );
         } finally {
           dispatch(closeLoading());
@@ -139,6 +135,29 @@ const SavedPromptsModal = ({ onSelectPrompt }: Props) => {
       },
     };
     dispatch(openConfirm(confirm));
+  };
+
+  const handleCopyPrompt = async (content: string) => {
+    try {
+      await navigator.clipboard.writeText(content);
+      dispatch(
+        openAlert({
+          isOpen: true,
+          title: "SUCCESS",
+          subtitle: "Prompt copied to clipboard!",
+          type: "success",
+        }),
+      );
+    } catch (error: any) {
+      dispatch(
+        openAlert({
+          isOpen: true,
+          title: "ERROR",
+          subtitle: "Failed to copy prompt. Please try again.",
+          type: "error",
+        }),
+      );
+    }
   };
 
   if (savedPrompts.length === 0) {
@@ -167,30 +186,41 @@ const SavedPromptsModal = ({ onSelectPrompt }: Props) => {
         {savedPrompts.map((prompt) => (
           <div
             key={prompt.id}
-            className="px-3 py-2.5 flex flex-row items-center justify-between bg-primary-c50 rounded-xl cursor-pointer hover:bg-primary-c100 transition-colors"
+            className="px-3 py-2.5 flex flex-row items-center justify-between bg-primary-c50 rounded-xl"
           >
-            <div className="flex items-start gap-2 flex-1" onClick={() => onSelectPrompt(prompt)}>
+            <div className="flex items-start gap-2 flex-1">
               <Image src="/icons/prompt-icon.svg" alt="prompt-icon" width={20} height={20} className="mt-1" />
               <div className="flex flex-col gap-1">
                 <div className="text-grey-c900 font-medium">{prompt.content}</div>
                 <div className="text-grey-c500 text-xs">{prompt.timestamp.toLocaleDateString()}</div>
               </div>
             </div>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                handleDeletePrompt(prompt.id);
-              }}
-              className="p-1 hover:bg-primary-c200 rounded-lg transition-colors"
-            >
-              <Image
-                src="/icons/delete-icon.svg"
-                alt="delete"
-                width={20}
-                height={20}
-                className="opacity-60 hover:opacity-100"
-              />
-            </button>
+            <div className="flex flex-col gap-0">
+              <button
+                onClick={() => handleCopyPrompt(prompt.content)}
+                className="p-1 hover:bg-primary-c200 rounded-lg transition-colors"
+              >
+                <Image
+                  src="/icons/prompt-copy-icon.svg"
+                  alt="copy"
+                  width={20}
+                  height={20}
+                  className="opacity-60 hover:opacity-100"
+                />
+              </button>
+              <button
+                onClick={() => handleDeletePrompt(prompt.id)}
+                className="p-1 hover:bg-primary-c200 rounded-lg transition-colors"
+              >
+                <Image
+                  src="/icons/prompt-delete-icon.svg"
+                  alt="delete"
+                  width={19.5}
+                  height={19.5}
+                  className="opacity-60 hover:opacity-100"
+                />
+              </button>
+            </div>
           </div>
         ))}
       </div>

@@ -10,6 +10,8 @@ import { UpdateStudentDto } from './dto/update-student.dto';
 import { FilterStudentDto } from './dto/filter-student.dto';
 import { Prisma } from '@prisma/client';
 import { NotificationsService } from 'src/notifications/notifications.service';
+import { ImportFileStudentDto } from './dto/import-file-student.dto';
+import * as XLSX from 'xlsx';
 
 @Injectable()
 export class StudentsService {
@@ -27,6 +29,7 @@ export class StudentsService {
       rowPerPage = 10,
       classId,
       studentClassStatus, // status of student in class
+      isSort = false,
     } = filterStudentDto;
     try {
       const whereCondition: Prisma.StudentWhereInput = {
@@ -60,6 +63,7 @@ export class StudentsService {
           where: whereCondition,
           skip: (page - 1) * rowPerPage,
           take: rowPerPage,
+          orderBy: isSort ? { updatedAt: 'desc' } : undefined,
           include: {
             classes: {
               where:
@@ -290,5 +294,74 @@ export class StudentsService {
         status: 'ACTIVE',
       },
     });
+  }
+
+  async importFileStudent(
+    importFileStudentDto: ImportFileStudentDto,
+    user: TokenPayload,
+  ) {
+    try {
+      let { classId, file } = importFileStudentDto;
+      if (typeof classId === 'string') {
+        classId = Number(classId);
+      }
+      // Đọc buffer từ file upload
+      const workbook = XLSX.read(file.buffer, { type: 'buffer' });
+      const sheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[sheetName];
+      const rows: any[] = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
+
+      const errors: string[] = [];
+      let successCount = 0;
+
+      for (const row of rows) {
+        const name = row['Name']?.trim();
+        const dateStr = row['Date']?.trim();
+        const parent = row['Parent']?.trim();
+        const phoneNumber = row['Phone']?.toString().trim();
+        const secondPhoneNumber = row['Backup Phone']?.toString().trim();
+        if (!name) continue;
+        // Convert date DD-MM-YYYY -> Date
+        let dob: Date | null = null;
+        if (dateStr) {
+          const [day, month, year] = dateStr.split('-');
+          if (day && month && year) {
+            dob = new Date(Number(year), Number(month) - 1, Number(day));
+          }
+        }
+        try {
+          await this.createStudent(
+            {
+              name,
+              dob,
+              parent,
+              phoneNumber,
+              secondPhoneNumber,
+              classId,
+            } as any,
+            user,
+          );
+          successCount++;
+        } catch (err) {
+          if (
+            err?.message?.includes('Student name already exists') ||
+            err?.message?.includes('Student name already exists in this class')
+          ) {
+            errors.push(`Student "${name}" already exists in class`);
+            continue;
+          }
+          errors.push(`Error importing student "${name}": ${err.message}`);
+        }
+      }
+
+      return {
+        message: 'Import completed',
+        successCount,
+        errorCount: errors.length,
+        errors: errors.length > 0 ? errors : undefined,
+      };
+    } catch (error) {
+      throw new BadRequestException(error.message);
+    }
   }
 }

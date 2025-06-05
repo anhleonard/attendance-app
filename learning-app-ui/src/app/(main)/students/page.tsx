@@ -23,6 +23,8 @@ import { closeLoading } from "@/redux/slices/loading-slice";
 import { openLoading } from "@/redux/slices/loading-slice";
 import { openAlert } from "@/redux/slices/alert-slice";
 import Label from "@/lib/label";
+import { openModal } from "@/redux/slices/modal-slice";
+import ImportFileModal from "@/components/student/import-file-modal";
 
 interface StudentsResponse {
   total: number;
@@ -57,6 +59,7 @@ const Students = () => {
           classId: filterClassId,
           studentClassStatus: Status.ACTIVE,
         }),
+        isSort: true,
       });
       if (response) {
         setStudentsData(response);
@@ -155,6 +158,17 @@ const Students = () => {
     dispatch(openDrawer(drawer));
   };
 
+  const handleOpenModalImportFile = () => {
+    const modal: ModalState = {
+      isOpen: true,
+      title: "Import file",
+      content: <ImportFileModal />,
+      className: "max-w-2xl",
+    };
+
+    dispatch(openModal(modal));
+  };
+
   const handleOpenEditDrawer = (student: Student) => {
     const drawer: ModalState = {
       isOpen: true,
@@ -247,7 +261,14 @@ const Students = () => {
           </div>
         </div>
 
-        <div className="inline-grid justify-end items-center mb-2">
+        <div className="flex flex-row gap-3 justify-end items-center mb-2">
+          <Button
+            label="Import file"
+            status="primary"
+            className="py-2.5 px-4"
+            startIcon={<Image src={"/icons/add-icon.svg"} alt="add-icon" width={20} height={20} />}
+            onClick={handleOpenModalImportFile}
+          />
           <Button
             label="Add student"
             status="success"

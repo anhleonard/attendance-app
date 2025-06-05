@@ -17,7 +17,7 @@ const ConfirmModal = () => {
 
   return (
     <Transition appear show={confirmData?.isOpen} as={Fragment}>
-      <Dialog as="div" className="fixed inset-0 z-50" onClose={handleCloseModal}>
+      <Dialog as="div" className="fixed inset-0 z-[3999]" onClose={handleCloseModal}>
         <div className="fixed inset-0 overflow-y-auto">
           <div className="flex min-h-full items-center justify-center p-4 text-center">
             <TransitionChild

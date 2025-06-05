@@ -15,7 +15,17 @@ const Sidebar = () => {
     <div className="w-[260px] h-full bg-white border-r border-grey-c100 overflow-y-auto hidden md:block">
       <div className="flex flex-col gap-2 justify-center items-center py-6">
         {profile?.avatar ? (
-          <Image src={profile.avatar} alt="User avatar" width={60} height={60} className="rounded-full" />
+          <div className="w-[60px] h-[60px] rounded-full overflow-hidden">
+            <Image 
+              src={profile.avatar} 
+              alt="User avatar" 
+              width={500} 
+              height={500} 
+              quality={100}
+              className="w-full h-full object-cover rounded-full"
+              priority
+            />
+          </div>
         ) : (
           <div className="w-[60px] h-[60px] rounded-full bg-primary-c50 text-primary-c900 flex items-center justify-center font-semibold text-lg">
             {profile?.fullname?.substring(0, 2).toUpperCase()}

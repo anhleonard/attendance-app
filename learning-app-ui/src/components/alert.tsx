@@ -62,7 +62,7 @@ export function Alert() {
           animate={{ opacity: 1, x: 0 }}
           exit={{ opacity: 0, x: 50 }}
           transition={{ duration: 0.2 }}
-          className={`fixed top-4 right-4 w-80 md:w-96 rounded-xl ${config.bgColor} z-[999]`}
+          className={`fixed top-4 right-4 w-80 md:w-96 rounded-xl ${config.bgColor} z-[2999]`}
         >
           <div className="w-full h-full relative">
             <div className="flex items-start gap-6 justify-center w-fit pl-6 pr-12 py-4">

@@ -5,6 +5,7 @@ import {
   IsNumber,
   IsOptional,
   IsString,
+  IsBoolean,
 } from 'class-validator';
 import { Status } from 'src/utils/enums';
 
@@ -32,4 +33,8 @@ export class FilterStudentDto {
   @IsNumber()
   @IsOptional()
   rowPerPage: number;
+
+  @IsBoolean()
+  @IsOptional()
+  isSort: boolean;
 }

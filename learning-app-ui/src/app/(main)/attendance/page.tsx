@@ -163,7 +163,7 @@ const Attendance = () => {
         const allAttended = attendanceResponse.data.every((record: AttendanceRecord) => record.isAttend);
         setCheckedAll(allAttended);
 
-        // Update class statistics
+        // Update class statistics only when there is existing attendance
         setClassesInfo((prevClasses) =>
           prevClasses.map((classInfo) =>
             classInfo.id === classId
@@ -193,21 +193,8 @@ const Attendance = () => {
         }); // Clear attendance data
         setCheckedAll(false); // Reset checkedAll for new attendance
 
-        // Update class statistics for new attendance
-        setClassesInfo((prevClasses) =>
-          prevClasses.map((classInfo) =>
-            classInfo.id === classId
-              ? {
-                  ...classInfo,
-                  statistic: {
-                    total: studentsResponse.total,
-                    attended: 0,
-                    absent: studentsResponse.total,
-                  },
-                }
-              : classInfo,
-          ),
-        );
+        // Remove the class statistics update when fetching students
+        // We'll only update statistics after saving attendance
       }
     } catch (error) {
       dispatch(openAlert({ isOpen: true, title: "ERROR", subtitle: "Error fetching data", type: "error" }));

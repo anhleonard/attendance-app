@@ -229,6 +229,54 @@ const ChatMessages = React.memo(
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const dispatch = useDispatch();
 
+    // Add function to parse content of message
+    const parseMessage = (text: string) => {
+      // First split by code blocks (`)
+      const codeParts = text.split(/(`.*?`)/g);
+      // Then process each part for bold and italic
+      return codeParts.map((part, codeIndex) => {
+        if (part.startsWith('`') && part.endsWith('`')) {
+          // Remove backticks and wrap in code tag
+          const codeText = part.slice(1, -1);
+          return <code key={`code-${codeIndex}`} className="bg-grey-c100 px-1 py-0.5 rounded text-[13px] font-mono">{codeText}</code>;
+        }
+
+        // Process bold text (**)
+        const boldParts = part.split(/(\*\*.*?\*\*)/g);
+        return boldParts.map((boldPart, boldIndex) => {
+          if (boldPart.startsWith('**') && boldPart.endsWith('**')) {
+            // Remove ** and wrap in strong tag
+            const boldText = boldPart.slice(2, -2);
+            // Process any italic text within bold text
+            const italicParts = boldText.split(/(\*.*?\*)/g);
+            return (
+              <strong key={`bold-${codeIndex}-${boldIndex}`}>
+                {italicParts.map((italicPart, italicIndex) => {
+                  if (italicPart.startsWith('*') && italicPart.endsWith('*')) {
+                    // Remove * and wrap in em tag
+                    const italicText = italicPart.slice(1, -1);
+                    return <em key={`italic-${codeIndex}-${boldIndex}-${italicIndex}`}>{italicText}</em>;
+                  }
+                  return italicPart;
+                })}
+              </strong>
+            );
+          }
+
+          // Process italic text in non-bold parts
+          const italicParts = boldPart.split(/(\*.*?\*)/g);
+          return italicParts.map((italicPart, italicIndex) => {
+            if (italicPart.startsWith('*') && italicPart.endsWith('*')) {
+              // Remove * and wrap in em tag
+              const italicText = italicPart.slice(1, -1);
+              return <em key={`italic-${codeIndex}-${boldIndex}-${italicIndex}`}>{italicText}</em>;
+            }
+            return italicPart;
+          });
+        });
+      });
+    };
+
     useEffect(() => {
       if (shouldScroll && messagesEndRef.current) {
         messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
@@ -311,7 +359,7 @@ const ChatMessages = React.memo(
                     : "bg-grey-c50 text-grey-c900 max-w-[70%]"
                 }`}
               >
-                {message.content}
+                {parseMessage(message.content)}
                 {message.isUser &&
                   (message.isSaved ? (
                     <div className="absolute -bottom-3 right-6 translate-x-1/2 p-0 bg-white rounded-full shadow-[0px_4px_16px_rgba(17,17,26,0.1),_0px_8px_24px_rgba(17,17,26,0.1),_0px_16px_56px_rgba(17,17,26,0.1)]">
@@ -356,9 +404,9 @@ const Assistant = () => {
     message: "Chào mừng tới với AI Assistant",
   });
   const [updatedChatHistory, setUpdatedChatHistory] = useState<ChatHistory[]>([]);
-  const [updateSource, setUpdateSource] = useState<"initial" | "newChat" | "newMessage" | "savedPrompt">("initial");
-
-  console.log(currentChatId, "currentChatId");
+  const [updateSource, setUpdateSource] = useState<"initial" | "newChat" | "newMessage" | `savedPrompt-${number}`>(
+    "initial",
+  );
 
   // Create debounced update function
   const debouncedSetInputMessage = useCallback(
@@ -458,7 +506,7 @@ const Assistant = () => {
         throw new Error("No authentication token found");
       }
 
-      const response = await fetch(`http://localhost:8000/chats/${chatId}`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_HTTP_AI_DOMAIN}/chats/${chatId}`, {
         method: "DELETE",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -535,6 +583,14 @@ const Assistant = () => {
     );
   };
 
+  // Effect to handle saved prompt updates
+  useEffect(() => {
+    if (count > 0) {
+      // Set updateSource to trigger the fetch messages effect
+      setUpdateSource(`savedPrompt-${count}`);
+    }
+  }, [count]);
+
   // Separate effect for initial chat load and chat switching
   useEffect(() => {
     const fetchMessages = async () => {
@@ -586,19 +642,11 @@ const Assistant = () => {
     // Fetch messages when:
     // 1. Switching chats (newChat)
     // 2. Initial load (initial)
-    // 3. After saving/unsaving a prompt (savedPrompt)
-    if (updateSource === "newChat" || updateSource === "initial" || updateSource === "savedPrompt") {
+    // 3. After saving/unsaving a prompt (savedPrompt-{count})
+    if (updateSource === "newChat" || updateSource === "initial" || updateSource.startsWith("savedPrompt-")) {
       fetchMessages();
     }
   }, [currentChatId, dispatch, updateSource]);
-
-  // Effect to handle saved prompt updates
-  useEffect(() => {
-    if (count > 0) {
-      // Set updateSource to trigger the fetch messages effect
-      setUpdateSource("savedPrompt");
-    }
-  }, [count]);
 
   const handleSendMessage = async () => {
     const currentValue = inputRef.current?.getValue() || "";
@@ -634,6 +682,7 @@ const Assistant = () => {
 
       const payload: any = {
         message: messageToSend,
+        temp_message_id: tempUserMessageId,
       };
 
       if (currentChatId) {
@@ -655,16 +704,18 @@ const Assistant = () => {
 
       const data = await response.json();
 
-      // Update user message with real ID from API
-      if (data.id) {
+      // Update user message with real ID from API if available
+      if (data.data?.user_message_id) {
         setMessages((prev) =>
-          prev.map((msg) => (msg.id === tempUserMessageId ? { ...msg, id: data.id.toString() } : msg)),
+          prev.map((msg) =>
+            msg.id === data.data.temp_message_id ? { ...msg, id: data.data.user_message_id.toString() } : msg,
+          ),
         );
       }
 
       // Add AI response to UI
       const aiMessage: Message = {
-        id: data.id ? data.id.toString() : `temp_ai_${Date.now()}`,
+        id: data.data?.user_message_id ? `${data.data.user_message_id}_ai` : `temp_ai_${Date.now()}`,
         content: data.response || "Sorry, I couldn't process your request.",
         isUser: false,
         timestamp: new Date(),
@@ -724,23 +775,10 @@ const Assistant = () => {
     const modal = {
       isOpen: true,
       title: "Saved Prompts",
-      content: <SavedPromptsModal onSelectPrompt={handleSelectPrompt} />,
+      content: <SavedPromptsModal />,
       className: "max-w-2xl",
     };
     dispatch(openModal(modal));
-  };
-
-  const handleSelectPrompt = (prompt: { content: string }) => {
-    if (inputRef.current) {
-      inputRef.current.clear();
-      const event = new Event("input", { bubbles: true });
-      const textarea = document.querySelector("textarea");
-      if (textarea) {
-        textarea.value = prompt.content;
-        textarea.dispatchEvent(event);
-      }
-    }
-    dispatch(closeModal());
   };
 
   return (

@@ -201,7 +201,7 @@ tools = [
                             )
                         )
                     },
-                    required=["name", "status", "sessions"]
+                    required=["name", "description", "status", "sessions"]
                 )
             )
         ]
@@ -242,11 +242,12 @@ class Sender(str, Enum):
 class ChatRequest(BaseModel):
     message: str
     user_id: Optional[int] = None
-    chat_id: Optional[int] = None  # Thêm chat_id để lưu tin nhắn vào chat cụ thể
+    chat_id: Optional[int] = None
+    temp_message_id: Optional[str] = None  # Thêm temp_message_id từ frontend
 
 class ChatResponse(BaseModel):
     response: str
-    data: Optional[Dict[str, Any]] = None
+    data: Optional[Dict[str, Any]] = None  # user_message_id và temp_message_id sẽ nằm trong data
 
 
 # =========================
@@ -545,7 +546,6 @@ async def chat(request: ChatRequest, authorization: Optional[str] = Header(None)
         api_responses = []
         process_query = True
         function_call_count = 0
-        user_message_saved = False
         user_chat_id = request.chat_id  # Lưu chat_id từ request
         chat_history = []  # Lưu lịch sử chat
 
@@ -780,6 +780,8 @@ async def chat(request: ChatRequest, authorization: Optional[str] = Header(None)
                 )
                 response_text = evaluated_response
 
+            user_message_id = None  # Mặc định là null
+
             # Lưu tin nhắn vào database nếu có response từ bot
             if response_text and response_text != "Xin lỗi, tôi chưa thể xử lý yêu cầu của bạn.":
                 try:
@@ -795,6 +797,10 @@ async def chat(request: ChatRequest, authorization: Optional[str] = Header(None)
                     if not user_chat_id and user_message_response:
                         user_chat_id = user_message_response.get("chatId")
                     
+                    # Lấy user_message_id từ response
+                    if user_message_response:
+                        user_message_id = user_message_response.get("id")
+                    
                     # Lưu tin nhắn của bot
                     if user_chat_id:
                         await save_message(
@@ -807,14 +813,16 @@ async def chat(request: ChatRequest, authorization: Optional[str] = Header(None)
                     print(f"Error saving messages to database: {str(e)}")
                     # Không raise exception ở đây để không ảnh hưởng đến response cho user
 
-            # ✅ FIX
+            # ✅ Return response với user_message_id và temp_message_id trong data
             return ChatResponse(
                 response=response_text,
                 data={
                     "api_calls": convert_proto_to_dict(api_calls),
                     "api_responses": convert_proto_to_dict(api_responses),
                     "function_call_count": function_call_count,
-                    "chat_id": user_chat_id
+                    "chat_id": user_chat_id,
+                    "user_message_id": user_message_id,  # Sẽ là null nếu không có response_text
+                    "temp_message_id": request.temp_message_id
                 }
             )
 

@@ -261,7 +261,7 @@ const Classes = () => {
                   <th className="px-1 py-4">Name</th>
                   <th className="px-1 py-4">Created at</th>
                   <th className="px-1 py-4">Sessions</th>
-                  <th className="px-1 py-4">Average amount</th>
+                  <th className="px-1 py-4">Amount</th>
                   <th className="px-1 py-4">Status</th>
                   <th className="px-1 py-4 text-center">Actions</th>
                 </tr>

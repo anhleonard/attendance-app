@@ -16,7 +16,7 @@ const Modal = () => {
 
   return (
     <Transition appear show={modalData?.isOpen} as={Fragment}>
-      <Dialog as="div" className="fixed inset-0 z-[9999]" onClose={handleCloseModal}>
+      <Dialog as="div" className="fixed inset-0 z-[1999]" onClose={handleCloseModal}>
         <div className="fixed inset-0 overflow-y-auto">
           <div className="flex min-h-full items-center justify-center p-4 text-center">
             <TransitionChild

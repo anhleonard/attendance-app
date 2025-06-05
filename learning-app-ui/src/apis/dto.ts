@@ -77,6 +77,7 @@ export interface FilterStudentDto {
   status?: Status;
   studentClassStatus?: Status;
   fetchAll?: boolean;
+  isSort?: boolean;
 }
 
 export interface FilterAttendanceDto {
@@ -213,4 +214,9 @@ export interface CreateNotificationDto {
   title: string;
   message: string;
   receiverIds: number[];
+}
+
+export interface ImportFileStudentDto {
+  classId: number;
+  file: File;
 }
