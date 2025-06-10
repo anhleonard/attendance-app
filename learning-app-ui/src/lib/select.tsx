@@ -214,7 +214,7 @@ const Select = ({
       return (
         <span
           className={`block w-full font-medium ${
-            selected ? "text-gray-800" : "text-grey-c200"
+            selected ? "text-black/80" : "text-grey-c200"
           } truncate overflow-hidden whitespace-nowrap text-ellipsis`}
         >
           {label}

@@ -170,6 +170,7 @@ const ImportFileModal = () => {
           className="w-fit py-3.5 mt-2 px-8"
           onClick={handleDownloadTemplate}
           type="button"
+          status="info"
         />
         <Button label="Process" type="submit" className="w-fit py-3.5 mt-2 px-8" />
       </div>

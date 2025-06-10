@@ -23,6 +23,7 @@ import { UpdateClassDto } from "@/apis/dto";
 import { RootState } from "@/redux/store";
 import { refetch } from "@/redux/slices/refetch-slice";
 import TextField from "@/lib/textfield";
+import { EmptyRow } from "@/lib/empty-row";
 
 interface ClassesResponse {
   total: number;
@@ -76,7 +77,7 @@ const Classes = () => {
     setFilterName("");
     setFilterStatus(undefined);
     setPage(1);
-    
+
     // Call API with empty filters
     dispatch(openLoading());
     getClasses({
@@ -106,7 +107,7 @@ const Classes = () => {
   };
 
   const handleNameChange = (value: string | React.ChangeEvent<HTMLInputElement>) => {
-    if (typeof value === 'string') {
+    if (typeof value === "string") {
       setFilterName(value);
     } else {
       setFilterName(value.target.value);
@@ -211,11 +212,7 @@ const Classes = () => {
 
         {/* filter class */}
         <div className="grid grid-cols-4 gap-3 mb-5 mt-4">
-          <TextField 
-            label="Search class" 
-            value={filterName}
-            onChange={handleNameChange}
-          />
+          <TextField label="Search class" value={filterName} onChange={handleNameChange} />
           <Select
             label="Status"
             defaultValue={filterStatus}
@@ -226,18 +223,8 @@ const Classes = () => {
             ]}
           />
           <div className="flex flex-row gap-3">
-            <Button 
-              label="Filter" 
-              className="py-[13px] px-8" 
-              status="success" 
-              onClick={handleFilter}
-            />
-            <Button 
-              label="Cancel" 
-              className="py-[13px] px-8" 
-              status="cancel" 
-              onClick={handleResetFilter}
-            />
+            <Button label="Filter" className="py-[13px] px-8" status="success" onClick={handleFilter} />
+            <Button label="Cancel" className="py-[13px] px-8" status="cancel" onClick={handleResetFilter} />
           </div>
         </div>
 
@@ -267,61 +254,65 @@ const Classes = () => {
                 </tr>
               </thead>
               <tbody>
-                {classesData?.data.map((classItem, index) => {
-                  // Calculate average amount from sessions
-                  const totalAmount = classItem.sessions.reduce((sum, session) => sum + session.amount, 0);
-                  const averageAmount = classItem.sessions.length > 0 ? totalAmount / classItem.sessions.length : 0;
+                {classesData?.data.length === 0 ? (
+                  <EmptyRow colSpan={7} />
+                ) : (
+                  classesData?.data.map((classItem, index) => {
+                    // Calculate average amount from sessions
+                    const totalAmount = classItem.sessions.reduce((sum, session) => sum + session.amount, 0);
+                    const averageAmount = classItem.sessions.length > 0 ? totalAmount / classItem.sessions.length : 0;
 
-                  return (
-                    <tr key={classItem.id} className="hover:bg-primary-c10 hover:text-grey-c700">
-                      <th className="pl-3 py-4">{(page - 1) * rowsPerPage + index + 1}</th>
-                      <th className="px-1 py-4">{classItem.name}</th>
-                      <th className="px-1 py-4">{moment(classItem.createdAt).format("DD/MM/YYYY")}</th>
-                      <th className="px-1 py-4">{classItem.sessions.length}</th>
-                      <th className="px-1 py-4">{averageAmount.toLocaleString()} VND</th>
-                      <th className="px-1 py-4">
-                        <Label
-                          status={classItem.status === Status.ACTIVE ? "success" : "error"}
-                          label={classItem.status}
-                        />
-                      </th>
-                      <th className="px-1 py-4 text-center">
-                        <div className="flex justify-center items-center gap-3">
-                          <button
-                            data-tooltip-id={`view-icon-${classItem.id}`}
-                            data-tooltip-content="View"
-                            onClick={() => handleOpenViewModal(classItem)}
-                          >
-                            <Image src="/icons/detail-icon.svg" alt="detail-icon" width={24} height={24} />
-                          </button>
-                          <Tooltip id={`view-icon-${classItem.id}`} />
+                    return (
+                      <tr key={classItem.id} className="hover:bg-primary-c10 hover:text-grey-c700">
+                        <th className="pl-3 py-4">{(page - 1) * rowsPerPage + index + 1}</th>
+                        <th className="px-1 py-4">{classItem.name}</th>
+                        <th className="px-1 py-4">{moment(classItem.createdAt).format("DD/MM/YYYY")}</th>
+                        <th className="px-1 py-4">{classItem.sessions.length}</th>
+                        <th className="px-1 py-4">{averageAmount.toLocaleString()} VND</th>
+                        <th className="px-1 py-4">
+                          <Label
+                            status={classItem.status === Status.ACTIVE ? "success" : "error"}
+                            label={classItem.status}
+                          />
+                        </th>
+                        <th className="px-1 py-4 text-center">
+                          <div className="flex justify-center items-center gap-3">
+                            <button
+                              data-tooltip-id={`view-icon-${classItem.id}`}
+                              data-tooltip-content="View"
+                              onClick={() => handleOpenViewModal(classItem)}
+                            >
+                              <Image src="/icons/detail-icon.svg" alt="detail-icon" width={24} height={24} />
+                            </button>
+                            <Tooltip id={`view-icon-${classItem.id}`} />
 
-                          <button
-                            data-tooltip-id={`edit-icon-${classItem.id}`}
-                            data-tooltip-content="Edit"
-                            onClick={() => handleOpenEditDrawer(classItem)}
-                          >
-                            <Image src="/icons/edit-icon.svg" alt="edit-icon" width={24} height={24} />
-                          </button>
-                          <Tooltip id={`edit-icon-${classItem.id}`} />
+                            <button
+                              data-tooltip-id={`edit-icon-${classItem.id}`}
+                              data-tooltip-content="Edit"
+                              onClick={() => handleOpenEditDrawer(classItem)}
+                            >
+                              <Image src="/icons/edit-icon.svg" alt="edit-icon" width={24} height={24} />
+                            </button>
+                            <Tooltip id={`edit-icon-${classItem.id}`} />
 
-                          <button
-                            data-tooltip-id={`confirm-icon-${classItem.id}`}
-                            data-tooltip-content={classItem?.status === Status.ACTIVE ? "Disable" : "Enable"}
-                            onClick={() => handleOpenConfirmChangeStatus(classItem)}
-                          >
-                            {classItem?.status === Status.ACTIVE ? (
-                              <Image src="/icons/disabled-icon.svg" alt="disabled-icon" width={22} height={22} />
-                            ) : (
-                              <Image src={"/icons/enabled-icon.svg"} alt="enabled-icon" width={23} height={23} />
-                            )}
-                          </button>
-                          <Tooltip id={`confirm-icon-${classItem.id}`} />
-                        </div>
-                      </th>
-                    </tr>
-                  );
-                })}
+                            <button
+                              data-tooltip-id={`confirm-icon-${classItem.id}`}
+                              data-tooltip-content={classItem?.status === Status.ACTIVE ? "Disable" : "Enable"}
+                              onClick={() => handleOpenConfirmChangeStatus(classItem)}
+                            >
+                              {classItem?.status === Status.ACTIVE ? (
+                                <Image src="/icons/disabled-icon.svg" alt="disabled-icon" width={22} height={22} />
+                              ) : (
+                                <Image src={"/icons/enabled-icon.svg"} alt="enabled-icon" width={23} height={23} />
+                              )}
+                            </button>
+                            <Tooltip id={`confirm-icon-${classItem.id}`} />
+                          </div>
+                        </th>
+                      </tr>
+                    );
+                  })
+                )}
               </tbody>
             </table>
           </div>

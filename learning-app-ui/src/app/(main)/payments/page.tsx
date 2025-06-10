@@ -5,7 +5,8 @@ import { formatCurrency } from "@/config/functions";
 import Button from "@/lib/button";
 import Label from "@/lib/label";
 import Pagination from "@/lib/pagination";
-import Select from "@/lib/select";
+import TextField from "@/lib/textfield";
+import { EmptyRow } from "@/lib/empty-row";
 import Image from "next/image";
 import React, { useState, useEffect } from "react";
 import { Tooltip } from "react-tooltip";
@@ -22,6 +23,7 @@ import { openLoading, closeLoading } from "@/redux/slices/loading-slice";
 import { openAlert } from "@/redux/slices/alert-slice";
 import { RootState } from "@/redux/store";
 import moment from "moment";
+import Select from "@/lib/select";
 
 interface PaymentResponse {
   total: number;
@@ -80,8 +82,8 @@ const Payments = () => {
   const [page, setPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [paymentsData, setPaymentsData] = useState<PaymentResponse>({ total: 0, data: [] });
-  const [selectedStudent, setSelectedStudent] = useState<string | null>(null);
-  const [selectedClass, setSelectedClass] = useState<number | null>(null);
+  const [selectedStudent, setSelectedStudent] = useState<string>("");
+  const [selectedClass, setSelectedClass] = useState<string>("");
   const currentMonth = moment().format("M");
   const currentYear = moment().format("YYYY");
   const [selectedMonth, setSelectedMonth] = useState<string>(currentMonth);
@@ -96,9 +98,11 @@ const Payments = () => {
         page: currentPage,
         rowPerPage: currentRowsPerPage,
         ...(selectedStudent && {
-          name: activeStudents.find((student: any) => student.value === selectedStudent)?.label,
+          name: selectedStudent,
         }),
-        ...(selectedClass && { classId: selectedClass }),
+        ...(selectedClass && {
+          classId: activeClasses.find((cls: any) => cls.name === selectedClass)?.id || parseInt(selectedClass),
+        }),
         learningMonth: parseInt(selectedMonth),
         learningYear: parseInt(currentYear),
       };
@@ -120,7 +124,49 @@ const Payments = () => {
 
   useEffect(() => {
     fetchPayments(page, rowsPerPage);
-  }, [page, rowsPerPage, refetchCount, selectedStudent, selectedClass, selectedMonth]);
+  }, [page, rowsPerPage, refetchCount]);
+
+  const handleFilter = () => {
+    setPage(1); // Reset to first page when filtering
+    fetchPayments(1, rowsPerPage);
+  };
+
+  const handleResetFilter = () => {
+    // Reset states first
+    setSelectedStudent("");
+    setSelectedClass("");
+    setSelectedMonth(currentMonth);
+    setPage(1);
+
+    // Call API with empty filters
+    dispatch(openLoading());
+    getPayments({
+      page: 1,
+      rowPerPage: rowsPerPage,
+      name: "",
+      classId: undefined,
+      learningMonth: parseInt(currentMonth),
+      learningYear: parseInt(currentYear),
+    })
+      .then((response) => {
+        if (response) {
+          setPaymentsData(response);
+        }
+      })
+      .catch((err: any) => {
+        dispatch(
+          openAlert({
+            isOpen: true,
+            title: "ERROR",
+            subtitle: err?.message || "Failed to reset payments list",
+            type: "error",
+          }),
+        );
+      })
+      .finally(() => {
+        dispatch(closeLoading());
+      });
+  };
 
   const handlePageChange = (newPage: number, newRowsPerPage: number) => {
     if (newRowsPerPage !== rowsPerPage) {
@@ -129,14 +175,6 @@ const Payments = () => {
     } else {
       setPage(newPage);
     }
-  };
-
-  const handleCancel = () => {
-    setSelectedStudent(null);
-    setSelectedClass(null);
-    setSelectedMonth(currentMonth);
-    setPage(1);
-    fetchPayments(1, rowsPerPage);
   };
 
   const handleOpenModal = (payment: PaymentResponse["data"][0]) => {
@@ -239,17 +277,22 @@ const Payments = () => {
 
         {/* filter class */}
         <div className="grid grid-cols-4 gap-3 mb-5 mt-4">
-          <Select
-            label="Select student"
-            options={activeStudents}
-            defaultValue={selectedStudent || ""}
-            onChange={(value) => setSelectedStudent(value)}
+          <TextField
+            label="Student name"
+            defaultValue={selectedStudent}
+            onChange={(value) => {
+              if (typeof value === "string") {
+                setSelectedStudent(value);
+              } else {
+                setSelectedStudent(value.target.value);
+              }
+            }}
           />
           <Select
             label="Select class"
             options={activeClasses}
             defaultValue={selectedClass?.toString() || ""}
-            onChange={(value) => setSelectedClass(value ? parseInt(value) : null)}
+            onChange={(value) => setSelectedClass(value)}
           />
           <Select
             label="Select month"
@@ -258,7 +301,8 @@ const Payments = () => {
             onChange={(value) => setSelectedMonth(value)}
           />
           <div className="flex flex-row gap-3">
-            <Button label="Cancel" className="py-[13px] px-8" status="cancel" onClick={handleCancel} />
+            <Button label="Filter" className="py-[13px] px-8" status="success" onClick={handleFilter} />
+            <Button label="Cancel" className="py-[13px] px-8" status="cancel" onClick={handleResetFilter} />
           </div>
         </div>
 
@@ -292,81 +336,85 @@ const Payments = () => {
                 </tr>
               </thead>
               <tbody>
-                {paymentsData.data.map((payment, index) => (
-                  <tr key={payment.id} className="hover:bg-primary-c10">
-                    <th className="pl-3 py-4">{(page - 1) * rowsPerPage + index + 1}</th>
-                    <th className="px-1 py-4">{payment.student.name}</th>
-                    <th className="px-1 py-4">{payment.student.currentClass?.name || "-"}</th>
-                    <th className="px-1 py-4 text-center">{payment.totalAttend}</th>
-                    <th className="px-1 py-4">
-                      <span className="font-bold text-[#FE9800]">{formatCurrency(payment.totalMonthAmount)} VNĐ</span>
-                    </th>
-                    <th className="px-1 py-4">
-                      {payment.student.debt === 0 ? (
-                        <span className="font-bold text-success-c700">0 VNĐ</span>
-                      ) : (
-                        <span className="font-bold text-support-c500">
-                          {payment.student.debt > 0
-                            ? `-${formatCurrency(payment.student.debt)}`
-                            : `+${formatCurrency(payment.student.debt * -1)}`}
+                {paymentsData.data.length > 0 ? (
+                  paymentsData.data.map((payment, index) => (
+                    <tr key={payment.id} className="hover:bg-primary-c10">
+                      <th className="pl-3 py-4">{(page - 1) * rowsPerPage + index + 1}</th>
+                      <th className="px-1 py-4">{payment.student.name}</th>
+                      <th className="px-1 py-4">{payment.student.currentClass?.name || "-"}</th>
+                      <th className="px-1 py-4 text-center">{payment.totalAttend}</th>
+                      <th className="px-1 py-4">
+                        <span className="font-bold text-[#FE9800]">{formatCurrency(payment.totalMonthAmount)} VNĐ</span>
+                      </th>
+                      <th className="px-1 py-4">
+                        {payment.student.debt === 0 ? (
+                          <span className="font-bold text-success-c700">0 VNĐ</span>
+                        ) : (
+                          <span className="font-bold text-support-c500">
+                            {payment.student.debt > 0
+                              ? `-${formatCurrency(payment.student.debt)}`
+                              : `+${formatCurrency(payment.student.debt * -1)}`}
+                            VNĐ
+                          </span>
+                        )}
+                      </th>
+                      <th className="px-1 py-4">
+                        <span className="font-bold text-primary-c900">
+                          {formatCurrency(payment.totalPayment)}
                           VNĐ
                         </span>
-                      )}
-                    </th>
-                    <th className="px-1 py-4">
-                      <span className="font-bold text-primary-c900">
-                        {formatCurrency(payment.totalPayment)}
-                        VNĐ
-                      </span>
-                    </th>
-                    <th className="px-1 py-4 relative">
-                      <Label status="info" label={payment.status} />
-                    </th>
-                    <th className="px-1 py-4 text-center">
-                      <div className="flex justify-center items-center gap-3">
-                        <button
-                          onClick={(e) => {
-                            e.preventDefault();
-                            handleOpenModal(payment);
-                          }}
-                          title="View"
-                          data-tooltip-id="view-icon"
-                          data-tooltip-content="View"
-                        >
-                          <Image src="/icons/detail-icon.svg" alt="view-icon" width={24} height={24} />
-                        </button>
-                        <Tooltip id="view-icon" />
-                        <button
-                          data-tooltip-id="download-icon"
-                          data-tooltip-content="Download"
-                          onClick={() => handleDownloadBillImage(`paymentDiv-${index}`, payment.student.name)}
-                        >
-                          <Image src="/icons/download-icon.svg" alt="download-icon" width={24} height={24} />
-                        </button>
-                        <Tooltip id="download-icon" />
-                        {payment.sentAt ? (
-                          <>
-                            <button
-                              data-tooltip-id="sent-icon"
-                              data-tooltip-content="Sent"
-                              onClick={() => handleConfirmBill(payment.totalPayment.toString())}
-                            >
-                              <Image src="/icons/sent-icon.svg" alt="sent-icon" width={24} height={24} />
-                            </button>
-                            <Tooltip id="sent-icon" />
-                          </>
-                        ) : (
-                          <>
-                            <button data-tooltip-id="unsent-icon" data-tooltip-content="Send">
-                              <Image src="/icons/unsent-icon.svg" alt="unsent-icon" width={24} height={24} />
-                            </button>
-                            <Tooltip id="unsent-icon" />
-                          </>
-                        )}
-                      </div>
-                    </th>
-                  </tr>
-                ))}
+                      </th>
+                      <th className="px-1 py-4 relative">
+                        <Label status="info" label={payment.status} />
+                      </th>
+                      <th className="px-1 py-4 text-center">
+                        <div className="flex justify-center items-center gap-3">
+                          <button
+                            onClick={(e) => {
+                              e.preventDefault();
+                              handleOpenModal(payment);
+                            }}
+                            title="View"
+                            data-tooltip-id="view-icon"
+                            data-tooltip-content="View"
+                          >
+                            <Image src="/icons/detail-icon.svg" alt="view-icon" width={24} height={24} />
+                          </button>
+                          <Tooltip id="view-icon" />
+                          <button
+                            data-tooltip-id="download-icon"
+                            data-tooltip-content="Download"
+                            onClick={() => handleDownloadBillImage(`paymentDiv-${index}`, payment.student.name)}
+                          >
+                            <Image src="/icons/download-icon.svg" alt="download-icon" width={24} height={24} />
+                          </button>
+                          <Tooltip id="download-icon" />
+                          {payment.sentAt ? (
+                            <>
+                              <button data-tooltip-id="sent-icon" data-tooltip-content="Sent">
+                                <Image src="/icons/sent-icon.svg" alt="sent-icon" width={24} height={24} />
+                              </button>
+                              <Tooltip id="sent-icon" />
+                            </>
+                          ) : (
+                            <>
+                              <button
+                                data-tooltip-id="unsent-icon"
+                                data-tooltip-content="Send"
+                                onClick={() => handleConfirmBill(payment.totalPayment.toString())}
+                              >
+                                <Image src="/icons/unsent-icon.svg" alt="unsent-icon" width={25} height={25} />
+                              </button>
+                              <Tooltip id="unsent-icon" />
+                            </>
+                          )}
+                        </div>
+                      </th>
+                    </tr>
+                  ))
+                ) : (
+                  <EmptyRow colSpan={9} />
+                )}
               </tbody>
             </table>
           </div>

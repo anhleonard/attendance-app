@@ -186,15 +186,19 @@ const TextField = ({
               paddingRight: endIcon ? `calc(1rem + ${endIconWidth}px)` : "1rem",
             }}
             placeholder={placeholder}
-            className={`text-grey-c900 text-sm w-full border-2 rounded-[20px] py-3 outline-none transition-all
+            className={`text-black/80 font-medium text-sm w-full border-2 rounded-[20px] py-3 outline-none transition-all
             ${
               isFocused && !error
                 ? "border-primary-c900"
                 : error
                 ? "border-support-c100 bg-support-c10"
                 : "border-grey-c200 group-hover:border-primary-c300"
-            } ${disabled ? "bg-grey-c100/80 group-hover:border-grey-c200 text-grey-c400" : ""}
-            ${inputType === "password" ? "font-mono text-sm placeholder:text-sm leading-[20px] placeholder:font-sourceSans3" : ""}
+            } ${disabled ? "bg-grey-c100/80 group-hover:border-grey-c200 text-grey-c600" : ""}
+            ${
+              inputType === "password"
+                ? "font-mono text-sm placeholder:text-sm leading-[20px] placeholder:font-sourceSans3"
+                : ""
+            }
             placeholder:font-sourceSans3
             ${inputClassName}`}
           />

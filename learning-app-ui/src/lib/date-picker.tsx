@@ -494,7 +494,7 @@ const DatePicker = ({ defaultDate, onChange, label, error = false, helperText = 
         <input
           type="text"
           className={`relative transition duration-300 py-3 pl-4 pr-14 w-full border-[2px] tracking-wide text-sm placeholder-grey-c400 
-             text-grey-c900 disabled:opacity-40 disabled:cursor-not-allowed rounded-[20px] 
+             text-black/80 font-medium disabled:opacity-40 disabled:cursor-not-allowed rounded-[20px] 
              ring-0 focus:ring-0 focus:outline-none shadow-none focus:shadow-none cursor-pointer ${
                isOpen && !error
                  ? "border-primary-c900"

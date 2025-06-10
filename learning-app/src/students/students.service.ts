@@ -12,6 +12,8 @@ import { Prisma } from '@prisma/client';
 import { NotificationsService } from 'src/notifications/notifications.service';
 import { ImportFileStudentDto } from './dto/import-file-student.dto';
 import * as XLSX from 'xlsx';
+import { sortVietnameseNames } from 'src/utils/functions';
+import { SortType } from 'src/utils/enums';
 
 @Injectable()
 export class StudentsService {
@@ -29,12 +31,14 @@ export class StudentsService {
       rowPerPage = 10,
       classId,
       studentClassStatus, // status of student in class
-      isSort = false,
     } = filterStudentDto;
     try {
       const whereCondition: Prisma.StudentWhereInput = {
         name: name
-          ? ({ contains: name, mode: 'insensitive' } as Prisma.StringFilter)
+          ? ({
+              contains: name,
+              mode: 'insensitive',
+            } as Prisma.StringFilter)
           : undefined,
         ...(status && { status }),
         // Nếu có classId và status là ACTIVE, chỉ lấy học sinh đang học trong lớp đó
@@ -58,12 +62,12 @@ export class StudentsService {
             : {}),
       };
 
-      const [data, total] = await Promise.all([
+      let data;
+      const total = await Promise.all([
         this.prismaService.student.findMany({
           where: whereCondition,
           skip: (page - 1) * rowPerPage,
           take: rowPerPage,
-          orderBy: isSort ? { updatedAt: 'desc' } : undefined,
           include: {
             classes: {
               where:
@@ -79,7 +83,10 @@ export class StudentsService {
         this.prismaService.student.count({
           where: whereCondition,
         }),
-      ]);
+      ]).then(([students, count]) => {
+        data = students;
+        return count;
+      });
 
       return {
         total,

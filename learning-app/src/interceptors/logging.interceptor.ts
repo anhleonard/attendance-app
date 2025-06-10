@@ -20,18 +20,6 @@ export class LoggingInterceptor implements NestInterceptor {
     const userAgent = request.get('user-agent') || '';
     const startTime = Date.now();
 
-    // Log request
-    this.logger.log(
-      `[Request] ${method} ${originalUrl} - User Agent: ${userAgent}`,
-    );
-    this.logger.debug('Request Body:', body);
-    this.logger.debug('Query Parameters:', query);
-    this.logger.debug('Route Parameters:', params);
-    this.logger.debug('Headers:', {
-      ...headers,
-      authorization: headers.authorization ? '[REDACTED]' : undefined,
-    });
-
     return next.handle().pipe(
       tap({
         next: (data) => {
@@ -39,10 +27,10 @@ export class LoggingInterceptor implements NestInterceptor {
           const statusCode = response.statusCode;
 
           // Log successful response
-          this.logger.log(
-            `[Response] ${method} ${originalUrl} ${statusCode} - ${responseTime}ms`,
-          );
-          this.logger.debug('Response Body:', data);
+          // this.logger.log(
+          //   `[Response] ${method} ${originalUrl} ${statusCode} - ${responseTime}ms`,
+          // );
+          // this.logger.debug('Response Body:', data);
         },
         error: (error) => {
           const responseTime = Date.now() - startTime;

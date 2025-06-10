@@ -26,3 +26,8 @@ export enum Status {
   ACTIVE = "ACTIVE",
   INACTIVE = "INACTIVE",
 }
+
+export enum SortType {
+  ASC = "asc",
+  DESC = "desc",
+}

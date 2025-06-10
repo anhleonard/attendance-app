@@ -13,15 +13,13 @@ import { createClass } from "@/apis/services/classes";
 import { CreateClassDto, CreateSessionDto } from "@/apis/dto";
 import { useRouter } from "next/navigation";
 import { openAlert } from "@/redux/slices/alert-slice";
-import { useDispatch } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import { openLoading, closeLoading } from "@/redux/slices/loading-slice";
 import { closeDrawer } from "@/redux/slices/drawer-slice";
 import { getSessionKeyByDay } from "@/config/functions";
 import { refetch } from "@/redux/slices/refetch-slice";
-
-const formatAmount = (amount: number): string => {
-  return amount.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-};
+import { RootState } from "@/redux/store";
+import { updateSystemInfo } from "@/redux/slices/system-slice";
 
 interface AddClassFormValues {
   className: string;
@@ -70,8 +68,8 @@ const initialValues: AddClassFormValues = {
 };
 
 const AddClass = () => {
-  const router = useRouter();
   const dispatch = useDispatch();
+  const activeClasses = useSelector((state: RootState) => state.system.activeClasses);
 
   const formik = useFormik({
     initialValues: initialValues,
@@ -92,7 +90,22 @@ const AddClass = () => {
           sessions,
         };
 
-        await createClass(classData);
+        const newClass = await createClass(classData);
+
+        // Add new class to Redux store
+        const newClassOption = {
+          label: values.className,
+          value: newClass.id.toString(),
+        };
+
+        const updatedActiveClasses = [...(activeClasses || []), newClassOption];
+
+        dispatch(
+          updateSystemInfo({
+            activeClasses: updatedActiveClasses,
+          }),
+        );
+
         dispatch(
           openAlert({
             isOpen: true,
@@ -101,7 +114,7 @@ const AddClass = () => {
             type: "success",
           }),
         );
-        router.push("/classes"); // Redirect to classes page after successful creation
+        dispatch(refetch());
       } catch (error: any) {
         dispatch(
           openAlert({
@@ -114,7 +127,6 @@ const AddClass = () => {
       } finally {
         dispatch(closeLoading());
         dispatch(closeDrawer());
-        dispatch(refetch());
       }
     },
     validateOnChange: true,

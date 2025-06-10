@@ -6,8 +6,11 @@ import {
   IsOptional,
   IsString,
   IsBoolean,
+  ValidateNested,
 } from 'class-validator';
 import { Status } from 'src/utils/enums';
+import { Type } from 'class-transformer';
+import { SortDto } from 'src/utils/interfaces';
 
 export class FilterStudentDto {
   @IsString()
@@ -34,7 +37,8 @@ export class FilterStudentDto {
   @IsOptional()
   rowPerPage: number;
 
-  @IsBoolean()
+  @ValidateNested()
+  @Type(() => SortDto)
   @IsOptional()
-  isSort: boolean;
+  sort: SortDto;
 }

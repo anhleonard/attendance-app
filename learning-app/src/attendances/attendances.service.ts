@@ -10,6 +10,7 @@ import { UpdateAttendanceDto } from './dto/update-attendance.dto';
 import { FilterAttendanceDto } from './dto/filter-attendance.dto';
 import { Prisma } from '@prisma/client';
 import { UpdateBatchAttendanceDto } from './dto/update-batch-attendance.dto';
+import { sortVietnameseNames } from 'src/utils/functions';
 
 @Injectable()
 export class AttendancesService {
@@ -315,9 +316,14 @@ export class AttendancesService {
             },
           },
         },
-        orderBy: {
-          learningDate: 'desc',
-        },
+        orderBy: [
+          {
+            isAttend: 'asc', // Sắp xếp theo trạng thái điểm danh: false (vắng) trước, true (có mặt) sau
+          },
+          {
+            learningDate: 'desc', // Sau đó sắp xếp theo ngày học giảm dần
+          },
+        ],
         skip: (page - 1) * rowPerPage,
         take: rowPerPage,
       }),

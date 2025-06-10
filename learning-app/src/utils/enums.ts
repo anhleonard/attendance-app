@@ -37,3 +37,8 @@ export enum SessionStatus {
   ACTIVE = 'ACTIVE',
   CLOSED = 'CLOSED',
 }
+
+export enum SortType {
+  ASC = 'asc',
+  DESC = 'desc',
+}

@@ -18,13 +18,14 @@ import { Tooltip } from "react-tooltip";
 import { RootState } from "@/redux/store";
 import { refetch } from "@/redux/slices/refetch-slice";
 import moment from "moment";
-import { Status } from "@/config/enums";
+import { SortType, Status } from "@/config/enums";
 import { closeLoading } from "@/redux/slices/loading-slice";
 import { openLoading } from "@/redux/slices/loading-slice";
 import { openAlert } from "@/redux/slices/alert-slice";
 import Label from "@/lib/label";
 import { openModal } from "@/redux/slices/modal-slice";
 import ImportFileModal from "@/components/student/import-file-modal";
+import { EmptyRow } from "@/lib/empty-row";
 
 interface StudentsResponse {
   total: number;
@@ -59,7 +60,10 @@ const Students = () => {
           classId: filterClassId,
           studentClassStatus: Status.ACTIVE,
         }),
-        isSort: true,
+        sort: {
+          title: "updatedAt",
+          type: SortType.DESC,
+        },
       });
       if (response) {
         setStudentsData(response);
@@ -296,45 +300,49 @@ const Students = () => {
                 </tr>
               </thead>
               <tbody>
-                {studentsData?.data?.map((student, index) => (
-                  <tr key={student.id} className="hover:bg-primary-c10 hover:text-grey-c700">
-                    <th className="pl-3 py-4">{(page - 1) * rowsPerPage + index + 1}</th>
-                    <th className="px-1 py-4">{student.name}</th>
-                    <th className="px-1 py-4">{moment(student.dob).format("DD/MM/YYYY")}</th>
-                    <th className="px-1 py-4">{getActiveClassName(student.classes)}</th>
-                    <th className="px-1 py-4">{student.parent}</th>
-                    <th className="px-1 py-4">{student.phoneNumber}</th>
-                    <th className="px-1 py-4">{student.secondPhoneNumber || "-"}</th>
-                    <th className="px-1 py-4">
-                      <Label status={student.status === Status.ACTIVE ? "success" : "error"} label={student.status} />
-                    </th>
-                    <th className="px-1 py-4 text-center">
-                      <div className="flex justify-center items-center gap-3">
-                        <button
-                          data-tooltip-id={`edit-icon-${student?.id}`}
-                          data-tooltip-content="Edit"
-                          onClick={() => handleOpenEditDrawer(student)}
-                        >
-                          <Image src="/icons/edit-icon.svg" alt="edit-icon" width={24} height={24} />
-                        </button>
-                        <Tooltip id={`edit-icon-${student?.id}`} />
+                {studentsData?.data?.length > 0 ? (
+                  studentsData?.data?.map((student, index) => (
+                    <tr key={student.id} className="hover:bg-primary-c10 hover:text-grey-c700">
+                      <th className="pl-3 py-4">{(page - 1) * rowsPerPage + index + 1}</th>
+                      <th className="px-1 py-4">{student.name}</th>
+                      <th className="px-1 py-4">{moment(student.dob).format("DD/MM/YYYY")}</th>
+                      <th className="px-1 py-4">{getActiveClassName(student.classes)}</th>
+                      <th className="px-1 py-4">{student.parent}</th>
+                      <th className="px-1 py-4">{student.phoneNumber}</th>
+                      <th className="px-1 py-4">{student.secondPhoneNumber || "-"}</th>
+                      <th className="px-1 py-4">
+                        <Label status={student.status === Status.ACTIVE ? "success" : "error"} label={student.status} />
+                      </th>
+                      <th className="px-1 py-4 text-center">
+                        <div className="flex justify-center items-center gap-3">
+                          <button
+                            data-tooltip-id={`edit-icon-${student?.id}`}
+                            data-tooltip-content="Edit"
+                            onClick={() => handleOpenEditDrawer(student)}
+                          >
+                            <Image src="/icons/edit-icon.svg" alt="edit-icon" width={24} height={24} />
+                          </button>
+                          <Tooltip id={`edit-icon-${student?.id}`} />
 
-                        <button
-                          data-tooltip-id={`confirm-icon-${student?.id}`}
-                          data-tooltip-content={student?.status === Status.ACTIVE ? "Disable" : "Enable"}
-                          onClick={() => handleOpenConfirmChangeStatus(student)}
-                        >
-                          {student?.status === Status.ACTIVE ? (
-                            <Image src="/icons/disabled-icon.svg" alt="disabled-icon" width={22} height={22} />
-                          ) : (
-                            <Image src={"/icons/enabled-icon.svg"} alt="enabled-icon" width={23} height={23} />
-                          )}
-                        </button>
-                        <Tooltip id={`confirm-icon-${student?.id}`} />
-                      </div>
-                    </th>
-                  </tr>
-                ))}
+                          <button
+                            data-tooltip-id={`confirm-icon-${student?.id}`}
+                            data-tooltip-content={student?.status === Status.ACTIVE ? "Disable" : "Enable"}
+                            onClick={() => handleOpenConfirmChangeStatus(student)}
+                          >
+                            {student?.status === Status.ACTIVE ? (
+                              <Image src="/icons/disabled-icon.svg" alt="disabled-icon" width={22} height={22} />
+                            ) : (
+                              <Image src={"/icons/enabled-icon.svg"} alt="enabled-icon" width={23} height={23} />
+                            )}
+                          </button>
+                          <Tooltip id={`confirm-icon-${student?.id}`} />
+                        </div>
+                      </th>
+                    </tr>
+                  ))
+                ) : (
+                  <EmptyRow colSpan={9} />
+                )}
               </tbody>
             </table>
           </div>

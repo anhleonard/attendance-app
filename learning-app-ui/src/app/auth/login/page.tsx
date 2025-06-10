@@ -53,41 +53,44 @@ const LoginPage = () => {
           // get user info
           const userInfo = await getUserInfo();
           // get active classes
-          let activeClasses = await getClasses({
+          const responseClasses = await getClasses({
             fetchAll: true,
             status: Status.ACTIVE,
           });
+          let activeClasses = responseClasses?.data || [];
           // get active students
-          let studentList = await getStudents({
+          let responseStudents = await getStudents({
             fetchAll: true,
             status: Status.ACTIVE,
           });
+          let studentList = responseStudents?.data || [];
           // get notifications
           const notifications = await getNotifications({
             userId: userInfo?.id,
           });
           // get system users
-          let systemUsers = await getSystemUsers({
+          const responseSystemUsers = await getSystemUsers({
             fetchAll: true,
             status: Status.ACTIVE,
           });
+          let systemUsers = responseSystemUsers?.data || [];
 
-          if (activeClasses?.data?.length > 0) {
-            const mappedActiveClasses = activeClasses?.data?.map((cls: Class) => ({
+          if (activeClasses?.length > 0) {
+            const mappedActiveClasses = activeClasses?.map((cls: Class) => ({
               label: cls.name,
               value: cls.id.toString(),
             }));
             activeClasses = mappedActiveClasses;
           }
-          if (studentList?.data?.length > 0) {
-            const mappedActiveStudents = studentList?.data?.map((student: Student) => ({
+          if (studentList?.length > 0) {
+            const mappedActiveStudents = studentList?.map((student: Student) => ({
               label: student.name,
               value: student.id.toString(),
             }));
             studentList = mappedActiveStudents;
           }
-          if (systemUsers?.data?.length > 0) {
-            const mappedSystemUsers = systemUsers?.data?.map((user: User) => ({
+          if (systemUsers?.length > 0) {
+            const mappedSystemUsers = systemUsers?.map((user: User) => ({
               label: user.fullname,
               value: user.id.toString(),
               role: user.role,
@@ -98,14 +101,14 @@ const LoginPage = () => {
           dispatch(
             updateSystemInfo({
               profile: userInfo,
-              activeClasses: activeClasses || activeClasses?.data || [],
-              activeStudents: studentList || studentList?.data || [],
+              activeClasses: activeClasses || [],
+              activeStudents: studentList || [],
               notifications: {
                 data: notifications?.data || [],
                 page: 1,
                 total: notifications?.total || 0,
               },
-              systemUsers: systemUsers || systemUsers?.data || [],
+              systemUsers: systemUsers || [],
             }),
           );
           router.push("/calendar");

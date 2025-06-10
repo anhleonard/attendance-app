@@ -21,6 +21,7 @@ import { FilterUsersDto, UserResponse, UsersResponse } from "@/apis/dto";
 import { RootState } from "@/redux/store";
 import { refetch } from "@/redux/slices/refetch-slice";
 import TextField from "@/lib/textfield";
+import { EmptyRow } from "@/lib/empty-row";
 
 const Users = () => {
   const dispatch = useDispatch();
@@ -241,47 +242,51 @@ const Users = () => {
                 </tr>
               </thead>
               <tbody>
-                {usersData?.data?.map((user, index) => (
-                  <tr key={user.id} className="hover:bg-primary-c10 hover:text-grey-c700">
-                    <th className="pl-3 py-4">{(page - 1) * rowsPerPage + index + 1}</th>
-                    <th className="px-1 py-4">{user.fullname}</th>
-                    <th className="px-1 py-4">{user.email}</th>
-                    <th className="px-1 py-4">{user.role}</th>
-                    <th className="px-1 py-4">
-                      <Label
-                        status={user.locked ? "error" : "success"}
-                        label={user.locked ? Status.INACTIVE : Status.ACTIVE}
-                        className="w-[80%]"
-                      />
-                    </th>
-                    <th className="px-1 py-4">{moment(user.createdAt).format("DD/MM/YYYY")}</th>
-                    <th className="px-1 py-4 text-center">
-                      <div className="flex justify-center items-center gap-3">
-                        <button
-                          data-tooltip-id={`edit-icon-${user.id}`}
-                          data-tooltip-content="Edit"
-                          onClick={() => handleOpenEditDrawer(user)}
-                        >
-                          <Image src="/icons/edit-icon.svg" alt="edit-icon" width={24} height={24} />
-                        </button>
-                        <Tooltip id={`edit-icon-${user.id}`} />
+                {usersData?.data?.length > 0 ? (
+                  usersData?.data?.map((user, index) => (
+                    <tr key={user.id} className="hover:bg-primary-c10 hover:text-grey-c700">
+                      <th className="pl-3 py-4">{(page - 1) * rowsPerPage + index + 1}</th>
+                      <th className="px-1 py-4">{user.fullname}</th>
+                      <th className="px-1 py-4">{user.email}</th>
+                      <th className="px-1 py-4">{user.role}</th>
+                      <th className="px-1 py-4">
+                        <Label
+                          status={user.locked ? "error" : "success"}
+                          label={user.locked ? Status.INACTIVE : Status.ACTIVE}
+                          className="w-[80%]"
+                        />
+                      </th>
+                      <th className="px-1 py-4">{moment(user.createdAt).format("DD/MM/YYYY")}</th>
+                      <th className="px-1 py-4 text-center">
+                        <div className="flex justify-center items-center gap-3">
+                          <button
+                            data-tooltip-id={`edit-icon-${user.id}`}
+                            data-tooltip-content="Edit"
+                            onClick={() => handleOpenEditDrawer(user)}
+                          >
+                            <Image src="/icons/edit-icon.svg" alt="edit-icon" width={24} height={24} />
+                          </button>
+                          <Tooltip id={`edit-icon-${user.id}`} />
 
-                        <button
-                          data-tooltip-id={`confirm-icon-${user.id}`}
-                          data-tooltip-content={user.locked ? "Enable" : "Disable"}
-                          onClick={() => handleOpenConfirmChangeStatus(user)}
-                        >
-                          {user.locked ? (
-                            <Image src="/icons/enabled-icon.svg" alt="enabled-icon" width={23} height={23} />
-                          ) : (
-                            <Image src="/icons/disabled-icon.svg" alt="disabled-icon" width={22} height={22} />
-                          )}
-                        </button>
-                        <Tooltip id={`confirm-icon-${user.id}`} />
-                      </div>
-                    </th>
-                  </tr>
-                ))}
+                          <button
+                            data-tooltip-id={`confirm-icon-${user.id}`}
+                            data-tooltip-content={user.locked ? "Enable" : "Disable"}
+                            onClick={() => handleOpenConfirmChangeStatus(user)}
+                          >
+                            {user.locked ? (
+                              <Image src="/icons/enabled-icon.svg" alt="enabled-icon" width={23} height={23} />
+                            ) : (
+                              <Image src="/icons/disabled-icon.svg" alt="disabled-icon" width={22} height={22} />
+                            )}
+                          </button>
+                          <Tooltip id={`confirm-icon-${user.id}`} />
+                        </div>
+                      </th>
+                    </tr>
+                  ))
+                ) : (
+                  <EmptyRow colSpan={8} />
+                )}
               </tbody>
             </table>
           </div>

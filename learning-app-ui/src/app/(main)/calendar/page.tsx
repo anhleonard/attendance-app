@@ -1,8 +1,5 @@
 "use client";
-import DetailHistoryModal from "@/components/history/detail-history";
-import { ConfirmState, ModalState, Class, Session } from "@/config/types";
-import { openConfirm } from "@/redux/slices/confirm-slice";
-import { openModal } from "@/redux/slices/modal-slice";
+import { Class, Session } from "@/config/types";
 import Image from "next/image";
 import React, { useEffect, useState } from "react";
 import { useDispatch } from "react-redux";
@@ -11,7 +8,7 @@ import { getCalendar } from "@/apis/services/classes";
 import { FilterCalendarDto } from "@/apis/dto";
 import { openLoading, closeLoading } from "@/redux/slices/loading-slice";
 import { openAlert } from "@/redux/slices/alert-slice";
-import { getDayBySessionKey } from "@/config/functions";
+import { useRouter } from "next/navigation";
 
 // Update interfaces to match backend response
 interface CalendarClass extends Class {
@@ -24,6 +21,7 @@ interface CalendarResponse {
 
 const CalendarPage = () => {
   const dispatch = useDispatch();
+  const router = useRouter();
   const [currentDate, setCurrentDate] = useState(moment());
   const [calendarData, setCalendarData] = useState<CalendarResponse>({});
   const [calendarDays, setCalendarDays] = useState<
@@ -103,11 +101,10 @@ const CalendarPage = () => {
     setCurrentDate(moment(currentDate).add(1, "month"));
   };
 
-  const calculateDuration = (startTime: string, endTime: string): string => {
-    const start = new Date(`2000-01-01T${startTime}`);
-    const end = new Date(`2000-01-01T${endTime}`);
-    const diffInHours = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
-    return `${diffInHours} hours`;
+  const handleClassClick = (classId: number, date: string) => {
+    // Navigate to attendance page with class ID and date parameters
+    const attendanceUrl = `/attendance?classId=${classId}&date=${date}`;
+    router.push(attendanceUrl);
   };
 
   const renderDayCell = (day: (typeof calendarDays)[0] | null) => {
@@ -117,9 +114,16 @@ const CalendarPage = () => {
 
     // Convert date format from DD-MM-YYYY to DD.MM.YYYY to match backend format
     const backendDateKey = day.date.replace(/-/g, ".");
-    const classes = calendarData[backendDateKey] || [];
+    const allClasses = calendarData[backendDateKey] || [];
     const today = moment().format("DD.MM.YYYY");
     const isToday = backendDateKey === today;
+
+    // Filter classes based on createdAt date - only show classes created on or before the current date
+    const classes = allClasses.filter((classItem) => {
+      const classCreatedAt = moment(classItem.createdAt);
+      const currentDate = moment(day.date, "DD-MM-YYYY");
+      return classCreatedAt.isSameOrBefore(currentDate, "day");
+    });
 
     const getClassStyle = (session: Session, sessionDate: string) => {
       const isPastDate = moment(sessionDate, "DD.MM.YYYY").isBefore(moment(), "day");
@@ -146,11 +150,11 @@ const CalendarPage = () => {
     return (
       <div className={`aspect-square p-2 bg-white relative`}>
         <div
-          className={`mb-1 ${isToday ? "text-primary-c900 text-sm font-black" : "text-grey-c900 text-sm font-medium"}`}
+          className={`mb-1 ${isToday ? "bg-primary-c800 text-sm text-white font-black rounded-sm px-1 w-fit" : "text-grey-c900 text-sm font-medium"}`}
         >
           {day.day}
         </div>
-        <div className="space-y-1 h-[calc(100%-24px)] overflow-y-auto custom-scrollbar">
+        <div className="space-y-1 h-[calc(100%-28px)] overflow-y-auto custom-scrollbar">
           {classes.map((classItem) => {
             const session = classItem.sessions[0]; // Get first session for display
             if (!session) return null;
@@ -165,6 +169,7 @@ const CalendarPage = () => {
                 title={`${classItem.name} - ${session.startTime} - ${session.endTime} (${
                   session.hasAttendance ? "Đã điểm danh" : "Chưa điểm danh"
                 })`}
+                onClick={() => handleClassClick(classItem.id, day.date)}
               >
                 <div className="font-medium truncate">{classItem.name}</div>
                 <div className={`text-[10px] truncate ${getTimeStyle(session, backendDateKey)}`}>
@@ -176,29 +181,6 @@ const CalendarPage = () => {
         </div>
       </div>
     );
-  };
-
-  const handleOpenViewModal = () => {
-    const modal: ModalState = {
-      isOpen: true,
-      title: "History detail",
-      content: <DetailHistoryModal />,
-      className: "max-w-lg",
-    };
-
-    dispatch(openModal(modal));
-  };
-
-  const handleOpenConfirmDelete = () => {
-    const confirm: ConfirmState = {
-      isOpen: true,
-      title: "Are you sure?",
-      subtitle: "This action cannot be undone. All values associated in this student will be lost.",
-      titleAction: "Delete",
-      handleAction: () => {},
-    };
-
-    dispatch(openConfirm(confirm));
   };
 
   return (

@@ -82,6 +82,18 @@ const Button: FC<Props> = ({
           {endIcon ? endIcon : null}
         </button>
       ) : null}
+
+      {status === "info" ? (
+        <button
+          type={type}
+          disabled={disabled}
+          className={`flex items-center justify-center gap-1 bg-white border-[1px] border-primary-c400 w-fit px-4 py-1.5 rounded-full cursor-pointer hover:bg-primary-c50 active:bg-primary-c100 hover:scale-105 duration-300 transition disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 ${className}`}
+        >
+          {startIcon && <div className="flex items-center text-primary-c900">{startIcon}</div>}
+          <div className="text-center font-medium text-sm text-primary-c900">{label}</div>
+          {endIcon && <div className="flex items-center text-primary-c900">{endIcon}</div>}
+        </button>
+      ) : null}
     </div>
   );
 };

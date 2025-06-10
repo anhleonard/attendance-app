@@ -128,7 +128,7 @@ const TextArea = forwardRef<TextAreaRef, TextAreaProps>(
           onFocus={() => setIsFocused(true)}
           onBlur={handleBlur}
           placeholder={placeholder}
-          className={`w-full border-2 rounded-[20px] px-4 py-3 outline-none transition-all focus:border-primary-c900
+          className={`text-black/80 font-medium text-sm w-full border-2 rounded-[20px] px-4 py-3 outline-none transition-all focus:border-primary-c900
           ${
             isFocused && !error
               ? "border-primary-c900"

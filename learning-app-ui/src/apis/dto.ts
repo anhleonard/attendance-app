@@ -1,4 +1,4 @@
-import { Permission, Role, SessionKey, Status } from "@/config/enums";
+import { Permission, Role, SessionKey, SortType, Status } from "@/config/enums";
 
 export interface LoginDto {
   email: string;
@@ -69,15 +69,20 @@ export interface UpdateStudentDto {
   secondPhoneNumber?: string;
 }
 
+export interface SortDto {
+  title?: string;
+  type?: SortType;
+}
+
 export interface FilterStudentDto {
   name?: string;
   classId?: number;
-  page?: number;
-  rowPerPage?: number;
   status?: Status;
   studentClassStatus?: Status;
   fetchAll?: boolean;
-  isSort?: boolean;
+  page?: number;
+  rowPerPage?: number;
+  sort?: SortDto;
 }
 
 export interface FilterAttendanceDto {
@@ -89,6 +94,7 @@ export interface FilterAttendanceDto {
   learningYear?: number;
   page?: number;
   rowPerPage?: number;
+  sort?: SortDto;
 }
 
 export interface CreateAttendanceDto {
