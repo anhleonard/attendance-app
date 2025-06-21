@@ -24,16 +24,130 @@ export class AttendancesService {
       const { studentId, sessionId, learningDate, ...rest } =
         createAttendanceDto;
 
-      const foundSession = await this.prismaService.session.findFirst({
+      console.log('=== CREATE ATTENDANCE DEBUG ===');
+      console.log('Input data:', {
+        studentId,
+        sessionId,
+        learningDate,
+        rest,
+        userId: user.userId
+      });
+
+      // Normalize learningDate to start of day for comparison
+      const normalizedLearningDate = new Date(learningDate);
+      normalizedLearningDate.setHours(0, 0, 0, 0);
+
+      console.log('Normalized learning date:', {
+        original: learningDate,
+        normalized: normalizedLearningDate
+      });
+
+      // First, let's check if the session exists at all
+      const basicSession = await this.prismaService.session.findFirst({
+        where: { id: sessionId },
+        include: { class: true }
+      });
+
+      console.log('Basic session check:', {
+        sessionFound: !!basicSession,
+        sessionData: basicSession ? {
+          id: basicSession.id,
+          sessionKey: basicSession.sessionKey,
+          status: basicSession.status,
+          validFrom: basicSession.validFrom,
+          validTo: basicSession.validTo,
+          classId: basicSession.classId,
+          classStatus: basicSession.class?.status
+        } : null
+      });
+
+      let foundSession = await this.prismaService.session.findFirst({
         where: {
           id: sessionId,
+          status: 'ACTIVE',
+          OR: [
+            // Sessions valid on learning date (compare by date only)
+            {
+              validFrom: {
+                lte: normalizedLearningDate,
+              },
+              validTo: {
+                gte: normalizedLearningDate,
+              },
+            },
+            // Sessions valid from before and still active (compare by date only)
+            {
+              validFrom: {
+                lte: normalizedLearningDate,
+              },
+              validTo: null,
+            },
+          ],
         },
         include: {
           class: true,
         },
       });
 
+      // Additional check: normalize validFrom and validTo for comparison
+      let sessionValidForDate = false;
+      if (basicSession) {
+        const sessionValidFrom = basicSession.validFrom ? new Date(basicSession.validFrom) : null;
+        const sessionValidTo = basicSession.validTo ? new Date(basicSession.validTo) : null;
+        
+        if (sessionValidFrom) {
+          sessionValidFrom.setHours(0, 0, 0, 0);
+        }
+        if (sessionValidTo) {
+          sessionValidTo.setHours(23, 59, 59, 999);
+        }
+
+        sessionValidForDate = 
+          sessionValidFrom && sessionValidFrom <= normalizedLearningDate &&
+          (!sessionValidTo || sessionValidTo >= normalizedLearningDate);
+
+        console.log('Manual date validation:', {
+          sessionValidFrom: sessionValidFrom,
+          sessionValidTo: sessionValidTo,
+          normalizedLearningDate: normalizedLearningDate,
+          sessionValidForDate: sessionValidForDate
+        });
+      }
+
+      console.log('Detailed session check:', {
+        sessionFound: !!foundSession,
+        sessionValidForDate: sessionValidForDate,
+        sessionData: foundSession ? {
+          id: foundSession.id,
+          sessionKey: foundSession.sessionKey,
+          status: foundSession.status,
+          validFrom: foundSession.validFrom,
+          validTo: foundSession.validTo,
+          classId: foundSession.classId,
+          classStatus: foundSession.class?.status,
+          learningDate: normalizedLearningDate
+        } : null,
+        queryConditions: {
+          sessionId,
+          status: 'ACTIVE',
+          learningDate: normalizedLearningDate,
+          validFromLte: normalizedLearningDate,
+          validToGte: normalizedLearningDate,
+          validToNull: null
+        }
+      });
+
+      // Use manual validation if Prisma query fails but session should be valid
+      if (!foundSession && sessionValidForDate && basicSession && basicSession.class) {
+        console.log('Using manual validation - session is valid for this date');
+        foundSession = basicSession;
+      }
+
       if (!foundSession || !foundSession.class) {
+        console.log('ERROR: Session or class not found');
+        console.log('Session found:', !!foundSession);
+        console.log('Class found:', !!foundSession?.class);
+        console.log('Session valid for date:', sessionValidForDate);
         throw new NotFoundException('No related session or class found');
       }
 
@@ -50,10 +164,31 @@ export class AttendancesService {
         },
       });
 
+      console.log('Student class check:', {
+        studentClassFound: !!studentClass,
+        studentClassData: studentClass ? {
+          studentId: studentClass.studentId,
+          classId: studentClass.classId,
+          status: studentClass.status,
+          studentStatus: studentClass.student?.status
+        } : null
+      });
+
       if (!studentClass) {
         throw new BadRequestException(
           'The student does not belong to this class',
         );
+      }
+
+      // Check if isAttend is false - if so, don't create attendance record
+      const { isAttend } = rest;
+      if (!isAttend) {
+        console.log('=== CREATE ATTENDANCE SKIPPED ===');
+        console.log('isAttend is false, skipping attendance creation');
+        return {
+          message: 'Attendance creation skipped - student is not attending',
+          isAttend: false,
+        };
       }
 
       //sau khi từ session tìm ra lớp và xác nhận student thuộc class đó thì tạo attendance
@@ -67,13 +202,26 @@ export class AttendancesService {
         },
       });
 
+      console.log('Attendance created successfully:', {
+        attendanceId: createdAttendance.id,
+        isAttend: createdAttendance.isAttend
+      });
+
       // TASK: update payment based on attendance //
-      const { isAttend } = createdAttendance;
+      // Note: Since we only create attendance when isAttend = true, we can simplify payment logic
 
       // Xác định tháng và năm của buổi học từ learningDate
       const attendanceDate = new Date(learningDate);
       const attendanceMonth = attendanceDate.getMonth() + 1;
       const attendanceYear = attendanceDate.getFullYear();
+
+      console.log('Payment calculation:', {
+        attendanceMonth,
+        attendanceYear,
+        isAttend: true, // Always true since we only create when attending
+        sessionAmount: foundSession.amount,
+        studentDebt: studentClass.student.debt
+      });
 
       // Lấy Payment hiện tại của tháng
       let payment = await this.prismaService.payment.findFirst({
@@ -86,20 +234,36 @@ export class AttendancesService {
         },
       });
 
+      console.log('Existing payment check:', {
+        paymentFound: !!payment,
+        paymentData: payment ? {
+          id: payment.id,
+          totalSessions: payment.totalSessions,
+          totalAttend: payment.totalAttend,
+          totalMonthAmount: payment.totalMonthAmount,
+          totalPayment: payment.totalPayment
+        } : null
+      });
+
       if (!payment) {
         // Nếu chưa có Payment, tạo mới
         try {
           payment = await this.prismaService.payment.create({
             data: {
-              totalSessions: 1, // Tăng tổng số buổi đã điểm danh (bất kể đi học hay không)
-              totalAttend: isAttend ? 1 : 0, // Tăng số buổi tham gia (chỉ khi đi học)
-              totalMonthAmount: isAttend ? foundSession.amount : 0, // Chỉ tính tiền nếu đi học
-              totalPayment: isAttend
-                ? foundSession.amount + studentClass.student.debt
-                : studentClass.student.debt,
+              totalSessions: 1, // Tăng tổng số buổi đã điểm danh
+              totalAttend: 1, // Tăng số buổi tham gia (luôn = 1 vì chỉ tạo khi đi học)
+              totalMonthAmount: foundSession.amount, // Tính tiền cho buổi học
+              totalPayment: foundSession.amount + studentClass.student.debt,
               status: 'SAVED',
               student: { connect: { id: studentId } },
             },
+          });
+          console.log('New payment created:', {
+            paymentId: payment.id,
+            totalSessions: payment.totalSessions,
+            totalAttend: payment.totalAttend,
+            totalMonthAmount: payment.totalMonthAmount,
+            totalPayment: payment.totalPayment
           });
         } catch (error) {
           console.error('Error creating payment:', error);
@@ -109,17 +273,27 @@ export class AttendancesService {
         // Nếu đã có Payment, cập nhật thêm buổi học mới
         try {
           const updateData = {
-            totalSessions: { increment: 1 }, // Luôn tăng tổng số buổi đã điểm danh
-            totalAttend: { increment: isAttend ? 1 : 0 }, // Chỉ tăng số buổi tham gia nếu đi học
-            totalMonthAmount: { increment: isAttend ? foundSession.amount : 0 }, // Chỉ cộng tiền nếu đi học
+            totalSessions: { increment: 1 }, // Tăng tổng số buổi đã điểm danh
+            totalAttend: { increment: 1 }, // Tăng số buổi tham gia
+            totalMonthAmount: { increment: foundSession.amount }, // Cộng tiền cho buổi học
             totalPayment: {
-              increment: isAttend ? foundSession.amount : 0, // Chỉ cộng tiền nếu đi học
+              increment: foundSession.amount, // Cộng tiền cho buổi học
             },
           };
+
+          console.log('Updating existing payment:', updateData);
 
           payment = await this.prismaService.payment.update({
             where: { id: payment.id },
             data: updateData,
+          });
+
+          console.log('Payment updated successfully:', {
+            paymentId: payment.id,
+            totalSessions: payment.totalSessions,
+            totalAttend: payment.totalAttend,
+            totalMonthAmount: payment.totalMonthAmount,
+            totalPayment: payment.totalPayment
           });
         } catch (error) {
           console.error('Error updating payment:', error);
@@ -133,12 +307,22 @@ export class AttendancesService {
         data: { payment: { connect: { id: payment.id } } },
       });
 
+      console.log('=== CREATE ATTENDANCE SUCCESS ===');
+      console.log('Final result:', {
+        attendanceId: updatedAttendance.id,
+        paymentId: payment.id,
+        isAttend: updatedAttendance.isAttend
+      });
+
       return {
         createdAttendance: updatedAttendance,
         payment: payment ?? 'No payment updated',
       };
     } catch (error) {
+      console.error('=== CREATE ATTENDANCE ERROR ===');
       console.error('Error in createAttendance:', error);
+      console.error('Error message:', error.message);
+      console.error('Error stack:', error.stack);
       throw new BadRequestException(error.message);
     }
   }
@@ -368,7 +552,32 @@ export class AttendancesService {
         where: { id: classId },
         include: {
           sessions: {
-            where: { status: 'ACTIVE' },
+            where: { 
+              status: 'ACTIVE',
+              OR: [
+                // Sessions valid on learning date (with validFrom/validTo)
+                {
+                  validFrom: {
+                    lte: new Date(learningDate),
+                  },
+                  validTo: {
+                    gte: new Date(learningDate),
+                  },
+                },
+                // Sessions valid from before and still active (with validFrom/validTo)
+                {
+                  validFrom: {
+                    lte: new Date(learningDate),
+                  },
+                  validTo: null,
+                },
+                // Fallback for old data without validFrom/validTo
+                {
+                  validFrom: null,
+                  validTo: null,
+                },
+              ],
+            },
           },
         },
       });

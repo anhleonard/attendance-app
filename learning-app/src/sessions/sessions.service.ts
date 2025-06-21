@@ -12,6 +12,8 @@ export class SessionsService {
       return await this.prismaService.session.create({
         data: {
           ...createSessionDto,
+          validFrom: createSessionDto.validFrom || new Date(),
+          validTo: createSessionDto.validTo || null,
           class: { connect: { id: classId } },
         },
       });

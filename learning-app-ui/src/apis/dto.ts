@@ -1,4 +1,4 @@
-import { Permission, Role, SessionKey, SortType, Status } from "@/config/enums";
+import { PaymentStatus, Permission, Role, SessionKey, SortType, Status } from "@/config/enums";
 
 export interface LoginDto {
   email: string;
@@ -35,6 +35,7 @@ export interface FilterClassDto {
   rowPerPage?: number;
   learningDate?: Date;
   fetchAll?: boolean;
+  hasHistories?: boolean;
 }
 
 export interface FilterCalendarDto {
@@ -148,6 +149,8 @@ export interface FilterPaymentDto {
   classId?: number;
   learningMonth?: number;
   learningYear?: number;
+  status?: PaymentStatus;
+  fetchAll?: boolean;
 }
 
 export interface FilterHistoryDto {
@@ -225,4 +228,35 @@ export interface CreateNotificationDto {
 export interface ImportFileStudentDto {
   classId: number;
   file: File;
+}
+
+export interface UpdatePaymentDto {
+  paymentId: number;
+  paidAmount?: number;
+  paymentNote?: string;
+  status?: PaymentStatus;
+}
+
+export interface UpdateBatchPaymentsDto {
+  isSelectedAll?: boolean;
+  unselectedPaymentIds?: number[];
+  selectedPaymentIds?: number[];
+  status: PaymentStatus.SENT | PaymentStatus.DONE;
+  filter?: BatchPaymentFilter;
+}
+
+export interface DownloadAllBillsDto {
+  name?: string; // the name of student
+  classId?: number;
+  learningMonth?: number;
+  learningYear?: number;
+  status?: PaymentStatus;
+}
+
+export interface BatchPaymentFilter {
+  name?: string; // the name of student
+  classId?: number;
+  status?: PaymentStatus;
+  learningMonth?: number;
+  learningYear?: number;
 }

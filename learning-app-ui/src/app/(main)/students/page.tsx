@@ -1,7 +1,6 @@
 "use client";
 import { getStudents, updateStudent } from "@/apis/services/students";
-import { getClasses } from "@/apis/services/classes";
-import { UpdateStudentDto, FilterClassDto } from "@/apis/dto";
+import { UpdateStudentDto } from "@/apis/dto";
 import AddStudent from "@/components/student/add-student";
 import EditStudent from "@/components/student/edit-student";
 import { ConfirmState, ModalState, Student, StudentClass } from "@/config/types";

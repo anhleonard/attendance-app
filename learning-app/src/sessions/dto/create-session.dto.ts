@@ -1,4 +1,5 @@
-import { IsString, IsInt, IsNotEmpty, IsEnum, Matches } from 'class-validator';
+import { IsString, IsInt, IsNotEmpty, IsEnum, Matches, IsOptional, IsDate } from 'class-validator';
+import { Transform } from 'class-transformer';
 import { SessionKey } from 'src/utils/enums';
 
 export class CreateSessionDto {
@@ -21,4 +22,14 @@ export class CreateSessionDto {
   @IsInt()
   @IsNotEmpty()
   amount: number;
+
+  @Transform(({ value }) => value && new Date(value))
+  @IsDate()
+  @IsOptional()
+  validFrom?: Date;
+
+  @Transform(({ value }) => value && new Date(value))
+  @IsDate()
+  @IsOptional()
+  validTo?: Date;
 }

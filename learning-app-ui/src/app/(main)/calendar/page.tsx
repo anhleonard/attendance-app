@@ -115,24 +115,32 @@ const CalendarPage = () => {
     // Convert date format from DD-MM-YYYY to DD.MM.YYYY to match backend format
     const backendDateKey = day.date.replace(/-/g, ".");
     const allClasses = calendarData[backendDateKey] || [];
-    const today = moment().format("DD.MM.YYYY");
-    const isToday = backendDateKey === today;
+    const today = moment();
+    const isToday = backendDateKey === today.format("DD.MM.YYYY");
 
     // Filter classes based on createdAt date - only show classes created on or before the current date
     const classes = allClasses.filter((classItem) => {
       const classCreatedAt = moment(classItem.createdAt);
-      const currentDate = moment(day.date, "DD-MM-YYYY");
-      return classCreatedAt.isSameOrBefore(currentDate, "day");
+      return classCreatedAt.isSameOrBefore(today, "day");
     });
 
     const getClassStyle = (session: Session, sessionDate: string) => {
       const isPastDate = moment(sessionDate, "DD.MM.YYYY").isBefore(moment(), "day");
 
       if (session.hasAttendance) {
-        return "bg-success-c100 text-success-c800 hover:bg-success-c200";
+        // Đã điểm danh + validTo = null: màu xanh lá
+        if (!session.validTo) {
+          return "bg-success-c100 text-success-c800 hover:bg-success-c200";
+        }
+        // Đã điểm danh + validTo !== null: màu vàng cam
+        else {
+          return "bg-secondary-c50 text-secondary-c800 hover:bg-secondary-c100/95";
+        }
       } else if (isPastDate) {
+        // Quá hạn điểm danh: màu đỏ
         return "bg-support-c50/50 text-support-c700 hover:bg-support-c100/60";
       }
+      // Chưa điểm danh: xanh blue
       return "bg-primary-c100 text-primary-c900 hover:bg-primary-c200";
     };
 
@@ -140,17 +148,30 @@ const CalendarPage = () => {
       const isPastDate = moment(sessionDate, "DD.MM.YYYY").isBefore(moment(), "day");
 
       if (session.hasAttendance) {
-        return "text-success-c600";
+        // Đã điểm danh + validTo = null: màu xanh lá
+        if (session.validTo === null) {
+          return "text-success-c600";
+        }
+        // Đã điểm danh + validTo !== null: màu vàng cam
+        else {
+          return "text-secondary-c700";
+        }
       } else if (isPastDate) {
+        // Quá hạn điểm danh: màu đỏ
         return "text-support-c300";
       }
+      // Chưa điểm danh: xanh blue
       return "text-primary-c700";
     };
 
     return (
       <div className={`aspect-square p-2 bg-white relative`}>
         <div
-          className={`mb-1 ${isToday ? "bg-primary-c800 text-sm text-white font-black rounded-sm px-1 w-fit" : "text-grey-c900 text-sm font-medium"}`}
+          className={`mb-1 ${
+            isToday
+              ? "bg-primary-c800 text-sm text-white font-black rounded-lg px-1 w-fit"
+              : "text-grey-c900 text-sm font-medium"
+          }`}
         >
           {day.day}
         </div>
@@ -167,7 +188,11 @@ const CalendarPage = () => {
                   backendDateKey,
                 )}`}
                 title={`${classItem.name} - ${session.startTime} - ${session.endTime} (${
-                  session.hasAttendance ? "Đã điểm danh" : "Chưa điểm danh"
+                  session.hasAttendance 
+                    ? session.validTo === null 
+                      ? "Đã điểm danh (Đang học)" 
+                      : "Đã điểm danh (Lịch này đã chuyển)"
+                    : "Chưa điểm danh"
                 })`}
                 onClick={() => handleClassClick(classItem.id, day.date)}
               >

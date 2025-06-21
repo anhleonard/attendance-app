@@ -171,6 +171,7 @@ const ImportFileModal = () => {
           onClick={handleDownloadTemplate}
           type="button"
           status="info"
+          disabled={Boolean(formik.values.selectedClass && formik.values.selectedFile)}
         />
         <Button label="Process" type="submit" className="w-fit py-3.5 mt-2 px-8" />
       </div>

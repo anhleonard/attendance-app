@@ -1,29 +1,23 @@
 "use client";
 import PaymentDetailModal from "@/components/payment/payment-detail-modal";
-import { MONTHS } from "@/config/constants";
-import { formatCurrency } from "@/config/functions";
-import Button from "@/lib/button";
-import Label from "@/lib/label";
-import Pagination from "@/lib/pagination";
-import TextField from "@/lib/textfield";
-import { EmptyRow } from "@/lib/empty-row";
+import { BatchUpdateBar } from "@/components/payment/batch-update-bar";
+import PaymentFilter from "@/components/payment/payment-filter";
+import PaymentTable from "@/components/payment/payment-table";
 import Image from "next/image";
 import React, { useState, useEffect } from "react";
-import { Tooltip } from "react-tooltip";
-import Html2CanvasPro from "html2canvas-pro";
-import JSZip from "jszip";
-import { saveAs } from "file-saver";
-import { ModalState } from "@/config/types";
+import { ConfirmState, ModalState } from "@/config/types";
 import { useDispatch, useSelector } from "react-redux";
 import { openModal } from "@/redux/slices/modal-slice";
 import ConfirmBillModal from "@/components/payment/confirm-bill-modal";
-import { getPayments } from "@/apis/services/payment";
+import { getPayments, updatePayment, updateBatchPayments } from "@/apis/services/payment";
 import { FilterPaymentDto } from "@/apis/dto";
 import { openLoading, closeLoading } from "@/redux/slices/loading-slice";
 import { openAlert } from "@/redux/slices/alert-slice";
 import { RootState } from "@/redux/store";
 import moment from "moment";
-import Select from "@/lib/select";
+import { closeConfirm, openConfirm } from "@/redux/slices/confirm-slice";
+import { PaymentStatus } from "@/config/enums";
+import { refetch } from "@/redux/slices/refetch-slice";
 
 interface PaymentResponse {
   total: number;
@@ -84,12 +78,19 @@ const Payments = () => {
   const [paymentsData, setPaymentsData] = useState<PaymentResponse>({ total: 0, data: [] });
   const [selectedStudent, setSelectedStudent] = useState<string>("");
   const [selectedClass, setSelectedClass] = useState<string>("");
+  const [selectedStatus, setSelectedStatus] = useState<string>("");
   const currentMonth = moment().format("M");
   const currentYear = moment().format("YYYY");
   const [selectedMonth, setSelectedMonth] = useState<string>(currentMonth);
   const refetchCount = useSelector((state: RootState) => state.refetch.count);
-  const activeStudents: any = useSelector((state: RootState) => state.system.activeStudents) || [];
   const activeClasses: any = useSelector((state: RootState) => state.system.activeClasses) || [];
+
+  // Batch selection state
+  const [allChecked, setAllChecked] = useState(false);
+  const [batchLoading, setBatchLoading] = useState(false);
+  const [isSelectedAll, setIsSelectedAll] = useState(false);
+  const [unselectedPaymentIds, setUnselectedPaymentIds] = useState<number[]>([]);
+  const [selectedPaymentIds, setSelectedPaymentIds] = useState<number[]>([]);
 
   const fetchPayments = async (currentPage: number, currentRowsPerPage: number) => {
     try {
@@ -102,6 +103,9 @@ const Payments = () => {
         }),
         ...(selectedClass && {
           classId: activeClasses.find((cls: any) => cls.name === selectedClass)?.id || parseInt(selectedClass),
+        }),
+        ...(selectedStatus && {
+          status: selectedStatus as PaymentStatus,
         }),
         learningMonth: parseInt(selectedMonth),
         learningYear: parseInt(currentYear),
@@ -127,6 +131,12 @@ const Payments = () => {
   }, [page, rowsPerPage, refetchCount]);
 
   const handleFilter = () => {
+    // Reset selections when applying filter
+    setSelectedPaymentIds([]);
+    setUnselectedPaymentIds([]);
+    setIsSelectedAll(false);
+    setAllChecked(false);
+
     setPage(1); // Reset to first page when filtering
     fetchPayments(1, rowsPerPage);
   };
@@ -135,8 +145,13 @@ const Payments = () => {
     // Reset states first
     setSelectedStudent("");
     setSelectedClass("");
+    setSelectedStatus("");
     setSelectedMonth(currentMonth);
     setPage(1);
+    setSelectedPaymentIds([]);
+    setUnselectedPaymentIds([]);
+    setIsSelectedAll(false);
+    setAllChecked(false);
 
     // Call API with empty filters
     dispatch(openLoading());
@@ -145,6 +160,7 @@ const Payments = () => {
       rowPerPage: rowsPerPage,
       name: "",
       classId: undefined,
+      status: undefined,
       learningMonth: parseInt(currentMonth),
       learningYear: parseInt(currentYear),
     })
@@ -168,6 +184,14 @@ const Payments = () => {
       });
   };
 
+  const handleFilterChange = () => {
+    // Reset selections when filter values change
+    setSelectedPaymentIds([]);
+    setUnselectedPaymentIds([]);
+    setIsSelectedAll(false);
+    setAllChecked(false);
+  };
+
   const handlePageChange = (newPage: number, newRowsPerPage: number) => {
     if (newRowsPerPage !== rowsPerPage) {
       setRowsPerPage(newRowsPerPage);
@@ -187,83 +211,218 @@ const Payments = () => {
     setSelectedPayment(null);
   };
 
-  const handleConfirmBill = (totalPayment: string) => {
+  const handleConfirmBill = (paymentId: number, totalPayment: string, paidAmount: number | null) => {
     const modal: ModalState = {
       isOpen: true,
       title: "Update payment information",
-      content: <ConfirmBillModal totalPayment={totalPayment} />,
+      content: <ConfirmBillModal paymentId={paymentId} totalPayment={totalPayment} paidAmount={paidAmount} />,
       className: "max-w-lg",
     };
 
     dispatch(openModal(modal));
   };
 
-  async function downloadAllImagesAsZip() {
-    const zip = new JSZip();
-    const folder = zip.folder("bills");
-
-    if (!folder) {
-      console.error("Cannot create ZIP folder!");
-      return;
-    }
-
-    const promises = paymentsData.data.map(async (payment, index) => {
-      const div = document.getElementById(`paymentDiv-${index}`);
-      if (!div) {
-        console.error(`Element paymentDiv-${index} not found!`);
-        return;
-      }
-
-      try {
-        const canvas = await Html2CanvasPro(div);
-
-        // Bỏ đi "data:image/png;base64,"
-        const imgData = canvas.toDataURL("image/png").split(",")[1];
-
-        if (!imgData) {
-          console.error(`Cannot create image for bill-${index + 1}`);
-          return;
+  const handleConfirmSent = (id: number) => {
+    const confirmModal: ConfirmState = {
+      isOpen: true,
+      title: "Confirm sent",
+      subtitle: "Are you sure you sent this payment?",
+      titleAction: "Confirm",
+      handleAction: async () => {
+        try {
+          dispatch(openLoading());
+          await updatePayment({ paymentId: id, status: PaymentStatus.SENT });
+          dispatch(
+            openAlert({
+              isOpen: true,
+              title: "SUCCESS",
+              subtitle: "Payment sent successfully",
+              type: "success",
+            }),
+          );
+          dispatch(refetch());
+        } catch (error: any) {
+          dispatch(
+            openAlert({
+              isOpen: true,
+              title: "ERROR",
+              subtitle: error?.message || "Failed to send payment",
+              type: "error",
+            }),
+          );
+        } finally {
+          dispatch(closeLoading());
+          dispatch(closeConfirm());
         }
-
-        folder.file(`${paymentsData.data[index].student.name}.png`, imgData, { base64: true });
-      } catch (error) {
-        console.error(`Error when processing bill-${index}:`, error);
-      }
-    });
-
-    await Promise.all(promises);
-
-    if (Object.keys(folder.files).length === 0) {
-      return;
-    }
-
-    zip.generateAsync({ type: "blob" }).then((content) => {
-      saveAs(content, "MMA Class.zip");
-    });
-  }
-
-  const handleDownloadAll = () => {
-    downloadAllImagesAsZip();
+      },
+    };
+    dispatch(openConfirm(confirmModal));
   };
 
-  const handleDownloadBillImage = async (id: string, studentName: string) => {
-    const div = document.getElementById(id);
-    if (!div) {
-      console.error("Element paymentDiv not found!");
-      return;
+  // Batch selection functions
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      // Select all visible payments - switch to isSelectedAll mode
+      setIsSelectedAll(true);
+      setSelectedPaymentIds([]);
+      setUnselectedPaymentIds([]);
+      setAllChecked(true);
+    } else {
+      // Deselect all payments
+      setSelectedPaymentIds([]);
+      setUnselectedPaymentIds([]);
+      setIsSelectedAll(false);
+      setAllChecked(false);
     }
-    try {
-      const canvas = await Html2CanvasPro(div);
-      canvas.toBlob((blob) => {
-        if (!blob) {
-          console.error("Cannot create Blob from canvas!");
-          return;
+  };
+
+  const handleSelectRow = (paymentId: number, checked: boolean) => {
+    if (isSelectedAll) {
+      // When all are selected, only manage unselected items
+      if (checked) {
+        // Remove from unselected list
+        setUnselectedPaymentIds((prev) => prev.filter((id) => id !== paymentId));
+      } else {
+        // Add to unselected list
+        setUnselectedPaymentIds((prev) => [...prev, paymentId]);
+      }
+    } else {
+      // When not all selected, only manage selected items
+      if (checked) {
+        // Add to selected list
+        setSelectedPaymentIds((prev) => [...prev, paymentId]);
+      } else {
+        // Remove from selected list
+        setSelectedPaymentIds((prev) => prev.filter((id) => id !== paymentId));
+      }
+    }
+  };
+
+  const isChecked = (paymentId: number) => {
+    if (isSelectedAll) {
+      return !unselectedPaymentIds.includes(paymentId);
+    } else {
+      return selectedPaymentIds.includes(paymentId);
+    }
+  };
+
+  // Calculate status options based on selected payments
+  const getBatchStatusOptions = () => {
+    const effectiveSelectedPayments = isSelectedAll
+      ? paymentsData.data.filter((payment) => !unselectedPaymentIds.includes(payment.id))
+      : paymentsData.data.filter((payment) => selectedPaymentIds.includes(payment.id));
+
+    if (effectiveSelectedPayments.length === 0) return [];
+
+    // Get unique statuses from selected payments
+    const uniqueStatuses = [...new Set(effectiveSelectedPayments.map((payment) => payment.status))];
+
+    // If all selected items have status SAVED, only allow SENT
+    if (uniqueStatuses.length === 1 && uniqueStatuses[0] === PaymentStatus.SAVED) {
+      return [{ value: PaymentStatus.SENT, label: "SENT" }];
+    }
+
+    // If all selected items have status SENT, only allow DONE
+    if (uniqueStatuses.length === 1 && uniqueStatuses[0] === PaymentStatus.SENT) {
+      return [{ value: PaymentStatus.DONE, label: "DONE" }];
+    }
+
+    // If all selected items have status PAYING, only allow DONE
+    if (uniqueStatuses.length === 1 && uniqueStatuses[0] === PaymentStatus.PAYING) {
+      return [{ value: PaymentStatus.DONE, label: "DONE" }];
+    }
+
+    // If all selected items have status SENT or PAYING (mixed between these two), allow DONE
+    if (
+      uniqueStatuses.length === 2 &&
+      uniqueStatuses.includes(PaymentStatus.SENT) &&
+      uniqueStatuses.includes(PaymentStatus.PAYING)
+    ) {
+      return [{ value: PaymentStatus.DONE, label: "DONE" }];
+    }
+
+    // For any other mixed statuses, return empty array (no batch update allowed)
+    return [];
+  };
+
+  const handleBatchStatusUpdate = async (
+    status: string,
+    selectionData: {
+      isSelectedAll: boolean;
+      unselectedPaymentIds: number[];
+      selectedPaymentIds: number[];
+    },
+  ) => {
+    const effectiveSelectedPayments = selectionData.isSelectedAll
+      ? paymentsData.data.filter((payment) => !selectionData.unselectedPaymentIds.includes(payment.id))
+      : paymentsData.data.filter((payment) => selectionData.selectedPaymentIds.includes(payment.id));
+
+    if (effectiveSelectedPayments.length === 0) return;
+
+    const confirmModal: ConfirmState = {
+      isOpen: true,
+      title: "Confirm batch update",
+      subtitle: `Are you sure you want to update all of these payments to ${status}?`,
+      titleAction: "Confirm",
+      handleAction: async () => {
+        try {
+          setBatchLoading(true);
+          dispatch(openLoading());
+
+          // Use batch update instead of individual updates
+          const batchData: any = {
+            status: status as PaymentStatus.SENT | PaymentStatus.DONE,
+            filter: {
+              name: selectedStudent || undefined,
+              classId: activeClasses.find((cls: any) => cls.name === selectedClass)?.id || undefined,
+              status: (selectedStatus as PaymentStatus) || undefined,
+              learningMonth: parseInt(selectedMonth) || undefined,
+              learningYear: parseInt(currentYear) || undefined,
+            },
+          };
+
+          if (selectionData.isSelectedAll) {
+            batchData.isSelectedAll = true;
+            batchData.unselectedPaymentIds = selectionData.unselectedPaymentIds;
+          } else {
+            batchData.isSelectedAll = false;
+            batchData.selectedPaymentIds = selectionData.selectedPaymentIds;
+          }
+
+          await updateBatchPayments(batchData);
+
+          dispatch(
+            openAlert({
+              isOpen: true,
+              title: "SUCCESS",
+              subtitle: `Successfully updated ${effectiveSelectedPayments.length} payments`,
+              type: "success",
+            }),
+          );
+
+          // Clear selection and refetch data
+          setSelectedPaymentIds([]);
+          setUnselectedPaymentIds([]);
+          setIsSelectedAll(false);
+          setAllChecked(false);
+          dispatch(refetch());
+        } catch (error: any) {
+          dispatch(
+            openAlert({
+              isOpen: true,
+              title: "ERROR",
+              subtitle: error?.message || "Failed to update payments",
+              type: "error",
+            }),
+          );
+        } finally {
+          setBatchLoading(false);
+          dispatch(closeLoading());
+          dispatch(closeConfirm());
         }
-        saveAs(blob, `${studentName}.png`);
-      }, "image/png");
-    } catch (error) {
-      console.error("Error when handling:", error);
-    }
+      },
+    };
+    dispatch(openConfirm(confirmModal));
   };
 
   return (
@@ -275,249 +434,61 @@ const Payments = () => {
       <div className="flex flex-col">
         <div className="font-bold text-base">1. Payment list</div>
 
-        {/* filter class */}
-        <div className="grid grid-cols-4 gap-3 mb-5 mt-4">
-          <TextField
-            label="Student name"
-            defaultValue={selectedStudent}
-            onChange={(value) => {
-              if (typeof value === "string") {
-                setSelectedStudent(value);
-              } else {
-                setSelectedStudent(value.target.value);
-              }
-            }}
-          />
-          <Select
-            label="Select class"
-            options={activeClasses}
-            defaultValue={selectedClass?.toString() || ""}
-            onChange={(value) => setSelectedClass(value)}
-          />
-          <Select
-            label="Select month"
-            options={MONTHS}
-            defaultValue={selectedMonth}
-            onChange={(value) => setSelectedMonth(value)}
-          />
-          <div className="flex flex-row gap-3">
-            <Button label="Filter" className="py-[13px] px-8" status="success" onClick={handleFilter} />
-            <Button label="Cancel" className="py-[13px] px-8" status="cancel" onClick={handleResetFilter} />
-          </div>
-        </div>
+        <PaymentFilter
+          selectedStudent={selectedStudent}
+          setSelectedStudent={setSelectedStudent}
+          selectedClass={selectedClass}
+          setSelectedClass={setSelectedClass}
+          selectedStatus={selectedStatus}
+          setSelectedStatus={setSelectedStatus}
+          selectedMonth={selectedMonth}
+          setSelectedMonth={setSelectedMonth}
+          onFilter={handleFilter}
+          onResetFilter={handleResetFilter}
+          onFilterChange={handleFilterChange}
+        />
 
-        <div className="flex flex-row justify-end">
-          <Button
-            label="Download All"
-            className="mb-2"
-            onClick={handleDownloadAll}
-            status="success"
-            startIcon={
-              <Image src="/icons/file-download.svg" alt="file-download" width={18} height={18} className="py-1" />
-            }
-          />
-        </div>
-
-        {/* table */}
-        <div className="max-w-[100%] rounded-[10px] overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="table-auto w-full text-left relative">
-              <thead className={`text-grey-c700 uppercase bg-primary-c50`}>
-                <tr className="hover:bg-success-c50 hover:text-grey-c700 font-bold">
-                  <th className="pl-3 py-4">STT</th>
-                  <th className="px-1 py-4">Student</th>
-                  <th className="px-1 py-4">Class</th>
-                  <th className="px-1 py-4 text-center">Attendance</th>
-                  <th className="px-1 py-4">Tuition/ month</th>
-                  <th className="px-1 py-4">Debt</th>
-                  <th className="px-1 py-4">Total paid</th>
-                  <th className="px-1 py-4">Status</th>
-                  <th className="px-1 py-4 text-center">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {paymentsData.data.length > 0 ? (
-                  paymentsData.data.map((payment, index) => (
-                    <tr key={payment.id} className="hover:bg-primary-c10">
-                      <th className="pl-3 py-4">{(page - 1) * rowsPerPage + index + 1}</th>
-                      <th className="px-1 py-4">{payment.student.name}</th>
-                      <th className="px-1 py-4">{payment.student.currentClass?.name || "-"}</th>
-                      <th className="px-1 py-4 text-center">{payment.totalAttend}</th>
-                      <th className="px-1 py-4">
-                        <span className="font-bold text-[#FE9800]">{formatCurrency(payment.totalMonthAmount)} VNĐ</span>
-                      </th>
-                      <th className="px-1 py-4">
-                        {payment.student.debt === 0 ? (
-                          <span className="font-bold text-success-c700">0 VNĐ</span>
-                        ) : (
-                          <span className="font-bold text-support-c500">
-                            {payment.student.debt > 0
-                              ? `-${formatCurrency(payment.student.debt)}`
-                              : `+${formatCurrency(payment.student.debt * -1)}`}
-                            VNĐ
-                          </span>
-                        )}
-                      </th>
-                      <th className="px-1 py-4">
-                        <span className="font-bold text-primary-c900">
-                          {formatCurrency(payment.totalPayment)}
-                          VNĐ
-                        </span>
-                      </th>
-                      <th className="px-1 py-4 relative">
-                        <Label status="info" label={payment.status} />
-                      </th>
-                      <th className="px-1 py-4 text-center">
-                        <div className="flex justify-center items-center gap-3">
-                          <button
-                            onClick={(e) => {
-                              e.preventDefault();
-                              handleOpenModal(payment);
-                            }}
-                            title="View"
-                            data-tooltip-id="view-icon"
-                            data-tooltip-content="View"
-                          >
-                            <Image src="/icons/detail-icon.svg" alt="view-icon" width={24} height={24} />
-                          </button>
-                          <Tooltip id="view-icon" />
-                          <button
-                            data-tooltip-id="download-icon"
-                            data-tooltip-content="Download"
-                            onClick={() => handleDownloadBillImage(`paymentDiv-${index}`, payment.student.name)}
-                          >
-                            <Image src="/icons/download-icon.svg" alt="download-icon" width={24} height={24} />
-                          </button>
-                          <Tooltip id="download-icon" />
-                          {payment.sentAt ? (
-                            <>
-                              <button data-tooltip-id="sent-icon" data-tooltip-content="Sent">
-                                <Image src="/icons/sent-icon.svg" alt="sent-icon" width={24} height={24} />
-                              </button>
-                              <Tooltip id="sent-icon" />
-                            </>
-                          ) : (
-                            <>
-                              <button
-                                data-tooltip-id="unsent-icon"
-                                data-tooltip-content="Send"
-                                onClick={() => handleConfirmBill(payment.totalPayment.toString())}
-                              >
-                                <Image src="/icons/unsent-icon.svg" alt="unsent-icon" width={25} height={25} />
-                              </button>
-                              <Tooltip id="unsent-icon" />
-                            </>
-                          )}
-                        </div>
-                      </th>
-                    </tr>
-                  ))
-                ) : (
-                  <EmptyRow colSpan={9} />
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-        <div className="mt-5">
-          <Pagination
-            totalItems={paymentsData.total}
-            rowsEachPage={rowsPerPage}
-            nowPage={page}
-            onPageChange={handlePageChange}
-          />
-        </div>
+        <PaymentTable
+          paymentsData={paymentsData}
+          page={page}
+          rowsPerPage={rowsPerPage}
+          allChecked={allChecked}
+          onSelectAll={handleSelectAll}
+          onSelectRow={handleSelectRow}
+          isChecked={isChecked}
+          onPageChange={handlePageChange}
+          onOpenModal={handleOpenModal}
+          onConfirmBill={handleConfirmBill}
+          onConfirmSent={handleConfirmSent}
+          onDownloadAll={() => {}}
+          selectedStudent={selectedStudent}
+          selectedClass={selectedClass}
+          selectedStatus={selectedStatus}
+          selectedMonth={selectedMonth}
+          currentYear={currentYear}
+          activeClasses={activeClasses}
+        />
       </div>
 
       <PaymentDetailModal show={show} handleCloseModal={handleCloseModal} payment={selectedPayment || undefined} />
 
-      {/* render all bills to download but will be hidden */}
-      {paymentsData.data.map((payment, index) => (
-        <div
-          id={`paymentDiv-${index}`}
-          key={`paymentDiv-${index}`}
-          className="hidden-for-capture p-3 text-sm bg-primary-c900"
-        >
-          <div className="bg-white px-8 md:px-[70px] pt-4">
-            {/* main content */}
-            <div className="flex flex-col items-center justify-center w-full">
-              <div className="font-bold text-lg text-grey-c900">
-                HỌC PHÍ THÁNG {moment(payment.createdAt).format("MM/YYYY")}
-              </div>
-              <div className="font-semibold text-lg text-grey-c900">
-                <span className="text-grey-c900 text-sm font-normal pr-2">Tên:</span>
-                <span className="text-grey-c600 text-sm font-bold">{payment.student.name}</span>
-              </div>
-              <div className="grid md:grid-cols-2 w-full py-3 gap-4">
-                {/* 1. table 1 */}
-                <div className="max-w-[100%] rounded-[10px] overflow-hidden">
-                  <div className="overflow-x-auto">
-                    <table className="table-auto w-full text-left relative">
-                      <thead className={`text-grey-c700 uppercase bg-primary-c50`}>
-                        <tr className="hover:bg-success-c50 hover:text-grey-c700 font-bold">
-                          <th className="pl-3 py-4">STT</th>
-                          <th className="px-1 py-4">Ngày học</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {payment.attendances.map((attendance, idx) => (
-                          <tr key={attendance.id} className="hover:bg-primary-c10 hover:text-grey-c700 text-grey-c900">
-                            <th className="pl-3 py-4">{idx + 1}</th>
-                            <th className="px-1 py-4">{moment(attendance.learningDate).format("DD/MM/YYYY")}</th>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-
-                {/* 2. table 2 */}
-                <div className="max-w-[100%]">
-                  <div className="overflow-x-auto">
-                    <table className="table-auto w-full text-left relative rounded-[10px] overflow-hidden">
-                      <thead className={`text-grey-c700 uppercase bg-primary-c50`}>
-                        <tr className="hover:bg-success-c50 hover:text-grey-c700 font-bold">
-                          <th colSpan={2} className="py-4 text-center">
-                            Summary
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr className="hover:bg-primary-c10 hover:text-grey-c700 text-grey-c900">
-                          <th className="pl-3 py-4">Tổng số buổi</th>
-                          <th className="px-1 py-4">{payment.totalSessions}</th>
-                        </tr>
-                        <tr className="hover:bg-primary-c10 hover:text-grey-c700 text-grey-c900">
-                          <th className="pl-3 py-4">Học phí/buổi</th>
-                          <th className="px-1 py-4">
-                            {formatCurrency(payment.attendances[0]?.session.amount || 0)} VNĐ
-                          </th>
-                        </tr>
-                        <tr className="hover:bg-primary-c10 hover:text-grey-c700 text-grey-c900">
-                          <th className="pl-3 py-4">Tổng tiền</th>
-                          <th className="px-1 py-4">{formatCurrency(payment.totalPayment)} VNĐ</th>
-                        </tr>
-                        <tr className="hover:bg-primary-c10 hover:text-grey-c700 text-grey-c900">
-                          <th className="pl-3 py-4">Ngân hàng</th>
-                          <th className="px-1 py-4">VIB</th>
-                        </tr>
-                        <tr className="hover:bg-primary-c10 hover:text-grey-c700 text-grey-c900">
-                          <th className="pl-3 py-4">STK</th>
-                          <th className="px-1 py-4">002122334</th>
-                        </tr>
-                        <tr className="hover:bg-primary-c10 hover:text-grey-c700 text-grey-c900">
-                          <th className="pl-3 py-4">Chủ tài khoản</th>
-                          <th className="px-1 py-4">TRẦN THỊ TRÂM</th>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      ))}
+      {(isSelectedAll || selectedPaymentIds.length > 0) && (
+        <BatchUpdateBar
+          count={isSelectedAll ? paymentsData.data.length - unselectedPaymentIds.length : selectedPaymentIds.length}
+          onStatusChange={handleBatchStatusUpdate}
+          onCancel={() => {
+            setSelectedPaymentIds([]);
+            setUnselectedPaymentIds([]);
+            setIsSelectedAll(false);
+            setAllChecked(false);
+          }}
+          loading={batchLoading}
+          statusOptions={getBatchStatusOptions()}
+          isSelectedAll={isSelectedAll}
+          unselectedPaymentIds={unselectedPaymentIds}
+          selectedPaymentIds={selectedPaymentIds}
+        />
+      )}
     </div>
   );
 };

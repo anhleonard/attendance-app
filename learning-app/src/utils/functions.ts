@@ -8,6 +8,10 @@ export function generateRandomPassword(length = 12) {
     .replace(/[+/=]/g, 'X'); // loại bỏ ký tự dễ gây nhầm lẫn
 }
 
+export function formatCurrency(amount: number) {
+  return amount.toLocaleString("vi-VN");
+}
+
 // Kiểu dữ liệu chung (có field 'name')
 interface NamedItem {
   name: string;

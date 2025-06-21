@@ -1,7 +1,7 @@
 import React from "react";
 
 interface Props extends React.HTMLAttributes<HTMLDivElement> {
-  status?: "success" | "error" | "info" | "warning";
+  status?: "success" | "error" | "info" | "warning" | "progress";
   label: string;
 }
 
@@ -13,6 +13,7 @@ const Label: React.FC<Props> = ({ status = "info", label, className, ...props })
     error: "bg-red-100 text-support-c800",
     info: "bg-primary-c100 text-primary-c900",
     warning: "bg-[#FFE8C7] text-[#FE9800]",
+    progress: "bg-[#f8dce4] text-[#ab2c52]",
   }[status];
 
   // Hàm để kết hợp các lớp CSS

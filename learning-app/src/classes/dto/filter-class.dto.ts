@@ -49,4 +49,8 @@ export class FilterClassDto {
   @IsBoolean()
   @IsOptional()
   fetchAll: boolean;
+
+  @IsBoolean()
+  @IsOptional()
+  hasHistories: boolean = false;
 }

@@ -4,26 +4,13 @@ import {
   IsString,
   ValidateIf,
   IsEnum,
-  IsBoolean,
 } from 'class-validator';
 import { PaymentStatus } from 'src/utils/enums';
 
-export class FilterPaymentDto {
+export class DownloadBillsDto {
   @IsString()
   @IsOptional()
   name: string; // the name of student
-
-  @IsNumber()
-  @IsOptional()
-  page: number;
-
-  @IsNumber()
-  @IsOptional()
-  rowPerPage: number;
-
-  @IsBoolean()
-  @IsOptional()
-  fetchAll?: boolean;
 
   @IsNumber()
   @IsOptional()
@@ -44,4 +31,4 @@ export class FilterPaymentDto {
   )
   @IsNumber()
   learningYear?: number;
-}
+} 

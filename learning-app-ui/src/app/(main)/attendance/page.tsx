@@ -7,7 +7,7 @@ import Select from "@/lib/select";
 import TextArea from "@/lib/textarea";
 import moment from "moment";
 import Image from "next/image";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { getClasses } from "@/apis/services/classes";
 import { getAttendances, createBatchAttendance, updateBatchAttendance } from "@/apis/services/attendances";
 import {
@@ -99,7 +99,7 @@ interface StudentResponse {
 const Attendance = () => {
   const dispatch = useDispatch();
   const searchParams = useSearchParams();
-  const [date, setDate] = useState(moment().format("DD-MM-YYYY"));
+  const [date, setDate] = useState<string>(moment().format("DD-MM-YYYY"));
   const [checkedAll, setCheckedAll] = useState(false);
   const [selectedClassId, setSelectedClassId] = useState<number | null>(null);
   const [classesInfo, setClassesInfo] = useState<ClassResponse[]>([]);
@@ -118,6 +118,11 @@ const Attendance = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [allItemsAttendance, setAllItemsAttendance] = useState<{ [key: number]: boolean }>({});
   const [selectKey, setSelectKey] = useState(0);
+  
+  // Add refs to track API calls and prevent duplicate calls
+  const classesFetchedRef = useRef<string>("");
+  const attendanceFetchedRef = useRef<string>("");
+  const studentsFetchedRef = useRef<string>("");
 
   // Handle URL parameters for navigation from calendar
   useEffect(() => {
@@ -131,39 +136,33 @@ const Attendance = () => {
     }
   }, [searchParams]);
 
-  // Fetch attendance data when selectedClassId or date changes
-  useEffect(() => {
-    if (selectedClassId && date) {
-      fetchAttendanceOrStudents(selectedClassId);
-    }
-  }, [selectedClassId, date]);
-
-  // Update Select component value when classesInfo is loaded and selectedClassId is set
-  useEffect(() => {
-    if (classesInfo.length > 0 && selectedClassId) {
-      // Force re-render Select component by updating the key
-      setSelectKey(prev => prev + 1);
-    }
-  }, [classesInfo, selectedClassId]);
-
-  const calculateDuration = (startTime: string, endTime: string): string => {
-    const start = new Date(`2000-01-01T${startTime}`);
-    const end = new Date(`2000-01-01T${endTime}`);
-    const diffInHours = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
-    return `${diffInHours} hours`;
-  };
-
+  // Fetch classes only when date changes - remove dispatch from dependencies
   useEffect(() => {
     const fetchClasses = async () => {
+      // Check if we already fetched classes for this date
+      if (classesFetchedRef.current === date) {
+        return;
+      }
+
       try {
         dispatch(openLoading());
         const filterData: FilterClassDto = {
           learningDate: moment(date, "DD-MM-YYYY").toDate(),
           status: Status.ACTIVE,
           fetchAll: true,
+          hasHistories: true,
         };
         const response = await getClasses(filterData);
         setClassesInfo(response?.data || []);
+        classesFetchedRef.current = date; // Mark as fetched for this date
+        
+        // Update Select component if we have a selectedClassId
+        if (selectedClassId && response?.data) {
+          const selectedClassExists = response.data.some((classInfo: ClassResponse) => classInfo.id === selectedClassId);
+          if (selectedClassExists) {
+            setSelectKey(prev => prev + 1);
+          }
+        }
       } catch (error) {
         console.error("Error fetching classes:", error);
       } finally {
@@ -172,9 +171,24 @@ const Attendance = () => {
     };
 
     fetchClasses();
-  }, [date, dispatch]);
+  }, [date]); // Only depend on date, not dispatch
+
+  const calculateDuration = (startTime: string, endTime: string): string => {
+    const start = new Date(`2000-01-01T${startTime}`);
+    const end = new Date(`2000-01-01T${endTime}`);
+    const diffInHours = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
+    return `${diffInHours} hours`;
+  };
 
   const fetchAttendanceOrStudents = async (classId: number) => {
+    // Create a unique key for this fetch operation
+    const fetchKey = `${classId}-${date}-${page}-${rowsPerPage}`;
+    
+    // Check if we already fetched attendance for this combination
+    if (attendanceFetchedRef.current === fetchKey) {
+      return;
+    }
+
     try {
       // Fetch attendance data directly with full page size
       const filterData: FilterAttendanceDto = {
@@ -211,7 +225,7 @@ const Attendance = () => {
         const allAttended = Object.values(newAllItemsAttendance).every((status) => status);
         setCheckedAll(allAttended);
 
-        // Update class statistics only when there is existing attendance
+        // Update class statistics only when there is existing attendance - use functional update
         setClassesInfo((prevClasses) =>
           prevClasses.map((classInfo) =>
             classInfo.id === classId
@@ -224,11 +238,26 @@ const Attendance = () => {
         );
       } else {
         // If no attendance exists, fetch all active students to initialize allItemsAttendance
-        const allStudentsResponse = await getStudents({
-          classId: classId,
-          status: Status.ACTIVE,
-          fetchAll: true,
-        });
+        const studentsFetchKey = `${classId}-${date}-all`;
+        
+        // Check if we already fetched all students for this class and date
+        if (studentsFetchedRef.current !== studentsFetchKey) {
+          const allStudentsResponse = await getStudents({
+            classId: classId,
+            status: Status.ACTIVE,
+            fetchAll: true,
+          });
+
+          // Initialize allItemsAttendance with all students' data
+          const newAllItemsAttendance: { [key: number]: boolean } = {};
+          if (allStudentsResponse) {
+            allStudentsResponse.data.forEach((student: Student) => {
+              newAllItemsAttendance[student.id] = false;
+            });
+          }
+          setAllItemsAttendance(newAllItemsAttendance);
+          studentsFetchedRef.current = studentsFetchKey;
+        }
 
         // Fetch current page students for display
         const studentsResponse = await getStudents({
@@ -248,23 +277,24 @@ const Attendance = () => {
           data: [],
         }); // Clear attendance data
 
-        // Initialize allItemsAttendance with all students' data
-        const newAllItemsAttendance: { [key: number]: boolean } = {};
-        if (allStudentsResponse) {
-          allStudentsResponse.data.forEach((student: Student) => {
-            newAllItemsAttendance[student.id] = false;
-          });
-        }
-        setAllItemsAttendance(newAllItemsAttendance);
-
         setCheckedAll(false); // Reset checkedAll for new attendance
       }
+      
+      // Mark as fetched for this combination
+      attendanceFetchedRef.current = fetchKey;
     } catch (error) {
       dispatch(openAlert({ isOpen: true, title: "ERROR", subtitle: "Error fetching data", type: "error" }));
     } finally {
       setIsLoading(false);
     }
   };
+
+  // Fetch attendance data when selectedClassId changes
+  useEffect(() => {
+    if (selectedClassId && date) {
+      fetchAttendanceOrStudents(selectedClassId);
+    }
+  }, [selectedClassId, date]);
 
   const handleChangeSelect = (classId: number | null) => {
     if (selectedClassId === classId) {
@@ -281,12 +311,18 @@ const Attendance = () => {
       setCheckedAll(false);
       setNotes({});
       setAllItemsAttendance({});
+      // Reset refs when deselecting
+      attendanceFetchedRef.current = "";
+      studentsFetchedRef.current = "";
     } else {
       setSelectedClassId(classId);
       setPage(1);
       setCheckedAll(false);
       setNotes({});
       setAllItemsAttendance({});
+      // Reset refs when selecting new class
+      attendanceFetchedRef.current = "";
+      studentsFetchedRef.current = "";
       if (classId) {
         fetchAttendanceOrStudents(classId);
       }
@@ -415,6 +451,9 @@ const Attendance = () => {
     }
 
     if (selectedClassId) {
+      // Reset attendance ref when page changes
+      attendanceFetchedRef.current = "";
+      
       // Use the new values for the API call
       const currentPage = shouldResetPage ? 1 : newPage;
       const currentRowsPerPage = newRowsPerPage;
@@ -575,6 +614,9 @@ const Attendance = () => {
         data: [],
       });
       setStudentsData({ total: 0, data: [] });
+      // Reset refs after successful save
+      attendanceFetchedRef.current = "";
+      studentsFetchedRef.current = "";
     } catch (error: any) {
       console.error("Attendance save error:", error);
       dispatch(
@@ -606,6 +648,10 @@ const Attendance = () => {
       data: [],
     });
     setStudentsData({ total: 0, data: [] });
+    // Reset refs when date changes
+    classesFetchedRef.current = "";
+    attendanceFetchedRef.current = "";
+    studentsFetchedRef.current = "";
   };
 
   const handleCancel = () => {
@@ -625,6 +671,10 @@ const Attendance = () => {
       data: [],
     });
     setStudentsData({ total: 0, data: [] });
+    // Reset refs when canceling
+    classesFetchedRef.current = "";
+    attendanceFetchedRef.current = "";
+    studentsFetchedRef.current = "";
   };
 
   return (
@@ -816,6 +866,9 @@ const Attendance = () => {
                 )}
               </div>
             </div>
+
+                
+            
             {/* end table */}
             <div className="flex items-center justify-between mt-2">
               <Button label="Save" className="!py-2.5 !px-8" status="success" onClick={handleSaveAttendance} />

@@ -12,7 +12,8 @@ export enum Role {
 export enum PaymentStatus {
   SAVED = 'SAVED',
   SENT = 'SENT',
-  PAID = 'PAID',
+  PAYING = 'PAYING',
+  DONE = 'DONE',
 }
 
 export enum Permission {

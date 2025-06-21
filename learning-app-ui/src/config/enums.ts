@@ -31,3 +31,10 @@ export enum SortType {
   ASC = "asc",
   DESC = "desc",
 }
+
+export enum PaymentStatus {
+  SAVED = "SAVED",
+  SENT = "SENT",
+  PAYING = "PAYING",
+  DONE = "DONE",
+}

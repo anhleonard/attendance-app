@@ -1,4 +1,4 @@
-import { Permission } from "./enums";
+import { Permission, SessionKey } from "./enums";
 
 // define local storage keys
 export const USER_INFO = "userInfo";
@@ -8,6 +8,17 @@ export const ACTIVE_STUDENTS = "activeStudents";
 
 // websocket
 export const NEW_NOTIFICATION = "new_notification";
+
+// Day order for sorting sessions: Monday to Sunday
+export const SESSION_KEYS = [
+  SessionKey.SESSION_1, // Monday
+  SessionKey.SESSION_2, // Tuesday
+  SessionKey.SESSION_3, // Wednesday
+  SessionKey.SESSION_4, // Thursday
+  SessionKey.SESSION_5, // Friday
+  SessionKey.SESSION_6, // Saturday
+  SessionKey.SESSION_7, // Sunday
+];
 
 export const MONTHS = [
   { label: "January", value: "1" },

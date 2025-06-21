@@ -16,6 +16,7 @@ import { ChatsModule } from './chats/chats.module';
 import { MessagesModule } from './messages/messages.module';
 import { UploadModule } from './upload/upload.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { BillsModule } from './bills/bills.module';
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { NotificationsModule } from './notifications/notifications.module';
     MessagesModule,
     UploadModule,
     NotificationsModule,
+    BillsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -1,0 +1,162 @@
+### Test Bills API với Handlebars Template
+
+### 1. Tạo hóa đơn với dữ liệu đầy đủ (template mới)
+POST http://localhost:3000/bills/generate
+Content-Type: application/json
+
+{
+  "studentName": "Nguyễn Văn A",
+  "class": "12A1",
+  "month": "06/2025",
+  "amount": "3000000",
+  "learningDates": [
+    "01/06/2025",
+    "03/06/2025",
+    "05/06/2025",
+    "07/06/2025"
+  ],
+  "sessionCount": "4",
+  "amountPerSession": "750.000 VNĐ",
+  "totalAmount": "3.000.000 VNĐ"
+}
+
+### 2. Tạo hóa đơn với dữ liệu tối thiểu (fallback)
+POST http://localhost:3000/bills/generate
+Content-Type: application/json
+
+{
+  "studentName": "Lê Văn C",
+  "class": "10C3",
+  "month": "08/2025",
+  "amount": "2000000"
+}
+
+### 3. Tạo hóa đơn với learningDates rỗng
+POST http://localhost:3000/bills/generate
+Content-Type: application/json
+
+{
+  "studentName": "Phạm Thị D",
+  "class": "9D4",
+  "month": "09/2025",
+  "amount": "1800000",
+  "learningDates": [],
+  "sessionCount": "0",
+  "amountPerSession": "0 VNĐ",
+  "totalAmount": "1.800.000 VNĐ"
+}
+
+### 4. Tạo hóa đơn chỉ với learningDates (tự động tính sessionCount)
+POST http://localhost:3000/bills/generate
+Content-Type: application/json
+
+{
+  "studentName": "Hoàng Văn E",
+  "class": "8E5",
+  "month": "10/2025",
+  "amount": "1500000",
+  "learningDates": [
+    "01/10/2025",
+    "03/10/2025",
+    "05/10/2025",
+    "07/10/2025",
+    "09/10/2025"
+  ],
+  "amountPerSession": "300.000 VNĐ",
+  "totalAmount": "1.500.000 VNĐ"
+}
+
+### 5. Test validation error (thiếu dữ liệu bắt buộc)
+POST http://localhost:3000/bills/generate
+Content-Type: application/json
+
+{
+  "class": "12A1"
+}
+
+### 6. Test validation error (learningDates không hợp lệ)
+POST http://localhost:3000/bills/generate
+Content-Type: application/json
+
+{
+  "studentName": "Test User",
+  "class": "12A1",
+  "month": "06/2025",
+  "amount": "3000000",
+  "learningDates": [
+    "01/06/2025",
+    "",
+    "05/06/2025"
+  ]
+}
+
+### Generate single bill
+POST http://localhost:3000/bills/generate
+Content-Type: application/json
+
+{
+  "studentName": "Nguyễn Văn A",
+  "class": "Lớp 10A1",
+  "month": "12/2024",
+  "amount": "500000",
+  "learningDates": ["2024-12-01", "2024-12-08", "2024-12-15", "2024-12-22"],
+  "sessionCount": "4",
+  "amountPerSession": "125000 VNĐ",
+  "totalAmount": "500000 VNĐ"
+}
+
+### Download all bills for a specific month and year
+POST http://localhost:3000/bills/download-all
+Content-Type: application/json
+Authorization: Bearer YOUR_JWT_TOKEN
+
+{
+  "learningMonth": 12,
+  "learningYear": 2024
+}
+
+### Download all bills for a specific class in a month
+POST http://localhost:3000/bills/download-all
+Content-Type: application/json
+Authorization: Bearer YOUR_JWT_TOKEN
+
+{
+  "learningMonth": 12,
+  "learningYear": 2024,
+  "classId": 1
+}
+
+### Download all bills with status filter
+POST http://localhost:3000/bills/download-all
+Content-Type: application/json
+Authorization: Bearer YOUR_JWT_TOKEN
+
+{
+  "learningMonth": 12,
+  "learningYear": 2024,
+  "status": "SENT"
+}
+
+### Download all bills with student name filter
+POST http://localhost:3000/bills/download-all
+Content-Type: application/json
+Authorization: Bearer YOUR_JWT_TOKEN
+
+{
+  "learningMonth": 12,
+  "learningYear": 2024,
+  "name": "Nguyễn"
+}
+
+### Download all bills with multiple filters
+POST http://localhost:3000/bills/download-all
+Content-Type: application/json
+Authorization: Bearer YOUR_JWT_TOKEN
+
+{
+  "learningMonth": 12,
+  "learningYear": 2024,
+  "classId": 1,
+  "status": "SENT",
+  "name": "Nguyễn"
+} 

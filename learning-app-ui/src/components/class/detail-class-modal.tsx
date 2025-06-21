@@ -4,6 +4,7 @@ import React from "react";
 import { SessionKey } from "@/config/enums";
 import { Class, Session } from "@/config/types";
 import { getDayBySessionKey } from "@/config/functions";
+import { SESSION_KEYS } from "@/config/constants";
 import moment from "moment";
 
 interface Props {
@@ -17,6 +18,17 @@ const DetailClassModal = ({ classItem }: Props) => {
     const diffInHours = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
     return `${diffInHours} hours`;
   };
+
+  // Sort sessions by day order: Monday to Sunday
+  const sortSessionsByDay = (sessions: Session[]): Session[] => {
+    return [...sessions].sort((a, b) => {
+      const aIndex = SESSION_KEYS.indexOf(a.sessionKey);
+      const bIndex = SESSION_KEYS.indexOf(b.sessionKey);
+      return aIndex - bIndex;
+    });
+  };
+
+  const sortedSessions = sortSessionsByDay(classItem.sessions);
 
   return (
     <div className="flex flex-col gap-4">
@@ -74,7 +86,7 @@ const DetailClassModal = ({ classItem }: Props) => {
           <div className="font-semibold text-primary-c900">3. Detail sessions</div>
         </div>
         <div className="py-2 px-4 flex flex-col gap-3">
-          {classItem.sessions.map((session: Session, index: number) => (
+          {sortedSessions.map((session: Session, index: number) => (
             <div key={session.id} className="px-3 py-3 bg-primary-c50 rounded-xl text-grey-c900">
               {/* title */}
               <div className="font-semibold mb-2">Session {index + 1}</div>

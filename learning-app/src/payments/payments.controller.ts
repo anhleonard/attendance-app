@@ -8,6 +8,7 @@ import { CreatePaymentDto } from './dto/create-payment.dto';
 import { UpdatePaymentDto } from './dto/update-payment.dto';
 import { FilterPaymentDto } from './dto/filter-payment.dto';
 import { FindDetailPaymentDto } from './dto/find-detail-payment.dto';
+import { UpdateBatchPaymentsDto } from './dto/update-batch-payment.dto';
 
 @Controller('payments')
 export class PaymentsController {
@@ -39,5 +40,12 @@ export class PaymentsController {
   @Post('/find-payments')
   findPayments(@Body() filterPaymentDto: FilterPaymentDto) {
     return this.paymentsService.findPayments(filterPaymentDto);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  @Post('/update-batch')
+  updateBatchPayments(@Body() updateBatchPaymentsDto: UpdateBatchPaymentsDto) {
+    return this.paymentsService.updateBatchPayments(updateBatchPaymentsDto);
   }
 }

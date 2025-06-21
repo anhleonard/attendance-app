@@ -245,21 +245,25 @@ const Select = ({
         role="listbox"
         onClick={(e) => e.stopPropagation()}
       >
-        {options.map((option) => (
-          <li
-            key={option.value}
-            className={`px-4 py-2 font-medium cursor-pointer transition text-sm ${
-              selected === option.value ? "bg-primary-c800 text-white" : "text-grey-c900"
-            } hover:bg-primary-c100 hover:text-grey-c900`}
-            onClick={(e) => handleOptionClick(e, option.value)}
-            onMouseDown={(e) => e.stopPropagation()}
-            role="option"
-            aria-selected={selected === option.value}
-            tabIndex={0}
-          >
-            {option.label}
-          </li>
-        ))}
+        {options.length === 0 ? (
+          <li className="px-4 py-3 text-center text-grey-c300 font-medium text-sm">No option</li>
+        ) : (
+          options.map((option) => (
+            <li
+              key={option.value}
+              className={`px-4 py-2 font-medium cursor-pointer transition text-sm ${
+                selected === option.value ? "bg-primary-c800 text-white" : "text-grey-c900"
+              } hover:bg-primary-c100 hover:text-grey-c900`}
+              onClick={(e) => handleOptionClick(e, option.value)}
+              onMouseDown={(e) => e.stopPropagation()}
+              role="option"
+              aria-selected={selected === option.value}
+              tabIndex={0}
+            >
+              {option.label}
+            </li>
+          ))
+        )}
       </ul>,
       document.body,
     );

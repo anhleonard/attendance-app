@@ -32,7 +32,8 @@ enum Status {
 enum PaymentStatus {
   SAVED
   SENT
-  PAID
+  PAYING
+  DONE
 }
 
 enum Permission {
@@ -141,6 +142,8 @@ model Session {
   endTime    String
   amount     Int
   status     SessionStatus @default(ACTIVE)
+  validFrom  DateTime      @default(now()) // Từ khi nào lịch này có hiệu lực
+  validTo    DateTime?     // Đến khi nào lịch này hết hiệu lực (null = vô thời hạn)
   createdAt  DateTime      @default(now())
   updatedAt  DateTime      @updatedAt
 

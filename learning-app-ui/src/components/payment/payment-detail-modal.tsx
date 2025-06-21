@@ -6,8 +6,12 @@ import Button from "@/lib/button";
 import Html2CanvasPro from "html2canvas-pro";
 import moment from "moment";
 import { formatCurrency } from "@/config/functions";
-
-const DAYS_OF_WEEK = ['Chủ nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
+import { closeLoading, openLoading } from "@/redux/slices/loading-slice";
+import { generateBill } from "@/apis/services/bills";
+import { openAlert } from "@/redux/slices/alert-slice";
+import { useDispatch } from "react-redux";
+import { PaymentData } from "@/config/types";
+const DAYS_OF_WEEK = ["Chủ nhật", "Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7"];
 
 interface Props {
   show: boolean;
@@ -57,103 +61,7 @@ interface Props {
 }
 
 const PaymentDetailModal = ({ show, handleCloseModal, payment }: Props) => {
-  async function downloadBillPayment() {
-    const div = document.getElementById("paymentDiv");
-    if (!div) {
-      console.error("Element not found!");
-      return;
-    }
-
-    try {
-      // Clone div và chuẩn bị nó để capture
-      const clonedDiv = div.cloneNode(true) as HTMLElement;
-
-      // Lấy các style tính toán từ div gốc
-      const computedStyle = window.getComputedStyle(div);
-
-      // Đặt vị trí ngoài màn hình cho bản sao, nhưng giữ nguyên kích thước và style
-      clonedDiv.style.position = "absolute";
-      clonedDiv.style.left = "-9999px";
-      clonedDiv.style.top = "0";
-      clonedDiv.style.width = computedStyle.width;
-
-      // Đảm bảo hiển thị đầy đủ nội dung của div
-      clonedDiv.style.height = "auto";
-      clonedDiv.style.maxHeight = "none";
-      clonedDiv.style.overflow = "visible";
-
-      // Đảm bảo viền được hiển thị đầy đủ
-      clonedDiv.style.border = computedStyle.border;
-      clonedDiv.style.borderRadius = computedStyle.borderRadius;
-
-      // Thêm padding dưới để đảm bảo chụp được phần cuối
-      clonedDiv.style.paddingBottom = "12px";
-
-      // Thêm vào DOM để có thể chụp
-      document.body.appendChild(clonedDiv);
-
-      // Tìm và ẩn các nút không cần thiết trong bản sao
-      const clonedDeleteButton = clonedDiv.querySelector("#deleteButton") as HTMLElement;
-      const clonedDownloadButton = clonedDiv.querySelector("#downloadButton") as HTMLElement;
-
-      if (clonedDeleteButton) clonedDeleteButton.style.display = "none";
-      if (clonedDownloadButton) clonedDownloadButton.style.display = "none";
-
-      // Đảm bảo các hình ảnh trong bản sao đã tải xong
-      const images = clonedDiv.getElementsByTagName("img");
-      if (images.length > 0) {
-        await Promise.all(
-          Array.from(images).map((img) => {
-            if (img.complete) return Promise.resolve();
-            return new Promise((resolve) => {
-              img.onload = resolve;
-              img.onerror = resolve;
-              // Đảm bảo hình ảnh không tải được sẽ không chờ mãi
-              setTimeout(resolve, 1000);
-            });
-          }),
-        );
-      }
-
-      // Chụp với các tùy chọn nâng cao
-      const canvas = await Html2CanvasPro(clonedDiv, {
-        scale: 2,
-        useCORS: true,
-        allowTaint: true,
-        logging: false,
-        backgroundColor: null,
-        height: clonedDiv.scrollHeight, // Đặt chiều cao chính xác
-        windowHeight: clonedDiv.scrollHeight + 100, // Thêm dư để đảm bảo chụp đủ
-        onclone: (clonedDoc) => {
-          // Nếu cần thêm xử lý cho phần tử đã clone
-          const clonedElement = clonedDoc.querySelector("body > [style*='position: absolute']") as HTMLElement;
-          if (clonedElement) {
-            clonedElement.style.height = "auto";
-            clonedElement.style.maxHeight = "none";
-          }
-        },
-      });
-
-      // Dọn dẹp sau khi chụp xong
-      document.body.removeChild(clonedDiv);
-
-      // Xử lý và tải xuống hình ảnh
-      const imgData = canvas.toDataURL("image/png");
-      const blob = await fetch(imgData).then((res) => res.blob());
-
-      const link = document.createElement("a");
-      const url = URL.createObjectURL(blob);
-      link.href = url;
-      link.download = "bill_payment.png";
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error("Error taking photo:", error);
-    }
-  }
-
+  const dispatch = useDispatch();
   // Group session amounts by day of week
   const getSessionAmounts = () => {
     if (!payment?.attendances?.length) return null;
@@ -162,8 +70,8 @@ const PaymentDetailModal = ({ show, handleCloseModal, payment }: Props) => {
     const uniqueAmounts = new Set<number>();
 
     payment.attendances
-      .filter(attendance => attendance.isAttend)
-      .forEach(attendance => {
+      .filter((attendance) => attendance.isAttend)
+      .forEach((attendance) => {
         const dayOfWeek = moment(attendance.learningDate).day();
         const amount = attendance.session.amount;
         amountsByDay.set(DAYS_OF_WEEK[dayOfWeek], amount);
@@ -180,9 +88,38 @@ const PaymentDetailModal = ({ show, handleCloseModal, payment }: Props) => {
   };
 
   const sessionAmounts = getSessionAmounts();
-  const attendedSessions = payment?.attendances
-    ?.filter(attendance => attendance.isAttend)
-    .sort((a, b) => moment(a.learningDate).valueOf() - moment(b.learningDate).valueOf()) || [];
+  const attendedSessions =
+    payment?.attendances
+      ?.filter((attendance) => attendance.isAttend)
+      .sort((a, b) => moment(a.learningDate).valueOf() - moment(b.learningDate).valueOf()) || [];
+  
+  const handleGenerateBill = async (payment: PaymentData) => {
+    try {
+      dispatch(openLoading());
+      await generateBill({
+        studentName: payment.student.name,
+        class: payment.student.currentClass?.name || "",
+        month: moment(payment.createdAt).format("MM/YYYY"),
+        amount: payment.totalMonthAmount.toString(),
+        learningDates: payment.attendances
+          .filter((attendance) => attendance.isAttend)
+          .map((attendance) => moment(attendance.learningDate).format("DD/MM/YYYY")),
+        sessionCount: payment.totalAttend.toString(),
+        amountPerSession: `${formatCurrency(payment.totalMonthAmount / payment.totalAttend)} VNĐ`,
+        totalAmount: `${formatCurrency(payment.totalPayment)} VNĐ`,
+      });
+    } catch (error) {
+      dispatch(openAlert({
+        isOpen: true,
+        title: "ERROR",
+        subtitle: "Error downloading bill",
+        type: "error",
+        }),
+      );
+    } finally {
+      dispatch(closeLoading());
+    }
+  };
 
   return (
     <Transition appear show={show} as={Fragment}>
@@ -243,9 +180,14 @@ const PaymentDetailModal = ({ show, handleCloseModal, payment }: Props) => {
                               </thead>
                               <tbody>
                                 {attendedSessions.map((attendance, index) => (
-                                  <tr key={attendance.id} className="hover:bg-primary-c10 hover:text-grey-c700 text-grey-c900">
+                                  <tr
+                                    key={attendance.id}
+                                    className="hover:bg-primary-c10 hover:text-grey-c700 text-grey-c900"
+                                  >
                                     <th className="pl-3 py-4">{index + 1}</th>
-                                    <th className="px-1 py-4">{moment(attendance.learningDate).format("DD/MM/YYYY")}</th>
+                                    <th className="px-1 py-4">
+                                      {moment(attendance.learningDate).format("DD/MM/YYYY")}
+                                    </th>
                                   </tr>
                                 ))}
                               </tbody>
@@ -260,7 +202,7 @@ const PaymentDetailModal = ({ show, handleCloseModal, payment }: Props) => {
                               <thead className={`text-grey-c700 uppercase bg-primary-c50`}>
                                 <tr className="hover:bg-success-c50 hover:text-grey-c700 font-bold">
                                   <th colSpan={2} className="py-4 text-center">
-                                    Summary
+                                    Tổng kết
                                   </th>
                                 </tr>
                               </thead>
@@ -272,16 +214,18 @@ const PaymentDetailModal = ({ show, handleCloseModal, payment }: Props) => {
                                 <tr className="hover:bg-primary-c10 hover:text-grey-c700 text-grey-c900">
                                   <th className="pl-3 py-4">Học phí/buổi</th>
                                   <th className="px-1 py-4">
-                                    {typeof sessionAmounts === 'number' ? (
+                                    {typeof sessionAmounts === "number" ? (
                                       `${formatCurrency(sessionAmounts)} VNĐ`
                                     ) : sessionAmounts ? (
                                       <div className="flex flex-col gap-1">
                                         {Array.from(sessionAmounts.entries()).map(([day, amount]) => (
-                                          <span key={day}>{day}: {formatCurrency(amount)} VNĐ/buổi</span>
+                                          <span key={day}>
+                                            {day}: {formatCurrency(amount)} VNĐ/buổi
+                                          </span>
                                         ))}
                                       </div>
                                     ) : (
-                                      '0 VNĐ'
+                                      "0 VNĐ"
                                     )}
                                   </th>
                                 </tr>
@@ -289,14 +233,16 @@ const PaymentDetailModal = ({ show, handleCloseModal, payment }: Props) => {
                                   <>
                                     <tr className="hover:bg-primary-c10 hover:text-grey-c700 text-grey-c900">
                                       <th className="pl-3 py-4">Học phí tháng</th>
-                                      <th className="px-1 py-4">{formatCurrency(payment?.totalMonthAmount || 0)} VNĐ</th>
+                                      <th className="px-1 py-4">
+                                        {formatCurrency(payment?.totalMonthAmount || 0)} VNĐ
+                                      </th>
                                     </tr>
                                     <tr className="hover:bg-primary-c10 hover:text-grey-c700 text-grey-c900">
                                       <th className="pl-3 py-4">Tiền nợ</th>
                                       <th className="px-1 py-4">
                                         <span className="font-bold text-support-c500">
-                                          {payment?.student?.debt && payment.student.debt > 0 
-                                            ? `-${formatCurrency(payment.student.debt)}` 
+                                          {payment?.student?.debt && payment.student.debt > 0
+                                            ? `-${formatCurrency(payment.student.debt)}`
                                             : `+${formatCurrency(Math.abs(payment?.student?.debt || 0))}`}
                                           VNĐ
                                         </span>
@@ -314,11 +260,11 @@ const PaymentDetailModal = ({ show, handleCloseModal, payment }: Props) => {
                                 </tr>
                                 <tr className="hover:bg-primary-c10 hover:text-grey-c700 text-grey-c900">
                                   <th className="pl-3 py-4">STK</th>
-                                  <th className="px-1 py-4">002122334</th>
+                                  <th className="px-1 py-4">0101010101</th>
                                 </tr>
                                 <tr className="hover:bg-primary-c10 hover:text-grey-c700 text-grey-c900">
                                   <th className="pl-3 py-4">Chủ tài khoản</th>
-                                  <th className="px-1 py-4">TRẦN THỊ TRÂM</th>
+                                  <th className="px-1 py-4">NGUYỄN VĂN A</th>
                                 </tr>
                               </tbody>
                             </table>
@@ -334,7 +280,7 @@ const PaymentDetailModal = ({ show, handleCloseModal, payment }: Props) => {
                         startIcon={
                           <Image src="/icons/solid-download.svg" alt="solid-download" width={20} height={20} />
                         }
-                        onClick={downloadBillPayment}
+                        onClick={() => payment && handleGenerateBill(payment as PaymentData)}
                       />
                     </div>
                   </div>

@@ -66,6 +66,8 @@ export interface Session {
   updatedAt: string;
   classId: number;
   attendances: Attendance[];
+  validFrom: string;
+  validTo: string | null;
 }
 
 export interface Class {
@@ -151,4 +153,51 @@ export interface OptionState {
   value: string;
   label: string | React.ReactNode;
   role?: Role; // dùng trong trường hợp là system users
+}
+
+export interface PaymentData {
+  id: number;
+  totalSessions: number;
+  totalAttend: number;
+  totalMonthAmount: number;
+  totalPayment: number;
+  paidPayment: number | null;
+  status: string;
+  paymentNote: string;
+  sentAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  studentId: number;
+  student: {
+    id: number;
+    name: string;
+    debt: number;
+    currentClass: {
+      id: number;
+      name: string;
+    };
+  };
+  attendances: Array<{
+    id: number;
+    isAttend: boolean;
+    noteAttendance: string;
+    learningDate: string;
+    session: {
+      id: number;
+      sessionKey: string;
+      startTime: string;
+      endTime: string;
+      amount: number;
+      class: {
+        id: number;
+        name: string;
+      };
+    };
+  }>;
+  classes: number[];
+  attendanceStats: {
+    total: number;
+    attended: number;
+    absent: number;
+  };
 }

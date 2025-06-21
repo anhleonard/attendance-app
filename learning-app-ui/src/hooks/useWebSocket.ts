@@ -46,9 +46,14 @@ export const useWebSocket = (userId: number | null | undefined) => {
         }),
       );
       // Update notifications in redux store
+      const currentNotifications = notifications.data || [];
       dispatch(
         updateSystemInfo({
-          notifications: notifications && notifications?.length > 0 ? [payload, ...notifications] : [payload],
+          notifications: {
+            data: [payload, ...currentNotifications],
+            total: notifications.total + 1,
+            page: notifications.page,
+          },
         }),
       );
     });
