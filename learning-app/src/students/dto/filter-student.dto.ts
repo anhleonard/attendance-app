@@ -10,7 +10,6 @@ import {
 } from 'class-validator';
 import { Status } from 'src/utils/enums';
 import { Type } from 'class-transformer';
-import { SortDto } from 'src/utils/interfaces';
 
 export class FilterStudentDto {
   @IsString()
@@ -37,8 +36,7 @@ export class FilterStudentDto {
   @IsOptional()
   rowPerPage: number;
 
-  @ValidateNested()
-  @Type(() => SortDto)
+  @IsBoolean()
   @IsOptional()
-  sort: SortDto;
+  fetchAll?: boolean;
 }

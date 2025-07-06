@@ -5,11 +5,48 @@ import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import React from "react";
 import { useSelector } from "react-redux";
+import { Role, Permission } from "@/config/enums";
 
 const Sidebar = () => {
   const pathname = usePathname();
   const router = useRouter();
   const { profile } = useSelector((state: RootState) => state.system);
+
+  // Check if user can access a specific menu based on role and permissions
+  const canAccessMenu = (menuName: string) => {
+    if (!profile) return false;
+    
+    // ADMIN can access all menus
+    if (profile.role === Role.ADMIN) return true;
+    
+    // TA needs specific permissions
+    if (profile.role === Role.TA) {
+      const permissions = profile.permissions || [];
+      
+      switch (menuName) {
+        case "assistant":
+          return false; // TA cannot access assistant
+        case "attendance":
+          return permissions.includes(Permission.CREATE_ATTENDANCE);
+        case "calendar":
+          return permissions.includes(Permission.CREATE_CLASS);
+        case "classes":
+          return permissions.includes(Permission.CREATE_CLASS);
+        case "students":
+          return permissions.includes(Permission.CREATE_STUDENT);
+        case "payments":
+          return permissions.includes(Permission.CREATE_PAYMENT);
+        case "histories":
+          return true; // TA can always access histories
+        case "users":
+          return permissions.includes(Permission.CREATE_USER);
+        default:
+          return false;
+      }
+    }
+    
+    return false;
+  };
 
   return (
     <div className="w-[260px] h-full bg-white border-r border-grey-c100 overflow-y-auto hidden md:block">
@@ -36,85 +73,101 @@ const Sidebar = () => {
       <Divider />
       <div className="flex flex-col p-3 gap-3">
         {/* Assistant  */}
-        <div
-          className={`flex flex-row px-4 py-3.5 items-center gap-2 active:bg-primary-c300 hover:bg-primary-c200 cursor-pointer rounded-xl duration-300 transition ${
-            pathname === "/assistant" ? "bg-primary-c100" : ""
-          }`}
-          onClick={() => router.push("/assistant")}
-        >
-          <Image src="/icons/assistant-icon.svg" alt="assistant-icon" width={23} height={23} />
-          <div className="font-semibold text-primary-c900">Assistant</div>
-        </div>
+        {/* {canAccessMenu("assistant") && (
+          <div
+            className={`flex flex-row px-4 py-3.5 items-center gap-2 active:bg-primary-c300 hover:bg-primary-c200 cursor-pointer rounded-xl duration-300 transition ${
+              pathname === "/assistant" ? "bg-primary-c100" : ""
+            }`}
+            onClick={() => router.push("/assistant")}
+          >
+            <Image src="/icons/assistant-icon.svg" alt="assistant-icon" width={23} height={23} />
+            <div className="font-semibold text-primary-c900">Assistant</div>
+          </div>
+        )} */}
         {/* Attendance  */}
-        <div
-          className={`flex flex-row px-4 py-3.5 items-center gap-2 active:bg-primary-c300 hover:bg-primary-c200 cursor-pointer rounded-xl duration-300 transition ${
-            pathname === "/attendance" ? "bg-primary-c100" : ""
-          }`}
-          onClick={() => router.push("/attendance")}
-        >
-          <Image src="/icons/attendance-icon.svg" alt="attendance-icon" width={24} height={24} />
-          <div className="font-semibold text-primary-c900">Attendance</div>
-        </div>
+        {canAccessMenu("attendance") && (
+          <div
+            className={`flex flex-row px-4 py-3.5 items-center gap-2 active:bg-primary-c300 hover:bg-primary-c200 cursor-pointer rounded-xl duration-300 transition ${
+              pathname === "/attendance" ? "bg-primary-c100" : ""
+            }`}
+            onClick={() => router.push("/attendance")}
+          >
+            <Image src="/icons/attendance-icon.svg" alt="attendance-icon" width={24} height={24} />
+            <div className="font-semibold text-primary-c900">Attendance</div>
+          </div>
+        )}
         {/* Calendar */}
-        <div
-          className={`flex flex-row px-4 py-3.5 items-center gap-2 active:bg-primary-c300 hover:bg-primary-c200 cursor-pointer rounded-xl duration-300 transition ${
-            pathname === "/calendar" ? "bg-primary-c100" : ""
-          }`}
-          onClick={() => router.push("/calendar")}
-        >
-          <Image src="/icons/solid-calendar.svg" alt="solid-calendar" width={24} height={24} />
-          <div className="font-semibold text-primary-c900">Calendar</div>
-        </div>
+        {canAccessMenu("calendar") && (
+          <div
+            className={`flex flex-row px-4 py-3.5 items-center gap-2 active:bg-primary-c300 hover:bg-primary-c200 cursor-pointer rounded-xl duration-300 transition ${
+              pathname === "/calendar" ? "bg-primary-c100" : ""
+            }`}
+            onClick={() => router.push("/calendar")}
+          >
+            <Image src="/icons/solid-calendar.svg" alt="solid-calendar" width={24} height={24} />
+            <div className="font-semibold text-primary-c900">Calendar</div>
+          </div>
+        )}
         {/* Classes */}
-        <div
-          className={`flex flex-row px-4 py-3.5 items-center gap-2 active:bg-primary-c300 hover:bg-primary-c200 cursor-pointer rounded-xl duration-300 transition ${
-            pathname === "/classes" ? "bg-primary-c100" : ""
-          }`}
-          onClick={() => router.push("/classes")}
-        >
-          <Image src="/icons/class-icon.svg" alt="class-icon" width={24} height={24} />
-          <div className="font-semibold text-primary-c900">Classes</div>
-        </div>
+        {canAccessMenu("classes") && (
+          <div
+            className={`flex flex-row px-4 py-3.5 items-center gap-2 active:bg-primary-c300 hover:bg-primary-c200 cursor-pointer rounded-xl duration-300 transition ${
+              pathname === "/classes" ? "bg-primary-c100" : ""
+            }`}
+            onClick={() => router.push("/classes")}
+          >
+            <Image src="/icons/class-icon.svg" alt="class-icon" width={24} height={24} />
+            <div className="font-semibold text-primary-c900">Classes</div>
+          </div>
+        )}
         {/* Students */}
-        <div
-          className={`flex flex-row px-4 py-3.5 items-center gap-2 active:bg-primary-c300 hover:bg-primary-c200 cursor-pointer rounded-xl duration-300 transition ${
-            pathname === "/students" ? "bg-primary-c100" : ""
-          }`}
-          onClick={() => router.push("/students")}
-        >
-          <Image src="/icons/student-icon.svg" alt="student-icon" width={24} height={24} />
-          <div className="font-semibold text-primary-c900">Students</div>
-        </div>
+        {canAccessMenu("students") && (
+          <div
+            className={`flex flex-row px-4 py-3.5 items-center gap-2 active:bg-primary-c300 hover:bg-primary-c200 cursor-pointer rounded-xl duration-300 transition ${
+              pathname === "/students" ? "bg-primary-c100" : ""
+            }`}
+            onClick={() => router.push("/students")}
+          >
+            <Image src="/icons/student-icon.svg" alt="student-icon" width={24} height={24} />
+            <div className="font-semibold text-primary-c900">Students</div>
+          </div>
+        )}
         {/* Payments */}
-        <div
-          className={`flex flex-row px-4 py-3.5 items-center gap-2 active:bg-primary-c300 hover:bg-primary-c200 cursor-pointer rounded-xl duration-300 transition ${
-            pathname === "/payments" ? "bg-primary-c100" : ""
-          }`}
-          onClick={() => router.push("/payments")}
-        >
-          <Image src="/icons/payment-icon.svg" alt="payment-icon" width={26} height={26} />
-          <div className="font-semibold text-primary-c900">Payments</div>
-        </div>
+        {canAccessMenu("payments") && (
+          <div
+            className={`flex flex-row px-4 py-3.5 items-center gap-2 active:bg-primary-c300 hover:bg-primary-c200 cursor-pointer rounded-xl duration-300 transition ${
+              pathname === "/payments" ? "bg-primary-c100" : ""
+            }`}
+            onClick={() => router.push("/payments")}
+          >
+            <Image src="/icons/payment-icon.svg" alt="payment-icon" width={26} height={26} />
+            <div className="font-semibold text-primary-c900">Payments</div>
+          </div>
+        )}
         {/* Histories */}
-        <div
-          className={`flex flex-row px-4 py-3.5 items-center gap-2 active:bg-primary-c300 hover:bg-primary-c200 cursor-pointer rounded-xl duration-300 transition ${
-            pathname === "/histories" ? "bg-primary-c100" : ""
-          }`}
-          onClick={() => router.push("/histories")}
-        >
-          <Image src="/icons/statistic-icon.svg" alt="statistic-icon" width={24} height={24} />
-          <div className="font-semibold text-primary-c900">Histories</div>
-        </div>
+        {canAccessMenu("histories") && (
+          <div
+            className={`flex flex-row px-4 py-3.5 items-center gap-2 active:bg-primary-c300 hover:bg-primary-c200 cursor-pointer rounded-xl duration-300 transition ${
+              pathname === "/histories" ? "bg-primary-c100" : ""
+            }`}
+            onClick={() => router.push("/histories")}
+          >
+            <Image src="/icons/statistic-icon.svg" alt="statistic-icon" width={24} height={24} />
+            <div className="font-semibold text-primary-c900">Histories</div>
+          </div>
+        )}
         {/* System Users */}
-        <div
-          className={`flex flex-row px-4 py-3.5 items-center gap-2 active:bg-primary-c300 hover:bg-primary-c200 cursor-pointer rounded-xl duration-300 transition ${
-            pathname === "/users" ? "bg-primary-c100" : ""
-          }`}
-          onClick={() => router.push("/users")}
-        >
-          <Image src="/icons/system-user.svg" alt="system-user" width={24} height={24} />
-          <div className="font-semibold text-primary-c900">System users</div>
-        </div>
+        {canAccessMenu("users") && (
+          <div
+            className={`flex flex-row px-4 py-3.5 items-center gap-2 active:bg-primary-c300 hover:bg-primary-c200 cursor-pointer rounded-xl duration-300 transition ${
+              pathname === "/users" ? "bg-primary-c100" : ""
+            }`}
+            onClick={() => router.push("/users")}
+          >
+            <Image src="/icons/system-user.svg" alt="system-user" width={24} height={24} />
+            <div className="font-semibold text-primary-c900">System users</div>
+          </div>
+        )}
       </div>
       <Divider />
     </div>

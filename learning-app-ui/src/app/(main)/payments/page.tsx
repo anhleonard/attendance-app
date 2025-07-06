@@ -23,7 +23,6 @@ interface PaymentResponse {
   total: number;
   data: {
     id: number;
-    totalSessions: number;
     totalAttend: number;
     totalMonthAmount: number;
     totalPayment: number;

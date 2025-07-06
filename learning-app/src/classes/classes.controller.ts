@@ -46,7 +46,7 @@ export class ClassesController {
 
   @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
   @Roles(Role.ADMIN, Role.TA)
-  @Permissions(Permission.CREATE_CLASS)
+  // @Permissions(Permission.CREATE_CLASS)
   @Post('/find-classes')
   findClasses(@Body() filterClassDto: FilterClassDto) {
     return this.classesService.findClasses(filterClassDto);

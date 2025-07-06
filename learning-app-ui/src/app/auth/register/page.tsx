@@ -11,6 +11,7 @@ import { register } from "@/apis/services/auth";
 import { useDispatch } from "react-redux";
 import { closeLoading, openLoading } from "@/redux/slices/loading-slice";
 import { openAlert } from "@/redux/slices/alert-slice";
+import { useAuthClear } from "@/hooks/useAuthClear";
 
 const validationSchema = Yup.object({
   name: Yup.string()
@@ -35,6 +36,9 @@ const RegisterPage = () => {
   const dispatch = useDispatch();
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  // Clear auth data when component mounts
+  useAuthClear();
 
   const formik = useFormik({
     initialValues: {

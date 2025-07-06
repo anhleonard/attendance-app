@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Select from "./select";
 import Image from "next/image";
 
@@ -33,14 +33,28 @@ const Pagination = ({ totalItems = 20, onPageChange, rowsEachPage, nowPage }: Pr
   const [rowsPerPage, setRowsPerPage] = useState(rowsEachPage ?? parseInt(rowsPerPageOptions[0]?.value, 10));
   const [currentPage, setCurrentPage] = useState(nowPage ?? 1);
 
+  // Sync internal state with props
+  useEffect(() => {
+    if (nowPage !== undefined) {
+      setCurrentPage(nowPage);
+    }
+  }, [nowPage]);
+
+  useEffect(() => {
+    if (rowsEachPage !== undefined) {
+      setRowsPerPage(rowsEachPage);
+    }
+  }, [rowsEachPage]);
+
   const totalPages = Math.ceil(totalItems / rowsPerPage);
   const startIndex = (currentPage - 1) * rowsPerPage + 1;
   const endIndex = Math.min(startIndex + rowsPerPage - 1, totalItems);
 
   const handleRowsPerPageChange = (value: string) => {
-    setRowsPerPage(Number(value));
+    const newRowsPerPage = Number(value);
+    setRowsPerPage(newRowsPerPage);
     setCurrentPage(1);
-    onPageChange(1, Number(value));
+    onPageChange(1, newRowsPerPage);
   };
 
   const handlePageChange = (newPage: number) => {

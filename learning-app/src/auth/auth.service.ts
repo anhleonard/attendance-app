@@ -11,6 +11,10 @@ import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { TokenPayload } from './token-payload/token-payload.auth';
 import ms from 'ms';
+import { Permission } from 'src/utils/enums';
+import { PrismaService } from 'src/prisma/prisma.service';
+import { v4 as uuidv4 } from 'uuid';
+import axios from 'axios';
 
 @Injectable()
 export class AuthService {
@@ -18,6 +22,7 @@ export class AuthService {
     private readonly usersService: UsersService,
     private readonly configService: ConfigService,
     private readonly jwtService: JwtService,
+    private readonly prismaService: PrismaService,
   ) {}
 
   async verifyUser(email: string, password: string) {
@@ -46,6 +51,7 @@ export class AuthService {
       userId: user?.id,
       email: user?.email,
       role: user?.role,
+      permissions: user?.permissions as Permission[],
     };
 
     const token = this.jwtService.sign(tokenPayload);
@@ -92,6 +98,94 @@ export class AuthService {
         throw error;
       }
       throw new BadRequestException(error.message);
+    }
+  }
+
+  async forgotPassword(email: string) {
+    try {
+      // Check if user exists
+      const user = await this.usersService.findOne(email);
+
+      // Generate UUID token
+      const token = uuidv4();
+
+      // Set expiration (24 hours from now)
+      const expiresAt = new Date();
+      expiresAt.setHours(expiresAt.getHours() + 24);
+
+      // Save token to database
+      await this.prismaService.passwordResetToken.create({
+        data: {
+          token,
+          expiresAt,
+          userId: user.id,
+        },
+      });
+
+      // Create reset link
+      const resetLink = `${this.configService.get<string>('FE_ENDPOINT')}/auth/reset-password/${token}`;
+
+      // Send email
+      const response = await axios.post(
+        `${this.configService.get<string>('N8N_ENDPOINT')}/webhook/send-mail`,
+        {
+          to: email,
+          subject: 'Attendance Password Reset',
+          message: `You have requested to reset your password for the Attendance system.\n\nPlease click the link below to reset your password:\n\nReset Link: ${resetLink}\n\nIf you didn't request this password reset, please ignore this email.\n\nBest regards,\nAttendance System Team`,
+        },
+      );
+
+      return { message: 'Password reset email sent successfully' };
+    } catch (error) {
+      // Don't reveal if email exists or not for security
+      throw new BadRequestException(
+        'If the email exists, a password reset link has been sent',
+      );
+    }
+  }
+
+  async resetPassword(token: string, newPassword: string) {
+    try {
+      // Find the reset token
+      const resetToken = await this.prismaService.passwordResetToken.findUnique(
+        {
+          where: { token },
+          include: { user: true },
+        },
+      );
+
+      if (!resetToken) {
+        throw new BadRequestException('Invalid or expired reset token');
+      }
+
+      // Check if token is expired
+      if (resetToken.expiresAt < new Date()) {
+        throw new BadRequestException('Reset token has expired');
+      }
+
+      // Check if token is already used
+      if (resetToken.used) {
+        throw new BadRequestException('Reset token has already been used');
+      }
+
+      // Update user password
+      await this.usersService.updateUser({
+        id: resetToken.user.id,
+        password: newPassword,
+      });
+
+      // Mark token as used
+      await this.prismaService.passwordResetToken.update({
+        where: { id: resetToken.id },
+        data: { used: true },
+      });
+
+      return { message: 'Password reset successfully' };
+    } catch (error) {
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      throw new BadRequestException('Failed to reset password');
     }
   }
 }

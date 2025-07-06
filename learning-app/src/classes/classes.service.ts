@@ -144,8 +144,8 @@ export class ClassesService {
       // Lấy danh sách sessions đang ACTIVE và có hiệu lực hiện tại của class
       const currentDate = new Date();
       const activeSessions = await this.prismaService.session.findMany({
-        where: { 
-          classId, 
+        where: {
+          classId,
           status: 'ACTIVE',
           OR: [
             // Sessions currently valid
@@ -193,11 +193,11 @@ export class ClassesService {
             existingValidTo: existingSession.validTo,
             newStartTime: session.startTime,
             newEndTime: session.endTime,
-            newAmount: session.amount
+            newAmount: session.amount,
           });
 
           // Kiểm tra xem có thay đổi gì không
-          const hasChanges = 
+          const hasChanges =
             existingSession.startTime !== session.startTime ||
             existingSession.endTime !== session.endTime ||
             existingSession.amount !== session.amount;
@@ -217,7 +217,7 @@ export class ClassesService {
           console.log('Closing existing session:', {
             sessionId: existingSession.id,
             terminateTime: terminateTime.toISOString(),
-            validFromDate: validFromDate.toISOString()
+            validFromDate: validFromDate.toISOString(),
           });
 
           // Đóng session cũ TRƯỚC khi tạo session mới
@@ -238,7 +238,7 @@ export class ClassesService {
           console.log('Creating new session:', {
             sessionKey: session.sessionKey,
             validFrom: validFromDate.toISOString(),
-            validTo: null
+            validTo: null,
           });
 
           const createdSession = await this.sessionsService.createSession(
@@ -257,7 +257,7 @@ export class ClassesService {
           console.log('Creating completely new session:', {
             sessionKey: session.sessionKey,
             validFrom: validFromDate.toISOString(),
-            validTo: null
+            validTo: null,
           });
 
           const createdSession = await this.sessionsService.createSession(
@@ -279,12 +279,12 @@ export class ClassesService {
         console.log('Closing removed sessions:', {
           sessionIds: sessionsToCloseIds,
           terminateTime: terminateTime.toISOString(),
-          validFromDate: validFromDate.toISOString()
+          validFromDate: validFromDate.toISOString(),
         });
 
         await this.prismaService.session.updateMany({
           where: { id: { in: sessionsToCloseIds } },
-          data: { 
+          data: {
             validTo: terminateTime,
           },
         });
@@ -377,7 +377,7 @@ export class ClassesService {
         ];
 
         const sessionKeyForDay = sessionKeys[targetDate.getDay()];
-        
+
         // Create start and end of target date
         const startOfDay = new Date(targetDate);
         startOfDay.setHours(0, 0, 0, 0);
@@ -559,17 +559,9 @@ export class ClassesService {
 
   async getCalendar(year: number, month: number): Promise<CalendarResponse> {
     try {
-      console.log('=== GET CALENDAR DEBUG ===');
-      console.log('Input parameters:', { year, month });
-
       // Get the first and last day of the month
       const firstDay = new Date(year, month - 1, 1);
       const lastDay = new Date(year, month, 0);
-
-      console.log('Month range:', {
-        firstDay: firstDay.toISOString(),
-        lastDay: lastDay.toISOString()
-      });
 
       // Generate all dates in the month
       const dates: Date[] = [];
@@ -584,8 +576,6 @@ export class ClassesService {
       // Get current date for comparison
       const currentDate = new Date();
       currentDate.setHours(0, 0, 0, 0);
-
-      console.log('Current date (normalized):', currentDate.toISOString());
 
       // Map session keys to days of week
       const sessionKeyToDayMap = {
@@ -611,15 +601,6 @@ export class ClassesService {
           })
           .replace(/\//g, '.');
 
-        // Special logging for date "20.06.2025"
-        const isTargetDate = dateKey === '20.06.2025';
-        if (isTargetDate) {
-          console.log('=== PROCESSING TARGET DATE: 20.06.2025 ===');
-          console.log('Date object:', date.toISOString());
-          console.log('Day of week:', dayOfWeek);
-          console.log('Date key:', dateKey);
-        }
-
         const startOfDay = new Date(date);
         startOfDay.setHours(0, 0, 0, 0);
         const endOfDay = new Date(date);
@@ -629,32 +610,12 @@ export class ClassesService {
           ([_, day]) => day === dayOfWeek,
         )?.[0] as SessionKey;
 
-        if (isTargetDate) {
-          console.log('Session key for day:', sessionKeyForDay);
-          console.log('Start of day:', startOfDay.toISOString());
-          console.log('End of day:', endOfDay.toISOString());
-        }
-
         const compareDate = new Date(date);
         compareDate.setHours(0, 0, 0, 0);
         const isCurrentOrFutureDate = compareDate >= currentDate;
 
-        if (isTargetDate) {
-          console.log('Compare date (normalized):', compareDate.toISOString());
-          console.log('Is current or future date:', isCurrentOrFutureDate);
-        }
-
         if (isCurrentOrFutureDate) {
           // For current or future dates: get classes with active sessions
-          if (isTargetDate) {
-            console.log('=== FETCHING CLASSES FOR FUTURE DATE ===');
-            console.log('Query conditions:', {
-              status: 'ACTIVE',
-              sessionKey: sessionKeyForDay,
-              sessionStatus: SessionStatus.ACTIVE
-            });
-          }
-
           const classes = await this.prismaService.class.findMany({
             where: {
               status: 'ACTIVE',
@@ -723,104 +684,6 @@ export class ClassesService {
             },
           });
 
-          if (isTargetDate) {
-            console.log('Classes found for future date:', classes.length);
-            if (classes.length === 0) {
-              console.log('No classes found with the query conditions');
-              
-              // Debug: Check if there are any active classes at all
-              const allActiveClasses = await this.prismaService.class.findMany({
-                where: { status: 'ACTIVE' },
-                select: { id: true, name: true }
-              });
-              console.log('All active classes:', allActiveClasses);
-              
-              // Debug: Check if there are any sessions with the sessionKey
-              const sessionsWithKey = await this.prismaService.session.findMany({
-                where: { 
-                  sessionKey: sessionKeyForDay,
-                  status: SessionStatus.ACTIVE
-                },
-                select: { 
-                  id: true, 
-                  sessionKey: true, 
-                  classId: true,
-                  validFrom: true,
-                  validTo: true
-                }
-              });
-              console.log('Sessions with sessionKey:', sessionsWithKey);
-              
-              // Debug: Check if there are any sessions with validTo = null
-              const activeSessions = await this.prismaService.session.findMany({
-                where: { 
-                  status: SessionStatus.ACTIVE,
-                  validTo: null
-                },
-                select: { 
-                  id: true, 
-                  sessionKey: true, 
-                  classId: true,
-                  validFrom: true,
-                  validTo: true
-                }
-              });
-              console.log('All active sessions (validTo = null):', activeSessions);
-            }
-            classes.forEach((classItem, index) => {
-              console.log(`Class ${index + 1}:`, {
-                id: classItem.id,
-                name: classItem.name,
-                sessionsCount: classItem.sessions.length,
-                sessions: classItem.sessions.map(s => ({
-                  id: s.id,
-                  sessionKey: s.sessionKey,
-                  validFrom: s.validFrom,
-                  validTo: s.validTo,
-                  attendancesCount: s.attendances.length
-                }))
-              });
-              
-              // Additional debug: Check all sessions for this specific class
-              if (classItem.sessions.length === 0) {
-                console.log(`No sessions found for class ${classItem.id}, checking all sessions for this class...`);
-                this.prismaService.session.findMany({
-                  where: { 
-                    classId: classItem.id,
-                    sessionKey: sessionKeyForDay
-                  },
-                  select: { 
-                    id: true, 
-                    sessionKey: true, 
-                    classId: true,
-                    status: true,
-                    validFrom: true,
-                    validTo: true
-                  }
-                }).then(allSessions => {
-                  console.log(`All sessions for class ${classItem.id} with sessionKey ${sessionKeyForDay}:`, allSessions);
-                });
-                
-                // Debug: Check ALL sessions for this class regardless of sessionKey
-                this.prismaService.session.findMany({
-                  where: { 
-                    classId: classItem.id
-                  },
-                  select: { 
-                    id: true, 
-                    sessionKey: true, 
-                    classId: true,
-                    status: true,
-                    validFrom: true,
-                    validTo: true
-                  }
-                }).then(allClassSessions => {
-                  console.log(`ALL sessions for class ${classItem.id} (any sessionKey):`, allClassSessions);
-                });
-              }
-            });
-          }
-
           const classesForDay = classes.map((classItem) => {
             const validSessions = classItem.sessions.map((session) => {
               const { attendances, ...sessionData } = session;
@@ -836,42 +699,26 @@ export class ClassesService {
             };
           });
 
-          if (isTargetDate) {
-            console.log('Final classes for day:', classesForDay.length);
-            console.log('Final data:', JSON.stringify(classesForDay, null, 2));
-          }
-
           calendarData[dateKey] = classesForDay;
         } else {
           // For past dates: only get classes that have attendance records
-          if (isTargetDate) {
-            console.log('=== FETCHING CLASSES FOR PAST DATE ===');
-          }
-
-          const classesWithAttendance = await this.prismaService.attendance.groupBy({
-            by: ['sessionId'],
-            where: {
-              learningDate: {
-                gte: startOfDay,
-                lte: endOfDay,
-              },
-              session: {
-                class: {
-                  status: 'ACTIVE',
+          const classesWithAttendance =
+            await this.prismaService.attendance.groupBy({
+              by: ['sessionId'],
+              where: {
+                learningDate: {
+                  gte: startOfDay,
+                  lte: endOfDay,
+                },
+                session: {
+                  class: {
+                    status: 'ACTIVE',
+                  },
                 },
               },
-            },
-          });
-
-          if (isTargetDate) {
-            console.log('Classes with attendance found:', classesWithAttendance.length);
-            console.log('Attendance session IDs:', classesWithAttendance.map(a => a.sessionId));
-          }
+            });
 
           if (classesWithAttendance.length === 0) {
-            if (isTargetDate) {
-              console.log('No classes with attendance found, returning empty array');
-            }
             calendarData[dateKey] = [];
             continue;
           }
@@ -888,14 +735,7 @@ export class ClassesService {
 
           const classIds = [...new Set(sessions.map((s) => s.classId))];
 
-          if (isTargetDate) {
-            console.log('Class IDs from sessions:', classIds);
-          }
-
           if (classIds.length === 0) {
-            if (isTargetDate) {
-              console.log('No class IDs found, returning empty array');
-            }
             calendarData[dateKey] = [];
             continue;
           }
@@ -926,24 +766,6 @@ export class ClassesService {
             },
           });
 
-          if (isTargetDate) {
-            console.log('Classes found for past date:', classes.length);
-            classes.forEach((classItem, index) => {
-              console.log(`Class ${index + 1}:`, {
-                id: classItem.id,
-                name: classItem.name,
-                sessionsCount: classItem.sessions.length,
-                sessions: classItem.sessions.map(s => ({
-                  id: s.id,
-                  sessionKey: s.sessionKey,
-                  validFrom: s.validFrom,
-                  validTo: s.validTo,
-                  attendancesCount: s.attendances.length
-                }))
-              });
-            });
-          }
-
           const classesForDay = classes
             .map((classItem) => {
               const validSessions = classItem.sessions
@@ -971,25 +793,12 @@ export class ClassesService {
             })
             .filter(Boolean); // Remove null entries
 
-          if (isTargetDate) {
-            console.log('Final classes for past date:', classesForDay.length);
-            console.log('Final data for past date:', JSON.stringify(classesForDay, null, 2));
-          }
-
           calendarData[dateKey] = classesForDay;
         }
       }
 
-      console.log('=== CALENDAR DATA COMPLETE ===');
-      console.log('Calendar data keys:', Object.keys(calendarData));
-      if (calendarData['20.06.2025']) {
-        console.log('Target date data:', JSON.stringify(calendarData['20.06.2025'], null, 2));
-      }
-
       return calendarData;
     } catch (error) {
-      console.error('=== GET CALENDAR ERROR ===');
-      console.error('Error in getCalendar:', error);
       throw new BadRequestException(error.message);
     }
   }

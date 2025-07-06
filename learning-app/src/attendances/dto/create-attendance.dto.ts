@@ -17,6 +17,10 @@ export class CreateAttendanceDto {
   @IsNotEmpty()
   sessionId: number;
 
+  @IsNumber()
+  @IsOptional()
+  classId?: number;
+
   @IsBoolean()
   @IsNotEmpty()
   isAttend: boolean;

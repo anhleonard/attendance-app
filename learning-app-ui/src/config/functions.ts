@@ -16,3 +16,16 @@ export const getSessionKeyByDay = (day: string): SessionKey => {
   const index = days.indexOf(day);
   return SESSION_KEYS[index];
 };
+
+export const maskPhoneNumber = (phoneNumber: string): string => {
+  if (!phoneNumber || phoneNumber.length < 4) {
+    return phoneNumber;
+  }
+  
+  const firstTwo = phoneNumber.slice(0, 2);
+  const lastTwo = phoneNumber.slice(-2);
+  const middleLength = phoneNumber.length - 4;
+  const asterisks = '*'.repeat(middleLength);
+  
+  return `${firstTwo}${asterisks}${lastTwo}`;
+};

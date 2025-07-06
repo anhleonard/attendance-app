@@ -50,7 +50,20 @@ const validationSchema = Yup.object().shape({
         }),
       money: Yup.string().required("Money is required"),
     }),
-  ),
+  ).test("no-duplicate-days", "Cannot have multiple sessions on the same day", function (sessions) {
+    if (!sessions) return true;
+    
+    const days = sessions.map(session => session.day).filter(day => day !== "");
+    const uniqueDays = new Set(days);
+    
+    if (days.length !== uniqueDays.size) {
+      return this.createError({
+        message: "Cannot have multiple sessions on the same day"
+      });
+    }
+    
+    return true;
+  }),
 });
 
 const initialSessionValue = {
@@ -150,7 +163,11 @@ const AddClass = () => {
             options={Days}
             position="top"
             defaultValue={formik.values.sessions[index].day}
-            onChange={(value) => formik.setFieldValue(`sessions.${index}.day`, value)}
+            onChange={(value) => {
+              formik.setFieldValue(`sessions.${index}.day`, value);
+              formik.setFieldTouched(`sessions.${index}.day`, true);
+              formik.validateField('sessions');
+            }}
             error={Boolean(sessionTouched?.day && sessionErrors?.day)}
             helperText={sessionTouched?.day && sessionErrors?.day ? sessionErrors.day : undefined}
           />
@@ -227,6 +244,12 @@ const AddClass = () => {
     }
 
     formik.setFieldValue("sessionsPerWeek", value);
+    formik.setFieldTouched("sessionsPerWeek", true);
+    
+    // Trigger validation for sessions after changing the number
+    setTimeout(() => {
+      formik.validateField('sessions');
+    }, 0);
   };
 
   return (
@@ -276,6 +299,12 @@ const AddClass = () => {
             <React.Fragment key={`session-${index}`}>{renderSessionForm(index)}</React.Fragment>
           ))}
       </div>
+
+      {formik.touched.sessions && formik.errors.sessions && typeof formik.errors.sessions === 'string' && (
+        <div className="text-red-500 text-sm mt-2">
+          {formik.errors.sessions}
+        </div>
+      )}
 
       {formik.values.sessionsPerWeek && (
         <div className="mx-1 my-2">

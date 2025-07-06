@@ -6,6 +6,8 @@ import { User } from '@prisma/client';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { TokenPayload } from './token-payload/token-payload.auth';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
 
 @Controller('auth')
 export class AuthController {
@@ -31,6 +33,7 @@ export class AuthController {
     return response.send({ message: 'Logged out successfully' });
   }
 
+  // thay đổi password
   @Post('change-password')
   @UseGuards(JwtAuthGuard)
   changePassword(
@@ -38,5 +41,17 @@ export class AuthController {
     @CurrentUser() user: TokenPayload,
   ) {
     return this.authService.changePassword(payload, user);
+  }
+
+  // send email để reset password
+  @Post('forgot-password')
+  async forgotPassword(@Body() body: ForgotPasswordDto) {
+    return this.authService.forgotPassword(body.email);
+  }
+
+  // reset khi không nhớ password
+  @Post('reset-password')
+  async resetPassword(@Body() body: ResetPasswordDto) {
+    return this.authService.resetPassword(body.token, body.newPassword);
   }
 }

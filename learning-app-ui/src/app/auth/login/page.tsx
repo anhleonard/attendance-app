@@ -2,29 +2,34 @@
 import { Class, ModalState, Student, User } from "@/config/types";
 import Button from "@/lib/button";
 import TextField from "@/lib/textfield";
-import { openModal } from "@/redux/slices/modal-slice";
+import { closeModal, openModal } from "@/redux/slices/modal-slice";
 import Image from "next/image";
 import Link from "next/link";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useDispatch } from "react-redux";
 import { useRouter } from "next/navigation";
 import { useFormik } from "formik";
 import * as Yup from "yup";
-import { login } from "@/apis/services/auth";
+import { login, forgotPassword } from "@/apis/services/auth";
 import { LoginDto } from "@/apis/dto";
 import { closeLoading, openLoading } from "@/redux/slices/loading-slice";
 import { openAlert } from "@/redux/slices/alert-slice";
 import { ACCESS_TOKEN } from "@/config/constants";
 import { getSystemUsers, getUserInfo } from "@/apis/services/users";
 import { getClasses } from "@/apis/services/classes";
-import { Status } from "@/config/enums";
+import { Status, Role, Permission } from "@/config/enums";
 import { getStudents } from "@/apis/services/students";
 import { updateSystemInfo } from "@/redux/slices/system-slice";
 import { getNotifications } from "@/apis/services/notifications";
+import { useAuthClear } from "@/hooks/useAuthClear";
 
 const validationSchema = Yup.object({
   email: Yup.string().email("Invalid email format").required("Email is required"),
   password: Yup.string().required("Password is required"),
+});
+
+const forgotPasswordValidationSchema = Yup.object({
+  email: Yup.string().email("Invalid email format").required("Email is required"),
 });
 
 const LoginPage = () => {
@@ -32,6 +37,35 @@ const LoginPage = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const dispatch = useDispatch();
+
+  // Clear auth data when component mounts
+  useAuthClear();
+
+  // Function to determine redirect path based on role and permissions
+  const getRedirectPath = (userRole: Role, userPermissions: Permission[]) => {
+    // If user is ADMIN, redirect to calendar (default)
+    if (userRole === Role.ADMIN) {
+      return "/calendar";
+    }
+
+    // If user is TA, check permissions in order of priority
+    if (userRole === Role.TA) {
+      const priorityOrder = [
+        { permission: Permission.CREATE_CLASS, path: "/calendar" },
+        { permission: Permission.CREATE_STUDENT, path: "/students" },
+        { permission: Permission.CREATE_ATTENDANCE, path: "/attendance" },
+      ];
+
+      for (const item of priorityOrder) {
+        if (userPermissions.includes(item.permission)) {
+          return item.path;
+        }
+      }
+    }
+
+    // Default fallback
+    return "/calendar";
+  };
 
   const formik = useFormik({
     initialValues: {
@@ -111,7 +145,11 @@ const LoginPage = () => {
               systemUsers: systemUsers || [],
             }),
           );
-          router.push("/calendar");
+
+          // Determine redirect path based on role and permissions
+          const redirectPath = getRedirectPath(userInfo?.role, userInfo?.permissions || []);
+          router.push(redirectPath);
+
           dispatch(
             openAlert({
               isOpen: true,
@@ -138,7 +176,7 @@ const LoginPage = () => {
 
   const handleShowModal = () => {
     const modal: ModalState = {
-      title: "Forgot Password",
+      title: "Forgot password",
       content: <ForgotPasswordModal />,
       isOpen: true,
       className: "max-w-xl",
@@ -213,9 +251,9 @@ const LoginPage = () => {
                 />
               </div>
               <div className="w-full flex justify-end">
-                <Link href="/auth/forgot-password" className="text-primary-c900 text-sm hover:underline">
+                <button type="button" onClick={handleShowModal} className="text-primary-c900 text-sm hover:underline">
                   Forgot password?
-                </Link>
+                </button>
               </div>
               <div className="w-full">
                 <Button
@@ -242,17 +280,62 @@ const LoginPage = () => {
 export default LoginPage;
 
 const ForgotPasswordModal = () => {
+  const dispatch = useDispatch();
+
+  const formik = useFormik({
+    initialValues: {
+      email: "",
+    },
+    validationSchema: forgotPasswordValidationSchema,
+    onSubmit: async (values) => {
+      try {
+        dispatch(openLoading());
+
+        await forgotPassword({ email: values.email });
+
+        dispatch(
+          openAlert({
+            isOpen: true,
+            title: "SUCCESS",
+            subtitle: "Password reset email has been sent to your email address.",
+            type: "success",
+          }),
+        );
+      } catch (error: any) {
+        dispatch(
+          openAlert({
+            isOpen: true,
+            title: "ERROR",
+            subtitle: error?.message || "Failed to send password reset email. Please try again.",
+            type: "error",
+          }),
+        );
+      } finally {
+        dispatch(closeLoading());
+        dispatch(closeModal());
+      }
+    },
+  });
+
   return (
     <div className="flex flex-col gap-4 py-4 px-3">
-      <TextField
-        label="Email"
-        className="w-full"
-        startIcon={<Image src="/icons/mail-icon.svg" alt="mail-icon" width={20} height={20} />}
-        placeholder="Enter your email"
-      />
-      <div className="flex justify-end">
-        <Button label="Send" className="py-3 w-32" />
-      </div>
+      <form onSubmit={formik.handleSubmit} className="w-full flex flex-col gap-4">
+        <TextField
+          label="Email"
+          className="w-full"
+          startIcon={<Image src="/icons/mail-icon.svg" alt="mail-icon" width={20} height={20} />}
+          placeholder="Enter your email"
+          name="email"
+          value={formik.values.email}
+          onChange={formik.handleChange}
+          onBlur={formik.handleBlur}
+          error={Boolean(formik.touched.email && formik.errors.email)}
+          helperText={formik.touched.email && formik.errors.email ? String(formik.errors.email) : undefined}
+        />
+        <div className="flex justify-end">
+          <Button type="submit" className="py-3 px-8" />
+        </div>
+      </form>
     </div>
   );
 };

@@ -48,10 +48,13 @@ export class HistoriesService {
           id: true,
           name: true,
           classes: {
+            // Lấy tất cả classes (cả ACTIVE và INACTIVE) để có lịch sử đầy đủ
             select: {
               id: true,
               classId: true,
               createdAt: true,
+              updatedAt: true, // Thêm updatedAt để làm endDate
+              status: true, // Thêm status để phân biệt
               class: true,
             },
             orderBy: { createdAt: 'asc' },
@@ -79,35 +82,91 @@ export class HistoriesService {
         const pastClasses = [];
         let currentClass = null;
 
-        for (let i = 0; i < classes.length; i++) {
-          const studentClass = classes[i];
-          const nextClass = classes[i + 1]; // Lớp tiếp theo của học sinh
-          const isCurrent = !nextClass; // Nếu không có lớp tiếp theo => đây là lớp hiện tại
-
-          const endDate = nextClass ? nextClass.createdAt : new Date();
-
-          // Tính số attendances trong khoảng thời gian học sinh ở lớp này
-          const totalAttendances = await this.prismaService.attendance.count({
+        // Tìm current class (class ACTIVE cuối cùng)
+        const activeClasses = classes.filter(c => c.status === Status.ACTIVE);
+        
+        if (activeClasses.length > 0) {
+          // Có active class - class cuối cùng là current class
+          const currentClassEnrollment = activeClasses[activeClasses.length - 1];
+          
+          // Tính số attendances cho current class
+          const currentClassAttendances = await this.prismaService.attendance.count({
             where: {
               studentId: student.id,
-              session: { classId: studentClass.class.id },
+              session: { classId: currentClassEnrollment.class.id },
               createdAt: {
-                gte: studentClass.createdAt,
-                lt: endDate,
+                gte: currentClassEnrollment.createdAt,
               },
               isAttend: true,
             },
           });
 
-          const classData = {
-            ...studentClass.class,
-            totalAttendances,
+          currentClass = {
+            id: currentClassEnrollment.class.id,
+            name: currentClassEnrollment.class.name,
+            description: currentClassEnrollment.class.description,
+            status: currentClassEnrollment.class.status,
+            totalAttendances: currentClassAttendances,
+            startDate: currentClassEnrollment.createdAt, // Thời gian bắt đầu học
+            endDate: currentClassEnrollment.updatedAt, // Thời gian kết thúc (hoặc hiện tại nếu vẫn đang học)
           };
 
-          if (isCurrent) {
-            currentClass = classData;
-          } else {
-            pastClasses.push(classData);
+          // Tất cả classes (cả ACTIVE và INACTIVE) trước current class là past classes
+          const currentClassIndex = classes.findIndex(c => c.id === currentClassEnrollment.id);
+          
+          for (let i = 0; i < currentClassIndex; i++) {
+            const studentClass = classes[i];
+            const nextClass = classes[i + 1];
+
+            const totalAttendances = await this.prismaService.attendance.count({
+              where: {
+                studentId: student.id,
+                session: { classId: studentClass.class.id },
+                createdAt: {
+                  gte: studentClass.createdAt,
+                  lt: nextClass.createdAt,
+                },
+                isAttend: true,
+              },
+            });
+
+            pastClasses.push({
+              id: studentClass.class.id,
+              name: studentClass.class.name,
+              description: studentClass.class.description,
+              status: studentClass.status, // Thêm status để biết class này có bị disable không
+              totalAttendances,
+              startDate: studentClass.createdAt, // Thời gian bắt đầu học
+              endDate: studentClass.updatedAt, // Thời gian kết thúc học
+            });
+          }
+        } else {
+          // Không có active class - tất cả classes đều là past classes
+          for (let i = 0; i < classes.length; i++) {
+            const studentClass = classes[i];
+            const nextClass = classes[i + 1];
+
+            const totalAttendances = await this.prismaService.attendance.count({
+              where: {
+                studentId: student.id,
+                session: { classId: studentClass.class.id },
+                createdAt: {
+                  gte: studentClass.createdAt,
+                  lt: nextClass ? nextClass.createdAt : new Date(),
+                },
+                isAttend: true,
+              },
+            });
+
+            pastClasses.push({
+              id: studentClass.class.id,
+              name: studentClass.class.name,
+              description: studentClass.class.description,
+              status: studentClass.status, // Thêm status để biết class này có bị disable không
+              totalAttendances,
+              startDate: studentClass.createdAt, // Thời gian bắt đầu học
+              endDate: studentClass.updatedAt, // Thời gian kết thúc học
+            });
           }
         }
 

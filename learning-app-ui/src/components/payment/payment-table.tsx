@@ -186,7 +186,7 @@ const PaymentTable = ({
                     </td>
                     <th className="pl-3 py-4">{(page - 1) * rowsPerPage + index + 1}</th>
                     <th className="px-1 py-4">{payment.student.name}</th>
-                    <th className="px-1 py-4">{payment.student.currentClass?.name || "-"}</th>
+                    <th className="px-1 py-4">{payment.student.currentClass?.name || "--"}</th>
                     <th className="px-1 py-4 text-center">{payment.totalAttend}</th>
                     <th className="px-1 py-4">
                       <span className="font-bold text-[#FE9800]">{formatCurrency(payment.totalMonthAmount)}</span>

@@ -11,20 +11,18 @@ interface HistoryData {
     name: string;
     description: string;
     status: string;
-    createdAt: string;
-    updatedAt: string;
-    createdById: number;
     totalAttendances: number;
-  };
+    startDate: string;
+    endDate: string;
+  } | null;
   pastClasses: Array<{
     id: number;
     name: string;
     description: string;
     status: string;
-    createdAt: string;
-    updatedAt: string;
-    createdById: number;
     totalAttendances: number;
+    startDate: string;
+    endDate: string;
   }>;
 }
 
@@ -34,7 +32,7 @@ interface Props {
 
 const DetailHistoryModal: React.FC<Props> = ({ history }) => {
   // Calculate total sessions across all classes
-  const totalSessions = history.currentClass.totalAttendances + 
+  const totalSessions = (history.currentClass?.totalAttendances || 0) + 
     history.pastClasses.reduce((sum, pastClass) => sum + pastClass.totalAttendances, 0);
 
   return (
@@ -58,7 +56,7 @@ const DetailHistoryModal: React.FC<Props> = ({ history }) => {
               <Image src="/icons/created-icon.svg" alt="created-icon" width={20} height={20} />
               <div className="text-grey-c900">Joined at</div>
             </div>
-            <div className="text-grey-c700">{moment(history.currentClass.createdAt).format("DD/MM/YYYY")}</div>
+            <div className="text-grey-c700">{history.currentClass ? moment(history.currentClass.startDate).format("DD/MM/YYYY") : "--"}</div>
           </div>
 
           {/* 3. Total sessions */}
@@ -76,7 +74,7 @@ const DetailHistoryModal: React.FC<Props> = ({ history }) => {
               <Image src="/icons/student-detail-icon.svg" alt="student-detail-icon" width={20} height={20} />
               <div className="text-grey-c900">Current class</div>
             </div>
-            <div className="text-grey-c700">{history.currentClass.name}</div>
+            <div className="text-grey-c700">{history.currentClass?.name || "--"}</div>
           </div>
         </div>
       </div>

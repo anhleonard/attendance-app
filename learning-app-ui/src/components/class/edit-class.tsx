@@ -1,4 +1,4 @@
-import { AmountSessions, Days, Times } from "@/config/constants";
+import { AmountSessions, Days, Times, SESSION_KEYS } from "@/config/constants";
 import Button from "@/lib/button";
 import Divider from "@/lib/divider";
 import Label from "@/lib/label";
@@ -43,20 +43,35 @@ const validationSchema = Yup.object().shape({
   className: Yup.string().required("Class name is required"),
   sessionsPerWeek: Yup.string().required("Sessions per week is required"),
   aboutClass: Yup.string().required("About class is required"),
-  sessions: Yup.array().of(
-    Yup.object().shape({
-      day: Yup.string().required("Day is required"),
-      startTime: Yup.string().required("Start time is required"),
-      endTime: Yup.string()
-        .required("End time is required")
-        .test("is-after-start", "End time must be after start time", function (value) {
-          const { startTime } = this.parent;
-          if (!startTime || !value) return true;
-          return value > startTime;
-        }),
-      money: Yup.string().required("Money is required"),
+  sessions: Yup.array()
+    .of(
+      Yup.object().shape({
+        day: Yup.string().required("Day is required"),
+        startTime: Yup.string().required("Start time is required"),
+        endTime: Yup.string()
+          .required("End time is required")
+          .test("is-after-start", "End time must be after start time", function (value) {
+            const { startTime } = this.parent;
+            if (!startTime || !value) return true;
+            return value > startTime;
+          }),
+        money: Yup.string().required("Money is required"),
+      }),
+    )
+    .test("no-duplicate-days", "Cannot have multiple sessions on the same day", function (sessions) {
+      if (!sessions) return true;
+
+      const days = sessions.map((session) => session.day).filter((day) => day !== "");
+      const uniqueDays = new Set(days);
+
+      if (days.length !== uniqueDays.size) {
+        return this.createError({
+          message: "Cannot have multiple sessions on the same day",
+        });
+      }
+
+      return true;
     }),
-  ),
 });
 
 const initialSessionValue = {
@@ -76,17 +91,28 @@ const initialValues: EditClassFormValues = {
 const EditClass = ({ classItem }: Props) => {
   const dispatch = useDispatch();
 
+  // Sort sessions by day order: Monday to Sunday
+  const sortSessionsByDay = (sessions: any[]): any[] => {
+    return [...sessions].sort((a, b) => {
+      const aIndex = Days.findIndex((day) => day.value === a.day);
+      const bIndex = Days.findIndex((day) => day.value === b.day);
+      return aIndex - bIndex;
+    });
+  };
+
   const formik = useFormik({
     initialValues: {
       className: classItem.name,
       sessionsPerWeek: classItem.sessions.length !== 0 ? classItem.sessions.length.toString() : "",
       aboutClass: classItem.description,
-      sessions: classItem.sessions.map((session) => ({
-        day: Days.find((day) => day.value === getDayBySessionKey(session.sessionKey))?.value || "",
-        startTime: session.startTime,
-        endTime: session.endTime,
-        money: formatAmount(session.amount),
-      })),
+      sessions: sortSessionsByDay(
+        classItem.sessions.map((session) => ({
+          day: Days.find((day) => day.value === getDayBySessionKey(session.sessionKey))?.value || "",
+          startTime: session.startTime,
+          endTime: session.endTime,
+          money: formatAmount(session.amount),
+        })),
+      ),
     },
     validationSchema,
     onSubmit: async (values) => {
@@ -135,10 +161,10 @@ const EditClass = ({ classItem }: Props) => {
   });
 
   const renderSessionForm = (index: number) => {
-    const sessionErrors = formik.errors.sessions?.[index] as
+    const sessionErrors = (formik.errors.sessions as any)?.[index] as
       | { day?: string; startTime?: string; endTime?: string; money?: string }
       | undefined;
-    const sessionTouched = formik.touched.sessions?.[index] as
+    const sessionTouched = (formik.touched.sessions as any)?.[index] as
       | { day?: boolean; startTime?: boolean; endTime?: boolean; money?: boolean }
       | undefined;
 
@@ -151,7 +177,11 @@ const EditClass = ({ classItem }: Props) => {
             options={Days}
             position="top"
             defaultValue={formik.values.sessions[index].day}
-            onChange={(value) => formik.setFieldValue(`sessions.${index}.day`, value)}
+            onChange={(value) => {
+              formik.setFieldValue(`sessions.${index}.day`, value);
+              formik.setFieldTouched(`sessions.${index}.day`, true);
+              formik.validateField("sessions");
+            }}
             error={Boolean(sessionTouched?.day && sessionErrors?.day)}
             helperText={sessionTouched?.day && sessionErrors?.day ? sessionErrors.day : undefined}
           />
@@ -228,6 +258,12 @@ const EditClass = ({ classItem }: Props) => {
     }
 
     formik.setFieldValue("sessionsPerWeek", value);
+    formik.setFieldTouched("sessionsPerWeek", true);
+
+    // Trigger validation for sessions after changing the number
+    setTimeout(() => {
+      formik.validateField("sessions");
+    }, 0);
   };
 
   return (
@@ -277,6 +313,10 @@ const EditClass = ({ classItem }: Props) => {
             <React.Fragment key={`session-${index}`}>{renderSessionForm(index)}</React.Fragment>
           ))}
       </div>
+
+      {formik.touched.sessions && formik.errors.sessions && typeof formik.errors.sessions === "string" && (
+        <div className="text-red-500 text-sm mt-2">{formik.errors.sessions}</div>
+      )}
 
       {formik.values.sessionsPerWeek && (
         <div className="mx-1 my-2">

@@ -1,5 +1,5 @@
 import axios from "axios";
-import { ChangePasswordDto, LoginDto, RegisterDto } from "../dto";
+import { ChangePasswordDto, ForgotPasswordDto, LoginDto, RegisterDto, ResetPasswordDto } from "../dto";
 import axiosInstance from "../axios";
 
 const API_DOMAIN = process.env.NEXT_PUBLIC_HTTP_API_DOMAIN;
@@ -25,6 +25,24 @@ export const register = async (data: RegisterDto) => {
 export const changePassword = async (data: ChangePasswordDto) => {
   try {
     const response = await axiosInstance.post(`${API_DOMAIN}/auth/change-password`, data);
+    return response.data;
+  } catch (error: any) {
+    throw error?.response?.data || error.message;
+  }
+};
+
+export const forgotPassword = async (data: ForgotPasswordDto) => {
+  try {
+    const response = await axiosInstance.post(`${API_DOMAIN}/auth/forgot-password`, data);
+    return response.data;
+  } catch (error: any) {
+    throw error?.response?.data || error.message;
+  }
+};
+
+export const resetPassword = async (data: ResetPasswordDto) => {
+  try {
+    const response = await axiosInstance.post(`${API_DOMAIN}/auth/reset-password`, data);
     return response.data;
   } catch (error: any) {
     throw error?.response?.data || error.message;

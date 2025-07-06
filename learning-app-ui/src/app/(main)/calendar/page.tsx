@@ -101,9 +101,9 @@ const CalendarPage = () => {
     setCurrentDate(moment(currentDate).add(1, "month"));
   };
 
-  const handleClassClick = (classId: number, date: string) => {
-    // Navigate to attendance page with class ID and date parameters
-    const attendanceUrl = `/attendance?classId=${classId}&date=${date}`;
+  const handleClassClick = (classId: number, date: string, sessionId: number) => {
+    // Navigate to attendance page with class ID, date, and session ID parameters
+    const attendanceUrl = `/attendance?classId=${classId}&date=${date}&sessionId=${sessionId}`;
     router.push(attendanceUrl);
   };
 
@@ -188,13 +188,13 @@ const CalendarPage = () => {
                   backendDateKey,
                 )}`}
                 title={`${classItem.name} - ${session.startTime} - ${session.endTime} (${
-                  session.hasAttendance 
-                    ? session.validTo === null 
-                      ? "Đã điểm danh (Đang học)" 
+                  session.hasAttendance
+                    ? session.validTo === null
+                      ? "Đã điểm danh (Đang học)"
                       : "Đã điểm danh (Lịch này đã chuyển)"
                     : "Chưa điểm danh"
                 })`}
-                onClick={() => handleClassClick(classItem.id, day.date)}
+                onClick={() => handleClassClick(classItem.id, day.date, session.id)}
               >
                 <div className="font-medium truncate">{classItem.name}</div>
                 <div className={`text-[10px] truncate ${getTimeStyle(session, backendDateKey)}`}>

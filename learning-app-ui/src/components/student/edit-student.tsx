@@ -15,11 +15,13 @@ import { openAlert } from "@/redux/slices/alert-slice";
 import { refetch } from "@/redux/slices/refetch-slice";
 import { closeDrawer } from "@/redux/slices/drawer-slice";
 import moment from "moment";
-import { Status } from "@/config/enums";
+import { Status, Role } from "@/config/enums";
 import { RootState } from "@/redux/store";
+import { maskPhoneNumber } from "@/config/functions";
 
 interface Props {
   student: Student;
+  disabled?: boolean;
 }
 
 const validationSchema = Yup.object().shape({
@@ -38,7 +40,12 @@ const validationSchema = Yup.object().shape({
       const date = new Date(`${year}-${month}-${day}`);
       return date <= new Date();
     }),
-  class: Yup.string().required("Class is required"),
+  status: Yup.string().required("Status is required"),
+  class: Yup.string().when('status', {
+    is: Status.ACTIVE,
+    then: (schema) => schema.required("Class is required"),
+    otherwise: (schema) => schema.optional(),
+  }),
   parentName: Yup.string().required("Parent name is required").min(2, "Parent name must be at least 2 characters"),
   phoneNumber: Yup.string()
     .required("Phone number is required")
@@ -52,14 +59,16 @@ const validationSchema = Yup.object().shape({
     .nullable(),
 });
 
-const EditStudent = ({ student }: Props) => {
+const EditStudent = ({ student, disabled = false }: Props) => {
   const dispatch = useDispatch();
   const activeClasses: any = useSelector((state: RootState) => state.system.activeClasses) || [];
+  const { profile } = useSelector((state: RootState) => state.system);
 
   const formik = useFormik({
     initialValues: {
       studentName: student.name,
       dateOfBirth: moment(student.dob).format("DD-MM-YYYY"),
+      status: student.status,
       class: student.classes?.find((c) => c.status === Status.ACTIVE)?.class?.id.toString() || "",
       parentName: student.parent,
       phoneNumber: student.phoneNumber,
@@ -74,7 +83,8 @@ const EditStudent = ({ student }: Props) => {
 
         const studentData: UpdateStudentDto = {
           id: student.id,
-          classId: parseInt(values.class),
+          status: values.status,
+          classId: values.status === Status.ACTIVE ? parseInt(values.class) : undefined,
           name: values.studentName,
           dob: dobDate,
           parent: values.parentName,
@@ -139,13 +149,27 @@ const EditStudent = ({ student }: Props) => {
       />
 
       <Select
-        label="Class"
-        options={activeClasses}
-        defaultValue={formik.values.class}
-        onChange={(value) => formik.setFieldValue("class", value)}
-        error={Boolean(formik.touched.class && formik.errors.class)}
-        helperText={formik.touched.class && formik.errors.class ? String(formik.errors.class) : undefined}
+        label="Status"
+        options={[
+          { label: "Active", value: Status.ACTIVE },
+          { label: "Inactive", value: Status.INACTIVE },
+        ]}
+        defaultValue={formik.values.status}
+        onChange={(value) => formik.setFieldValue("status", value)}
+        error={Boolean(formik.touched.status && formik.errors.status)}
+        helperText={formik.touched.status && formik.errors.status ? String(formik.errors.status) : undefined}
       />
+
+      {formik.values.status === Status.ACTIVE && (
+        <Select
+          label="Class"
+          options={activeClasses}
+          defaultValue={formik.values.class}
+          onChange={(value) => formik.setFieldValue("class", value)}
+          error={Boolean(formik.touched.class && formik.errors.class)}
+          helperText={formik.touched.class && formik.errors.class ? String(formik.errors.class) : undefined}
+        />
+      )}
 
       <TextField
         name="parentName"
@@ -163,19 +187,20 @@ const EditStudent = ({ student }: Props) => {
       <TextField
         name="phoneNumber"
         label="Phone number"
-        value={formik.values.phoneNumber}
+        value={profile?.role === Role.TA ? maskPhoneNumber(formik.values.phoneNumber) : formik.values.phoneNumber}
         onChange={formik.handleChange}
         onBlur={formik.handleBlur}
         error={Boolean(formik.touched.phoneNumber && formik.errors.phoneNumber)}
         helperText={
           formik.touched.phoneNumber && formik.errors.phoneNumber ? String(formik.errors.phoneNumber) : undefined
         }
+        disabled={profile?.role === Role.TA}
       />
 
       <TextField
         name="secondaryPhoneNumber"
         label="Secondary phone number"
-        value={formik.values.secondaryPhoneNumber}
+        value={profile?.role === Role.TA ? maskPhoneNumber(formik.values.secondaryPhoneNumber) : formik.values.secondaryPhoneNumber}
         onChange={formik.handleChange}
         onBlur={formik.handleBlur}
         error={Boolean(formik.touched.secondaryPhoneNumber && formik.errors.secondaryPhoneNumber)}
@@ -184,6 +209,7 @@ const EditStudent = ({ student }: Props) => {
             ? String(formik.errors.secondaryPhoneNumber)
             : undefined
         }
+        disabled={profile?.role === Role.TA}
       />
 
       <div className="mx-1 my-2">

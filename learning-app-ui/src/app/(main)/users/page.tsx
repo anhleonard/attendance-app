@@ -198,8 +198,8 @@ const Users = () => {
         <div className="font-bold text-base">1. User list</div>
 
         {/* filter users */}
-        <div className="flex flex-col sm:flex-row gap-4 mb-5 mt-4">
-          <div className="flex-1 grid grid-cols-1 sm:grid-cols-4 gap-4">
+        <div className="flex flex-col sm:flex-row gap-3 mb-5 mt-4">
+          <div className="flex-1 grid grid-cols-1 sm:grid-cols-4 gap-3">
             <TextField label="Search name" value={filterName} onChange={handleNameChange} />
             <Select
               label="Role"

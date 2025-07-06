@@ -1,9 +1,13 @@
 import axiosInstance from "../axios";
-import { CreateAttendanceDto, FilterAttendanceDto, UpdateBatchAttendanceDto } from "../dto";
+import { 
+  FilterAttendanceDto, 
+  UpdateBatchAttendanceDto,
+  CreateBatchAttendanceDto,
+} from "../dto";
 
 const API_DOMAIN = process.env.NEXT_PUBLIC_HTTP_API_DOMAIN;
 
-export const createBatchAttendance = async (data: CreateAttendanceDto[]) => {
+export const createBatchAttendance = async (data: CreateBatchAttendanceDto) => {
   try {
     const response = await axiosInstance.post(`${API_DOMAIN}/attendances/create-batch`, data);
     return response.data;

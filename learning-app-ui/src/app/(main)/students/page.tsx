@@ -17,7 +17,7 @@ import { Tooltip } from "react-tooltip";
 import { RootState } from "@/redux/store";
 import { refetch } from "@/redux/slices/refetch-slice";
 import moment from "moment";
-import { SortType, Status } from "@/config/enums";
+import { SortType, Status, Role } from "@/config/enums";
 import { closeLoading } from "@/redux/slices/loading-slice";
 import { openLoading } from "@/redux/slices/loading-slice";
 import { openAlert } from "@/redux/slices/alert-slice";
@@ -25,6 +25,7 @@ import Label from "@/lib/label";
 import { openModal } from "@/redux/slices/modal-slice";
 import ImportFileModal from "@/components/student/import-file-modal";
 import { EmptyRow } from "@/lib/empty-row";
+import { maskPhoneNumber } from "@/config/functions";
 
 interface StudentsResponse {
   total: number;
@@ -46,6 +47,7 @@ const Students = () => {
   const [filterClassId, setFilterClassId] = useState<number | undefined>(undefined);
   const refetchCount = useSelector((state: RootState) => state.refetch.count);
   const activeClasses: any = useSelector((state: RootState) => state.system.activeClasses) || [];
+  const { profile } = useSelector((state: RootState) => state.system);
 
   const fetchStudents = async (currentPage: number, currentRowsPerPage: number) => {
     try {
@@ -231,6 +233,14 @@ const Students = () => {
     return activeClass?.class?.name || "-";
   };
 
+  // Function to mask phone numbers if user is TA
+  const getDisplayPhoneNumber = (phoneNumber: string) => {
+    if (profile?.role === Role.TA) {
+      return maskPhoneNumber(phoneNumber);
+    }
+    return phoneNumber;
+  };
+
   return (
     <div className="p-5">
       <div className="flex flex-row items-center gap-2 mb-8">
@@ -307,8 +317,8 @@ const Students = () => {
                       <th className="px-1 py-4">{moment(student.dob).format("DD/MM/YYYY")}</th>
                       <th className="px-1 py-4">{getActiveClassName(student.classes)}</th>
                       <th className="px-1 py-4">{student.parent}</th>
-                      <th className="px-1 py-4">{student.phoneNumber}</th>
-                      <th className="px-1 py-4">{student.secondPhoneNumber || "-"}</th>
+                      <th className="px-1 py-4">{getDisplayPhoneNumber(student.phoneNumber)}</th>
+                      <th className="px-1 py-4">{student.secondPhoneNumber ? getDisplayPhoneNumber(student.secondPhoneNumber) : "--"}</th>
                       <th className="px-1 py-4">
                         <Label status={student.status === Status.ACTIVE ? "success" : "error"} label={student.status} />
                       </th>
@@ -323,18 +333,18 @@ const Students = () => {
                           </button>
                           <Tooltip id={`edit-icon-${student?.id}`} />
 
-                          <button
-                            data-tooltip-id={`confirm-icon-${student?.id}`}
-                            data-tooltip-content={student?.status === Status.ACTIVE ? "Disable" : "Enable"}
-                            onClick={() => handleOpenConfirmChangeStatus(student)}
-                          >
-                            {student?.status === Status.ACTIVE ? (
-                              <Image src="/icons/disabled-icon.svg" alt="disabled-icon" width={22} height={22} />
-                            ) : (
-                              <Image src={"/icons/enabled-icon.svg"} alt="enabled-icon" width={23} height={23} />
-                            )}
-                          </button>
-                          <Tooltip id={`confirm-icon-${student?.id}`} />
+                          {student?.status === Status.ACTIVE && (
+                            <>
+                              <button
+                                data-tooltip-id={`confirm-icon-${student?.id}`}
+                                data-tooltip-content="Disable"
+                                onClick={() => handleOpenConfirmChangeStatus(student)}
+                              >
+                                <Image src="/icons/disabled-icon.svg" alt="disabled-icon" width={22} height={22} />
+                              </button>
+                              <Tooltip id={`confirm-icon-${student?.id}`} />
+                            </>
+                          )}
                         </div>
                       </th>
                     </tr>

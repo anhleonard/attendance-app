@@ -84,6 +84,20 @@ model User {
   // Add relations for notifications
   createdNotifications  Notification[]         @relation("NotificationCreator")
   receivedNotifications NotificationReceiver[] @relation("NotificationReceiver")
+
+  // Add relation for password reset tokens
+  passwordResetTokens PasswordResetToken[]
+}
+
+model PasswordResetToken {
+  id        Int      @id @default(autoincrement())
+  token     String   @unique // UUID token
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  userId Int
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Student {
@@ -143,7 +157,7 @@ model Session {
   amount     Int
   status     SessionStatus @default(ACTIVE)
   validFrom  DateTime      @default(now()) // Từ khi nào lịch này có hiệu lực
-  validTo    DateTime?     // Đến khi nào lịch này hết hiệu lực (null = vô thời hạn)
+  validTo    DateTime? // Đến khi nào lịch này hết hiệu lực (null = vô thời hạn)
   createdAt  DateTime      @default(now())
   updatedAt  DateTime      @updatedAt
 
@@ -175,7 +189,6 @@ model Attendance {
 
 model Payment {
   id               Int           @id @default(autoincrement())
-  totalSessions    Int // tổng số buổi đã được điểm danh (có thể là tham gia hoặc không tham gia)
   totalAttend      Int // số buổi đã tham gia
   totalMonthAmount Int // tiền của tháng này
   totalPayment     Int // tổng phải trả = totalMonthAmount + debt (lấy ở student)

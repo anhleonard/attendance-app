@@ -1,10 +1,11 @@
-import { IsEnum, IsOptional, IsString } from 'class-validator';
-import { Permission, Role, SortType } from './enums';
+import { Permission, Role } from './enums';
 import { Role as PrismaRole } from '@prisma/client';
 
 export interface CreateAttendance {
   studentId: number;
   sessionId: number;
+  classId: number;
+  learningDate: Date;
   isAttend: boolean;
   noteAttendance: string;
 }
@@ -39,14 +40,4 @@ export interface NotificationPayload {
     fullname: string;
     isRead: boolean;
   }>;
-}
-
-export class SortDto {
-  @IsString()
-  @IsOptional()
-  title: string;
-
-  @IsEnum(SortType)
-  @IsOptional()
-  order: SortType;
 }

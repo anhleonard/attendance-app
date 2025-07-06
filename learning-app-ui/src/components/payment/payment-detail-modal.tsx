@@ -18,7 +18,6 @@ interface Props {
   handleCloseModal: () => void;
   payment?: {
     id: number;
-    totalSessions: number;
     totalAttend: number;
     totalMonthAmount: number;
     totalPayment: number;
@@ -83,8 +82,12 @@ const PaymentDetailModal = ({ show, handleCloseModal, payment }: Props) => {
       return Array.from(uniqueAmounts)[0];
     }
 
-    // Otherwise return the map of amounts by day
-    return amountsByDay;
+    // Otherwise return min and max amounts
+    const amountsArray = Array.from(uniqueAmounts).sort((a, b) => a - b);
+    return {
+      min: amountsArray[0],
+      max: amountsArray[amountsArray.length - 1]
+    };
   };
 
   const sessionAmounts = getSessionAmounts();
@@ -216,14 +219,8 @@ const PaymentDetailModal = ({ show, handleCloseModal, payment }: Props) => {
                                   <th className="px-1 py-4">
                                     {typeof sessionAmounts === "number" ? (
                                       `${formatCurrency(sessionAmounts)} VNĐ`
-                                    ) : sessionAmounts ? (
-                                      <div className="flex flex-col gap-1">
-                                        {Array.from(sessionAmounts.entries()).map(([day, amount]) => (
-                                          <span key={day}>
-                                            {day}: {formatCurrency(amount)} VNĐ/buổi
-                                          </span>
-                                        ))}
-                                      </div>
+                                    ) : sessionAmounts && typeof sessionAmounts === "object" && "min" in sessionAmounts ? (
+                                      `${formatCurrency(sessionAmounts.min)} - ${formatCurrency(sessionAmounts.max)} VNĐ`
                                     ) : (
                                       "0 VNĐ"
                                     )}

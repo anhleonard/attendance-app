@@ -62,6 +62,7 @@ export interface CreateStudentDto {
 
 export interface UpdateStudentDto {
   id: number;
+  status?: Status;
   classId?: number;
   name?: string;
   dob?: Date;
@@ -98,14 +99,6 @@ export interface FilterAttendanceDto {
   sort?: SortDto;
 }
 
-export interface CreateAttendanceDto {
-  studentId: number;
-  sessionId: number;
-  isAttend: boolean;
-  noteAttendance?: string;
-  learningDate: Date;
-}
-
 export interface UpdateAttendanceItemDto {
   studentId: number;
   sessionId: number;
@@ -114,10 +107,14 @@ export interface UpdateAttendanceItemDto {
   noteAttendance?: string;
 }
 
+export interface ChangedAttendanceItemDto {
+  attendanceId: number; // For existing attendance records
+  isAttend: boolean;
+  noteAttendance: string;
+}
+
 export interface UpdateBatchAttendanceDto {
-  classId: number;
-  learningDate: Date;
-  attendances: UpdateAttendanceItemDto[];
+  attendances: ChangedAttendanceItemDto[];
 }
 
 export interface FilterChatDto {
@@ -203,7 +200,16 @@ export interface ChangePasswordDto {
   newPassword: string;
 }
 
-export interface FilterNotificationsDto {
+export interface ForgotPasswordDto {
+  email: string;
+}
+
+export interface ResetPasswordDto {
+  token: string;
+  newPassword: string;
+}
+
+export interface FilterNotificationDto {
   page?: number;
   limit?: number;
   isRead?: boolean;
@@ -259,4 +265,14 @@ export interface BatchPaymentFilter {
   status?: PaymentStatus;
   learningMonth?: number;
   learningYear?: number;
+}
+
+export interface CreateBatchAttendanceDto {
+  classId: number;
+  sessionId: number;
+  learningDate: Date;
+  // Selection fields for creating new attendance
+  isSelectedAll?: boolean;
+  unselectedStudentIds?: number[];
+  selectedStudentIds?: number[];
 }
