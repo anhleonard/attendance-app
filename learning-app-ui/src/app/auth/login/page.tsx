@@ -306,7 +306,7 @@ const ForgotPasswordModal = () => {
           openAlert({
             isOpen: true,
             title: "ERROR",
-            subtitle: error?.message || "Failed to send password reset email. Please try again.",
+            subtitle: "Failed to send email. Please try again.",
             type: "error",
           }),
         );
@@ -333,7 +333,7 @@ const ForgotPasswordModal = () => {
           helperText={formik.touched.email && formik.errors.email ? String(formik.errors.email) : undefined}
         />
         <div className="flex justify-end">
-          <Button type="submit" className="py-3 px-8" />
+          <Button type="submit" className="py-3 px-8" label="Send" />
         </div>
       </form>
     </div>

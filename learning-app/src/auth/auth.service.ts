@@ -127,11 +127,19 @@ export class AuthService {
 
       // Send email
       const response = await axios.post(
-        `${this.configService.get<string>('N8N_ENDPOINT')}/webhook/send-mail`,
+        // `${this.configService.get<string>('N8N_ENDPOINT')}/webhook/send-mail`,
+        'http://localhost:5678/webhook/send-mail',
         {
           to: email,
           subject: 'Attendance Password Reset',
-          message: `You have requested to reset your password for the Attendance system.\n\nPlease click the link below to reset your password:\n\nReset Link: ${resetLink}\n\nIf you didn't request this password reset, please ignore this email.\n\nBest regards,\nAttendance System Team`,
+          message: `
+            <p>You have requested to reset your password for the Attendance system.</p>
+            <p>Please click the link below to reset your password:</p>
+            <p>Reset Link: <a href="${resetLink}">Reset Password</a></p>
+            <p>If you didn't request this password reset, please ignore this email.</p>
+            <p>Best regards,<br>
+            Attendance System Team</p>
+          `
         },
       );
 

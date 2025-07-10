@@ -4,6 +4,7 @@ import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as cookieParser from 'cookie-parser';
 import { LoggingInterceptor } from './interceptors/logging.interceptor';
+import { PrismaExceptionInterceptor } from './interceptors/prisma-exception.interceptor';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
@@ -11,7 +12,7 @@ async function bootstrap() {
   });
 
   app.enableCors({
-    origin: ['http://localhost:3015', 'https://your-production-domain.com'],
+    origin: ['http://localhost:3015', 'http://127.0.0.1:3015', 'https://your-production-domain.com'],
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
@@ -25,8 +26,9 @@ async function bootstrap() {
     }),
   );
 
-  // Global logging interceptor
+  // Global interceptors
   app.useGlobalInterceptors(new LoggingInterceptor());
+  app.useGlobalInterceptors(new PrismaExceptionInterceptor());
 
   const configService = app.get(ConfigService);
   await app.listen(configService.get('PORT') || 3000);

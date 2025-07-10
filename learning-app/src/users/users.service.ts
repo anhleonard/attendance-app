@@ -42,7 +42,13 @@ export class UsersService {
           await axios.post('http://localhost:5678/webhook/send-mail', {
             to: createUserDto.email,
             subject: 'Attendance Authentication',
-            message: `Your account has been created successfully.\n\nYour login credentials are:\nEmail: ${createUserDto.email}\nPassword: ${finalPassword}\n\nPlease change your password after first login.`,
+            message: `
+              <p>Your account has been created successfully.</p>
+              <p>Your login credentials are:</p>
+              <p><strong>Email:</strong> ${createUserDto.email}<br>
+              <strong>Password:</strong> ${finalPassword}</p>
+              <p>Please change your password after first login.</p>
+            `,
           });
         } catch (emailError) {
           throw new BadRequestException(
