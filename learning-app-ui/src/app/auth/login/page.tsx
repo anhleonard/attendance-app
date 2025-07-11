@@ -5,7 +5,7 @@ import TextField from "@/lib/textfield";
 import { closeModal, openModal } from "@/redux/slices/modal-slice";
 import Image from "next/image";
 import Link from "next/link";
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { useDispatch } from "react-redux";
 import { useRouter } from "next/navigation";
 import { useFormik } from "formik";
@@ -35,7 +35,6 @@ const forgotPasswordValidationSchema = Yup.object({
 const LoginPage = () => {
   const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
   const dispatch = useDispatch();
 
   // Clear auth data when component mounts
@@ -93,7 +92,7 @@ const LoginPage = () => {
           });
           let activeClasses = responseClasses?.data || [];
           // get active students
-          let responseStudents = await getStudents({
+          const responseStudents = await getStudents({
             fetchAll: true,
             status: Status.ACTIVE,
           });
@@ -159,15 +158,6 @@ const LoginPage = () => {
             }),
           );
         }
-      } catch (error: any) {
-        dispatch(
-          openAlert({
-            isOpen: true,
-            title: "ERROR",
-            subtitle: error?.message || "Something went wrong. Please try again.",
-            type: "error",
-          }),
-        );
       } finally {
         dispatch(closeLoading());
       }
@@ -258,14 +248,13 @@ const LoginPage = () => {
               <div className="w-full">
                 <Button
                   type="submit"
-                  label={isLoading ? "Logging in..." : "Login"}
+                  label={"Login"}
                   className="py-3 w-full"
-                  disabled={isLoading}
                 />
               </div>
             </form>
             <div className="text-grey-c400 text-sm">
-              Don't have an account?{" "}
+              Don&apos;t have an account?{" "}
               <Link href="/auth/register" className="text-primary-c900 underline">
                 Register
               </Link>
@@ -299,15 +288,6 @@ const ForgotPasswordModal = () => {
             title: "SUCCESS",
             subtitle: "Password reset email has been sent to your email address.",
             type: "success",
-          }),
-        );
-      } catch (error: any) {
-        dispatch(
-          openAlert({
-            isOpen: true,
-            title: "ERROR",
-            subtitle: "Failed to send email. Please try again.",
-            type: "error",
           }),
         );
       } finally {

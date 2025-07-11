@@ -52,11 +52,6 @@ const NewAttendance: React.FC<NewAttendanceProps> = ({
   const [selectedStudentIds, setSelectedStudentIds] = useState<number[]>([]);
   const [isSelectedAll, setIsSelectedAll] = useState(false);
 
-  // Store original server data for comparison
-  const [originalServerData, setOriginalServerData] = useState<{
-    [key: number]: { isAttend: boolean; noteAttendance: string };
-  }>({});
-
   const fetchStudentsData = async () => {
     if (!date) return;
 
@@ -85,21 +80,7 @@ const NewAttendance: React.FC<NewAttendanceProps> = ({
           ...response,
           data: updatedStudents,
         });
-
-        // Initialize states for new page
-        const newOriginalServerData: { [key: number]: { isAttend: boolean; noteAttendance: string } } = {};
-
-        response.data.forEach((student: Student) => {
-          newOriginalServerData[student.id] = {
-            isAttend: false, // Default for new attendance
-            noteAttendance: "",
-          };
-        });
-
-        setOriginalServerData((prev) => ({ ...prev, ...newOriginalServerData }));
       }
-    } catch (error) {
-      dispatch(openAlert({ isOpen: true, title: "ERROR", subtitle: "Error fetching students data", type: "error" }));
     } finally {
       setIsLoading(false);
     }
@@ -107,8 +88,9 @@ const NewAttendance: React.FC<NewAttendanceProps> = ({
 
   useEffect(() => {
     fetchStudentsData();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [classId, date, page, rowsPerPage]);
-
+  
   // Separate effect to update student data when selection state changes
   useEffect(() => {
     if (studentsData.data.length > 0) {
@@ -127,6 +109,7 @@ const NewAttendance: React.FC<NewAttendanceProps> = ({
         data: updatedStudents,
       });
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isSelectedAll, selectedStudentIds, unselectedStudentIds]);
 
   const handleSelectAll = (checked: boolean) => {
@@ -269,15 +252,6 @@ const NewAttendance: React.FC<NewAttendanceProps> = ({
       onUpdateStatistics(statistics);
 
       onSaveSuccess();
-    } catch (error: any) {
-      dispatch(
-        openAlert({
-          isOpen: true,
-          title: "ERROR",
-          subtitle: error.message || "Failed to create attendance",
-          type: "error",
-        }),
-      );
     } finally {
       dispatch(closeLoading());
     }

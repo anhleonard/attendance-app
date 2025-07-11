@@ -36,12 +36,12 @@ const ProfileSetting = () => {
           fullname: profile?.fullname || "",
           email: profile?.email || "",
         });
-      } catch (error: any) {
+      } catch {
         dispatch(
           openAlert({
             isOpen: true,
             title: "ERROR",
-            subtitle: error?.message || "Failed to fetch user info",
+            subtitle: "Failed to fetch user info",
             type: "error",
           }),
         );
@@ -49,6 +49,7 @@ const ProfileSetting = () => {
     };
 
     fetchUserInfo();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const formik = useFormik<ProfileFormValues>({
@@ -104,15 +105,6 @@ const ProfileSetting = () => {
             title: "SUCCESS",
             subtitle: "Profile updated successfully!",
             type: "success",
-          }),
-        );
-      } catch (error: any) {
-        dispatch(
-          openAlert({
-            isOpen: true,
-            title: "ERROR",
-            subtitle: error?.message || "Failed to update profile",
-            type: "error",
           }),
         );
       } finally {
@@ -187,6 +179,7 @@ const ProfileSetting = () => {
             className="w-24 h-24 rounded-full flex items-center justify-center bg-white text-primary-c700 border-[1.5px] border-primary-c200 text-xl lg:text-2xl font-semibold"
             id="preview-avatar-container"
           >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={typeof avatar === "string" ? avatar || "/default-avatar.png" : URL.createObjectURL(avatar)}
               alt="Profile"

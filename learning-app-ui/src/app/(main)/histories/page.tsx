@@ -1,21 +1,20 @@
 "use client";
 import DetailHistoryModal from "@/components/history/detail-history";
-import { ConfirmState, ModalState } from "@/config/types";
+import { ModalState } from "@/config/types";
 import Label from "@/lib/label";
 import Pagination from "@/lib/pagination";
 import Select from "@/lib/select";
 import Button from "@/lib/button";
 import TextField from "@/lib/textfield";
-import { openConfirm } from "@/redux/slices/confirm-slice";
 import { openModal } from "@/redux/slices/modal-slice";
 import { openLoading, closeLoading } from "@/redux/slices/loading-slice";
-import { openAlert } from "@/redux/slices/alert-slice";
 import { getHistories } from "@/apis/services/histories";
 import Image from "next/image";
 import React, { useState, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { Tooltip } from "react-tooltip";
 import { RootState } from "@/redux/store";
+import { OptionState } from "@/config/types";
 
 interface HistoryResponse {
   total: number;
@@ -50,7 +49,7 @@ const Histories = () => {
   const [historiesData, setHistoriesData] = useState<HistoryResponse>({ total: 0, data: [] });
   const [selectedStudent, setSelectedStudent] = useState<string>("");
   const [selectedClass, setSelectedClass] = useState<number | null>(null);
-  const activeClasses: any = useSelector((state: RootState) => state.system.activeClasses) || [];
+  const activeClasses: OptionState[] = useSelector((state: RootState) => state.system.activeClasses) || [];
 
   const fetchHistories = async (currentPage: number, currentRowsPerPage: number) => {
     try {
@@ -63,15 +62,6 @@ const Histories = () => {
       };
       const response = await getHistories(filterData);
       setHistoriesData(response);
-    } catch (err: any) {
-      dispatch(
-        openAlert({
-          isOpen: true,
-          title: "ERROR",
-          subtitle: err?.message || "Failed to fetch histories",
-          type: "error",
-        }),
-      );
     } finally {
       dispatch(closeLoading());
     }
@@ -79,6 +69,7 @@ const Histories = () => {
 
   useEffect(() => {
     fetchHistories(page, rowsPerPage);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, rowsPerPage]);
 
   const handlePageChange = (newPage: number, newRowsPerPage: number) => {
@@ -122,21 +113,6 @@ const Histories = () => {
     };
 
     dispatch(openModal(modal));
-  };
-
-  const handleOpenConfirmDelete = (historyId: number) => {
-    const confirm: ConfirmState = {
-      isOpen: true,
-      title: "Are you sure?",
-      subtitle: "This action cannot be undone. All values associated in this student will be lost.",
-      titleAction: "Delete",
-      handleAction: () => {
-        // TODO: Implement delete history
-        console.log("Delete history:", historyId);
-      },
-    };
-
-    dispatch(openConfirm(confirm));
   };
 
   return (

@@ -66,15 +66,6 @@ const RegisterPage = () => {
             type: "success",
           }),
         );
-      } catch (error: any) {
-        dispatch(
-          openAlert({
-            isOpen: true,
-            title: "ERROR",
-            subtitle: "Something went wrong. Please try again.",
-            type: "error",
-          }),
-        );
       } finally {
         dispatch(closeLoading());
       }

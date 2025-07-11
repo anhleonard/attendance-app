@@ -65,15 +65,6 @@ const ResetPasswordPage = () => {
             type: "success",
           }),
         );
-      } catch (error: any) {
-        dispatch(
-          openAlert({
-            isOpen: true,
-            title: "ERROR",
-            subtitle: error?.message || "Failed to reset password. Please try again.",
-            type: "error",
-          }),
-        );
       } finally {
         dispatch(closeLoading());
       }

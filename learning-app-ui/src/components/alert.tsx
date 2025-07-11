@@ -49,6 +49,7 @@ export function Alert() {
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
 
   const config = type ? alertConfig[type] : alertConfig.success;

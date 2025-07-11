@@ -13,6 +13,7 @@ import { openAlert } from "@/redux/slices/alert-slice";
 import { closeLoading, openLoading } from "@/redux/slices/loading-slice";
 import { refetch } from "@/redux/slices/refetch-slice";
 import { closeModal } from "@/redux/slices/modal-slice";
+import { OptionState } from "@/config/types";
 
 interface ImportFileFormValues {
   selectedClass: string;
@@ -27,7 +28,7 @@ const validationSchema = Yup.object().shape({
 const ImportFileModal = () => {
   const dispatch = useDispatch();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const activeClasses: any = useSelector((state: RootState) => state.system.activeClasses) || [];
+  const activeClasses: OptionState[] = useSelector((state: RootState) => state.system.activeClasses) || [];
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     accept: {
@@ -63,15 +64,6 @@ const ImportFileModal = () => {
           }),
         );
         dispatch(refetch());
-      } catch (error: any) {
-        dispatch(
-          openAlert({
-            isOpen: true,
-            title: "ERROR",
-            subtitle: error?.message || "Failed to process file",
-            type: "error",
-          }),
-        );
       } finally {
         dispatch(closeLoading());
         dispatch(closeModal());
@@ -93,7 +85,7 @@ const ImportFileModal = () => {
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-    } catch (error) {
+    } catch {
       dispatch(
         openAlert({
           isOpen: true,

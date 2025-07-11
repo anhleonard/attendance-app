@@ -13,6 +13,7 @@ import * as Yup from "yup";
 import { closeLoading, openLoading } from "@/redux/slices/loading-slice";
 import { createNotification } from "@/apis/services/notifications";
 import { openAlert } from "@/redux/slices/alert-slice";
+import { closeModal } from "@/redux/slices/modal-slice";
 
 const getAvailableSystemUsers = (systemUsers: OptionState[], profile: User | null) => {
   if (!profile) return [];
@@ -88,23 +89,15 @@ const MakeRequestModal = () => {
           type: "success",
         }),
       );
-    } catch (error: any) {
-      dispatch(
-        openAlert({
-          isOpen: true,
-          title: "ERROR",
-          subtitle: error?.message || "Failed to create notification",
-          type: "error",
-        }),
-      );
     } finally {
       dispatch(closeLoading());
+      dispatch(closeModal());
     }
   };
 
   return (
     <Formik initialValues={initialValues} validationSchema={validationSchema} onSubmit={handleSubmit}>
-      {({ values, errors, touched, handleChange, handleBlur, isSubmitting }) => (
+      {({ values, errors, touched, handleChange, handleBlur, setFieldValue }) => (
         <Form className="text-grey-c900 flex flex-col gap-5 px-2 py-3">
           <TextField
             label="Title"
@@ -118,7 +111,7 @@ const MakeRequestModal = () => {
           <TextArea
             label="Message"
             value={values.message}
-            onChange={(value) => handleChange("message")({ target: { value } } as any)}
+            onChange={(value) => setFieldValue("message", value)}
             onBlur={() => handleBlur("message")}
             error={!!(touched.message && errors.message)}
             helperText={touched.message && errors.message ? String(errors.message) : undefined}
@@ -126,7 +119,7 @@ const MakeRequestModal = () => {
           <Select
             label={`${profile?.role === "ADMIN" ? "Assign to" : "Request to"}`}
             defaultValue={values.receiverId}
-            onChange={(value) => handleChange("receiverId")({ target: { value } } as any)}
+            onChange={(value) => setFieldValue("receiverId", value)}
             error={!!(touched.receiverId && errors.receiverId)}
             helperText={touched.receiverId && errors.receiverId ? String(errors.receiverId) : undefined}
             options={getAvailableSystemUsers(systemUsers || [], profile || null)}

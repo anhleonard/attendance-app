@@ -1,6 +1,6 @@
 "use client";
 import Image from "next/image";
-import React, { useState, useRef, useEffect, useCallback } from "react";
+import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import TextArea, { TextAreaRef } from "@/lib/textarea";
 import { useRouter } from "next/navigation";
@@ -12,7 +12,7 @@ import { ACCESS_TOKEN } from "@/config/constants";
 import { openAlert } from "@/redux/slices/alert-slice";
 import { openLoading, closeLoading } from "@/redux/slices/loading-slice";
 import { openConfirm } from "@/redux/slices/confirm-slice";
-import { ConfirmState } from "@/config/types";
+import { ConfirmState, ChatMessagePayload } from "@/config/types";
 import { getChats, updateChat } from "@/apis/services/chats";
 import { FilterChatDto, FilterMessageDto, UpdateChatDto, UpdateMessageDto } from "@/apis/dto";
 import { getMessages, updateMessage } from "@/apis/services/messages";
@@ -47,6 +47,14 @@ interface MessageResponse {
     limit: number;
     totalPages: number;
   };
+}
+
+interface ChatItem {
+  id: number;
+  title: string;
+  createdAt: string;
+  updatedAt: string;
+  userId: number;
 }
 
 interface Message {
@@ -315,12 +323,12 @@ const ChatMessages = React.memo(
             type: "success",
           }),
         );
-      } catch (error: any) {
+      } catch (error) {
         dispatch(
           openAlert({
             isOpen: true,
             title: "ERROR",
-            subtitle: error.message || "Failed to save prompt. Please try again.",
+            subtitle: error instanceof Error ? error.message : "Failed to save prompt. Please try again.",
             type: "error",
           }),
         );
@@ -409,8 +417,9 @@ const Assistant = () => {
   );
 
   // Create debounced update function
-  const debouncedSetInputMessage = useCallback(
-    debounce((value: string) => {
+  const debouncedSetInputMessage = useMemo(
+    () => debounce((value: string) => {
+      console.log("⏰ Debounced value (after 500ms):", value);
       setDebouncedInputMessage(value);
     }, 500),
     [],
@@ -439,20 +448,20 @@ const Assistant = () => {
 
         const response = await getChats(filterData);
         const chatItems = response.items || response.data || [];
-        const chats: ChatHistory[] = chatItems.map((chat: any) => ({
-          id: chat.id,
+        const chats: ChatHistory[] = chatItems.map((chat: ChatItem) => ({
+          id: chat.id.toString(),
           title: chat.title,
           timestamp: new Date(chat.createdAt),
-          isActive: chat.id === currentChatId,
+          isActive: chat.id.toString() === currentChatId,
         }));
 
         setUpdatedChatHistory(chats);
-      } catch (error: any) {
+      } catch {
         dispatch(
           openAlert({
             isOpen: true,
             title: "ERROR",
-            subtitle: error.message || "Failed to fetch chats. Please try again.",
+            subtitle: "Failed to fetch chats. Please try again.",
             type: "error",
           }),
         );
@@ -460,6 +469,7 @@ const Assistant = () => {
     };
 
     fetchChats();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dispatch]);
 
   // Update chat history with active state
@@ -484,12 +494,12 @@ const Assistant = () => {
 
       // Update local state after successful API call
       setUpdatedChatHistory((prev) => prev.map((chat) => (chat.id === chatId ? { ...chat, title: newTitle } : chat)));
-    } catch (error: any) {
+    } catch {
       dispatch(
         openAlert({
           isOpen: true,
           title: "ERROR",
-          subtitle: error.message || "Failed to update chat title. Please try again.",
+          subtitle: "Failed to update chat title. Please try again.",
           type: "error",
         }),
       );
@@ -524,12 +534,12 @@ const Assistant = () => {
       if (chatId === currentChatId) {
         router.push("/assistant");
       }
-    } catch (error: any) {
+    } catch {
       dispatch(
         openAlert({
           isOpen: true,
           title: "ERROR",
-          subtitle: error.message || "Failed to delete chat. Please try again.",
+          subtitle: "Failed to delete chat. Please try again.",
           type: "error",
         }),
       );
@@ -624,16 +634,6 @@ const Assistant = () => {
 
         setMessages(messages);
         setShouldScroll(updateSource === "newChat");
-      } catch (error: any) {
-        console.error("Error fetching messages:", error);
-        dispatch(
-          openAlert({
-            isOpen: true,
-            title: "ERROR",
-            subtitle: error.message || "Failed to fetch messages. Please try again.",
-            type: "error",
-          }),
-        );
       } finally {
         setIsLoading(false);
       }
@@ -646,10 +646,12 @@ const Assistant = () => {
     if (updateSource === "newChat" || updateSource === "initial" || updateSource.startsWith("savedPrompt-")) {
       fetchMessages();
     }
-  }, [currentChatId, dispatch, updateSource]);
+  }, [currentChatId, updateSource]);
 
   const handleSendMessage = async () => {
     const currentValue = inputRef.current?.getValue() || "";
+    console.log("🚀 Sending message to server:", currentValue);
+    console.log("📊 Debounced input state:", debouncedInputMessage);
     if (!currentValue.trim()) return;
 
     // Clear welcome state when user sends first message
@@ -680,14 +682,11 @@ const Assistant = () => {
         throw new Error("No authentication token found");
       }
 
-      const payload: any = {
+      const payload: ChatMessagePayload = {
         message: messageToSend,
         temp_message_id: tempUserMessageId,
+        ...(currentChatId && { chat_id: Number(currentChatId) }),
       };
-
-      if (currentChatId) {
-        payload.chat_id = Number(currentChatId);
-      }
 
       const response = await fetch("http://localhost:8000/chat", {
         method: "POST",
@@ -738,7 +737,7 @@ const Assistant = () => {
       const chatResponse = await getChats(filterData);
       const chatItems = chatResponse.items || chatResponse.data || [];
       const fallbackActiveId = (data.chatId || currentChatId || chatItems[0]?.id)?.toString();
-      const chats: ChatHistory[] = chatItems.map((chat: any) => ({
+      const chats: ChatHistory[] = chatItems.map((chat: ChatItem) => ({
         id: chat.id.toString(),
         title: chat.title,
         timestamp: new Date(chat.createdAt),
@@ -746,12 +745,12 @@ const Assistant = () => {
       }));
 
       setUpdatedChatHistory(chats);
-    } catch (error: any) {
+    } catch {
       // Add error message to UI with a temporary ID
       const tempErrorMessageId = `temp_error_${Date.now()}`;
       const errorMessage: Message = {
         id: tempErrorMessageId,
-        content: error.message || "Failed to send message. Please try again.",
+        content: "Failed to send message. Please try again.",
         isUser: false,
         timestamp: new Date(),
       };
@@ -762,7 +761,7 @@ const Assistant = () => {
         openAlert({
           isOpen: true,
           title: "ERROR",
-          subtitle: error.message || "Failed to send message. Please try again.",
+          subtitle: "Failed to send message. Please try again.",
           type: "error",
         }),
       );

@@ -90,15 +90,6 @@ const AddUser = () => {
             type: "success",
           }),
         );
-      } catch (error: any) {
-        dispatch(
-          openAlert({
-            isOpen: true,
-            title: "ERROR",
-            subtitle: error?.message || "Failed to create user",
-            type: "error",
-          }),
-        );
       } finally {
         dispatch(closeLoading());
       }

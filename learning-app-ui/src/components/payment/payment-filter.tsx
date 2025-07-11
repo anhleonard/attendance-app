@@ -6,7 +6,7 @@ import Select from "@/lib/select";
 import { PaymentStatus } from "@/config/enums";
 import { RootState } from "@/redux/store";
 import { useSelector } from "react-redux";
-import moment from "moment";
+import { OptionState } from "@/config/types";
 
 interface PaymentFilterProps {
   selectedStudent: string;
@@ -35,7 +35,7 @@ const PaymentFilter = ({
   onResetFilter,
   onFilterChange,
 }: PaymentFilterProps) => {
-  const activeClasses: any = useSelector((state: RootState) => state.system.activeClasses) || [];
+  const activeClasses: OptionState[] = useSelector((state: RootState) => state.system.activeClasses) || [];
 
   const paymentStatusOptions = [
     { value: PaymentStatus.SAVED, label: "SAVED" },

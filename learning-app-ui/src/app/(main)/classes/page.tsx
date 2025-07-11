@@ -22,6 +22,7 @@ import moment from "moment";
 import { UpdateClassDto } from "@/apis/dto";
 import { RootState } from "@/redux/store";
 import { refetch } from "@/redux/slices/refetch-slice";
+import { updateSystemInfo } from "@/redux/slices/system-slice";
 import TextField from "@/lib/textfield";
 import { EmptyRow } from "@/lib/empty-row";
 
@@ -38,6 +39,7 @@ const Classes = () => {
   const [filterName, setFilterName] = useState("");
   const [filterStatus, setFilterStatus] = useState<Status | undefined>(undefined);
   const refetchCount = useSelector((state: RootState) => state.refetch.count);
+  const activeClasses = useSelector((state: RootState) => state.system.activeClasses);
 
   const fetchClasses = async (currentPage: number, currentRowsPerPage: number) => {
     try {
@@ -49,15 +51,6 @@ const Classes = () => {
         status: filterStatus,
       });
       setClassesData(response);
-    } catch (err: any) {
-      dispatch(
-        openAlert({
-          isOpen: true,
-          title: "ERROR",
-          subtitle: err?.message || "Failed to get classes",
-          type: "error",
-        }),
-      );
     } finally {
       dispatch(closeLoading());
     }
@@ -65,6 +58,7 @@ const Classes = () => {
 
   useEffect(() => {
     fetchClasses(page, rowsPerPage);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, rowsPerPage, refetchCount]);
 
   const handleFilter = () => {
@@ -72,38 +66,28 @@ const Classes = () => {
     fetchClasses(1, rowsPerPage);
   };
 
-  const handleResetFilter = () => {
+  const handleResetFilter = async () => {
     // Reset states first
     setFilterName("");
     setFilterStatus(undefined);
     setPage(1);
 
     // Call API with empty filters
-    dispatch(openLoading());
-    getClasses({
-      page: 1,
-      rowPerPage: rowsPerPage,
-      name: "",
-      status: undefined,
-    })
-      .then((response) => {
-        if (response) {
-          setClassesData(response);
-        }
-      })
-      .catch((err: any) => {
-        dispatch(
-          openAlert({
-            isOpen: true,
-            title: "ERROR",
-            subtitle: err?.message || "Failed to reset classes list",
-            type: "error",
-          }),
-        );
-      })
-      .finally(() => {
-        dispatch(closeLoading());
+    try {
+      dispatch(openLoading());
+      const response = await getClasses({
+        page: 1,
+        rowPerPage: rowsPerPage,
+        name: "",
+        status: undefined,
       });
+      
+      if (response) {
+        setClassesData(response);
+      }
+    } finally {
+      dispatch(closeLoading());
+    }
   };
 
   const handleNameChange = (value: string | React.ChangeEvent<HTMLInputElement>) => {
@@ -173,21 +157,26 @@ const Classes = () => {
           };
 
           await updateClass(classData);
+          
+          // Remove disabled class from Redux state
+          if (classItem?.status === Status.ACTIVE) {
+            const updatedActiveClasses = activeClasses?.filter(
+              (cls) => cls.value !== classItem.id.toString()
+            ) || [];
+            
+            dispatch(
+              updateSystemInfo({
+                activeClasses: updatedActiveClasses,
+              })
+            );
+          }
+          
           dispatch(
             openAlert({
               isOpen: true,
               title: "SUCCESS",
               subtitle: `Class ${classItem?.status === Status.ACTIVE ? "disabled" : "enabled"} successfully!`,
               type: "success",
-            }),
-          );
-        } catch (error: any) {
-          dispatch(
-            openAlert({
-              isOpen: true,
-              title: "ERROR",
-              subtitle: error?.message || "Failed to update class",
-              type: "error",
             }),
           );
         } finally {

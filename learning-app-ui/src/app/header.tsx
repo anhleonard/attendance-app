@@ -107,7 +107,6 @@ const Header = () => {
         });
         dispatch(updateSystemInfo({ notifications: { data: updatedNotifications || [], page, total } }));
       }
-    } catch (error) {
     } finally {
       setIsNotificationOpen(false);
       dispatch(

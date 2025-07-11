@@ -1,10 +1,8 @@
 import React from "react";
 import Button from "@/lib/button";
 import Select from "@/lib/select";
-import { PaymentStatus } from "@/config/enums";
 
 interface BatchUpdateBarProps {
-  count: number;
   onStatusChange: (
     status: string,
     selectionData: {
@@ -22,7 +20,6 @@ interface BatchUpdateBarProps {
 }
 
 export function BatchUpdateBar({
-  count,
   onStatusChange,
   onCancel,
   loading,

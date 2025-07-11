@@ -48,15 +48,6 @@ const Users = () => {
       if (response) {
         setUsersData(response);
       }
-    } catch (err: any) {
-      dispatch(
-        openAlert({
-          isOpen: true,
-          title: "ERROR",
-          subtitle: err?.message || "Failed to fetch users",
-          type: "error",
-        }),
-      );
     } finally {
       dispatch(closeLoading());
     }
@@ -64,6 +55,7 @@ const Users = () => {
 
   useEffect(() => {
     fetchUsers(page, rowsPerPage);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, rowsPerPage, refetchCount]);
 
   const handleFilter = () => {
@@ -71,7 +63,7 @@ const Users = () => {
     fetchUsers(1, rowsPerPage);
   };
 
-  const handleResetFilter = () => {
+  const handleResetFilter = async () => {
     // Reset states and fetch in one go
     const filterDto: FilterUsersDto = {
       page: 1,
@@ -83,26 +75,16 @@ const Users = () => {
     setPage(1);
 
     // Fetch with empty filters directly
-    dispatch(openLoading());
-    getSystemUsers(filterDto)
-      .then((response) => {
-        if (response) {
-          setUsersData(response);
-        }
-      })
-      .catch((err: any) => {
-        dispatch(
-          openAlert({
-            isOpen: true,
-            title: "ERROR",
-            subtitle: err?.message || "Failed to reset users list",
-            type: "error",
-          }),
-        );
-      })
-      .finally(() => {
-        dispatch(closeLoading());
-      });
+    try {
+      dispatch(openLoading());
+      const response = await getSystemUsers(filterDto);
+      
+      if (response) {
+        setUsersData(response);
+      }
+    } finally {
+      dispatch(closeLoading());
+    }
   };
 
   const handleNameChange = (value: string | React.ChangeEvent<HTMLInputElement>) => {
@@ -166,15 +148,6 @@ const Users = () => {
               title: "SUCCESS",
               subtitle: `User ${user.locked ? "enabled" : "disabled"} successfully!`,
               type: "success",
-            }),
-          );
-        } catch (error: any) {
-          dispatch(
-            openAlert({
-              isOpen: true,
-              title: "ERROR",
-              subtitle: error?.message || "Failed to update user status",
-              type: "error",
             }),
           );
         } finally {

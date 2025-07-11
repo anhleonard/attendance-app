@@ -100,15 +100,6 @@ const EditUser = ({ userData }: EditUserProps) => {
         );
         dispatch(closeDrawer());
         dispatch(refetch());
-      } catch (error: any) {
-        dispatch(
-          openAlert({
-            isOpen: true,
-            title: "ERROR",
-            subtitle: error?.message || "Failed to update user",
-            type: "error",
-          }),
-        );
       } finally {
         dispatch(closeLoading());
       }
@@ -127,6 +118,7 @@ const EditUser = ({ userData }: EditUserProps) => {
         permissions: initialPermissions,
       });
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userData]);
 
   const handleRoleChange = (value: string) => {

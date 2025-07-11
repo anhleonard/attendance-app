@@ -1,8 +1,8 @@
-import { Socket } from "socket.io-client";
+import { Socket, SocketOptions } from "socket.io-client";
 
 export type WebSocketMessage = {
   type: string;
-  payload: any;
+  payload: unknown;
   timestamp: number;
 };
 
@@ -27,4 +27,18 @@ export type WebSocketEventHandler = (message: WebSocketMessage) => void;
 
 export type WebSocketEventHandlers = {
   [key: string]: WebSocketEventHandler[];
+};
+
+export type WebSocketClientOptions = SocketOptions & {
+  reconnection?: boolean;
+  reconnectionAttempts?: number;
+  reconnectionDelay?: number;
+  reconnectionDelayMax?: number;
+  timeout?: number;
+};
+
+export type WebSocketEventData = {
+  reason?: string;
+  attempt?: number;
+  error?: string;
 };

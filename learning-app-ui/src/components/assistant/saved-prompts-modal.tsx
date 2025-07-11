@@ -2,13 +2,12 @@ import React, { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import { getMessages, updateMessage } from "@/apis/services/messages";
 import { FilterMessageDto } from "@/apis/dto";
-import { useDispatch, useSelector } from "react-redux";
+import { useDispatch } from "react-redux";
 import { openAlert } from "@/redux/slices/alert-slice";
 import { openLoading, closeLoading } from "@/redux/slices/loading-slice";
 import { closeConfirm, openConfirm } from "@/redux/slices/confirm-slice";
-import { Message } from "@/config/types";
+import { ConfirmState, Message } from "@/config/types";
 import Button from "@/lib/button";
-import { RootState } from "@/redux/store";
 import { refetch } from "@/redux/slices/refetch-slice";
 
 interface SavedPrompt {
@@ -24,7 +23,6 @@ const SavedPromptsModal = () => {
   const [hasMore, setHasMore] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const LIMIT = 10;
-  // const count = useSelector((state: RootState) => state.refetch.count);
 
   // Track if initial fetch has been done
   const hasFetchedRef = useRef(false);
@@ -61,15 +59,6 @@ const SavedPromptsModal = () => {
       } else {
         setSavedPrompts(prompts);
       }
-    } catch (error: any) {
-      dispatch(
-        openAlert({
-          isOpen: true,
-          title: "ERROR",
-          subtitle: error.message || "Failed to fetch saved prompts. Please try again.",
-          type: "error",
-        }),
-      );
     } finally {
       if (!isLoadMore) {
         dispatch(closeLoading());
@@ -80,12 +69,13 @@ const SavedPromptsModal = () => {
   };
 
   useEffect(() => {
-    // Chỉ gọi nếu chưa fetch lần nào
+    // Only fetch if not already fetched
     if (!hasFetchedRef.current) {
       hasFetchedRef.current = true;
       fetchSavedPrompts(1);
     }
-  }, []); // Empty dependency array
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleLoadMore = () => {
     const nextPage = page + 1;
@@ -94,7 +84,7 @@ const SavedPromptsModal = () => {
   };
 
   const handleDeletePrompt = async (promptId: string) => {
-    const confirm = {
+    const confirm: ConfirmState = {
       isOpen: true,
       title: "Delete saved prompt",
       subtitle: "Are you sure you want to remove this prompt from saved list?",
@@ -119,15 +109,6 @@ const SavedPromptsModal = () => {
               type: "success",
             }),
           );
-        } catch (error: any) {
-          dispatch(
-            openAlert({
-              isOpen: true,
-              title: "ERROR",
-              subtitle: error.message || "Failed to remove prompt. Please try again.",
-              type: "error",
-            }),
-          );
         } finally {
           dispatch(closeLoading());
           dispatch(closeConfirm());
@@ -148,7 +129,7 @@ const SavedPromptsModal = () => {
           type: "success",
         }),
       );
-    } catch (error: any) {
+    } catch {
       dispatch(
         openAlert({
           isOpen: true,

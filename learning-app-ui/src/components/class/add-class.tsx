@@ -11,7 +11,6 @@ import { useFormik } from "formik";
 import * as Yup from "yup";
 import { createClass } from "@/apis/services/classes";
 import { CreateClassDto, CreateSessionDto } from "@/apis/dto";
-import { useRouter } from "next/navigation";
 import { openAlert } from "@/redux/slices/alert-slice";
 import { useDispatch, useSelector } from "react-redux";
 import { openLoading, closeLoading } from "@/redux/slices/loading-slice";
@@ -128,15 +127,6 @@ const AddClass = () => {
           }),
         );
         dispatch(refetch());
-      } catch (error: any) {
-        dispatch(
-          openAlert({
-            isOpen: true,
-            title: "ERROR",
-            subtitle: error?.message || "Failed to create class",
-            type: "error",
-          }),
-        );
       } finally {
         dispatch(closeLoading());
         dispatch(closeDrawer());

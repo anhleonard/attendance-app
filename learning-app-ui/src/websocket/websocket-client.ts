@@ -1,5 +1,5 @@
 import { io } from "socket.io-client";
-import { WebSocketState } from "./websocket-types";
+import { WebSocketState, WebSocketClientOptions, WebSocketEventData } from "./websocket-types";
 import { websocketEventManager } from "./websocket-handlers";
 
 class WebSocketClient {
@@ -11,9 +11,9 @@ class WebSocketClient {
     socket: null,
   };
   private readonly baseUrl: string;
-  private readonly options: any;
+  private readonly options: WebSocketClientOptions;
 
-  private constructor(baseUrl: string, options: any = {}) {
+  private constructor(baseUrl: string, options: WebSocketClientOptions = {}) {
     this.baseUrl = baseUrl;
     this.options = {
       reconnection: true,
@@ -25,7 +25,7 @@ class WebSocketClient {
     };
   }
 
-  public static getInstance(baseUrl: string, options?: any): WebSocketClient {
+  public static getInstance(baseUrl: string, options?: WebSocketClientOptions): WebSocketClient {
     if (!WebSocketClient.instance) {
       WebSocketClient.instance = new WebSocketClient(baseUrl, options);
     }
@@ -61,41 +61,41 @@ class WebSocketClient {
       });
     });
 
-    this.state.socket.on("disconnect", (reason) => {
+    this.state.socket.on("disconnect", (reason: string) => {
       this.state.isConnected = false;
       websocketEventManager.emit("disconnect", {
         type: "disconnect",
-        payload: { reason },
+        payload: { reason } as WebSocketEventData,
         timestamp: Date.now(),
       });
     });
 
-    this.state.socket.on("connect_error", (error) => {
+    this.state.socket.on("connect_error", (error: Error) => {
       this.handleError(error);
     });
 
-    this.state.socket.on("error", (error) => {
+    this.state.socket.on("error", (error: Error) => {
       this.handleError(error);
     });
 
-    this.state.socket.on("reconnect_attempt", (attemptNumber) => {
+    this.state.socket.on("reconnect_attempt", (attemptNumber: number) => {
       this.state.reconnectAttempts = attemptNumber;
       websocketEventManager.emit("reconnect_attempt", {
         type: "reconnect_attempt",
-        payload: { attempt: attemptNumber },
+        payload: { attempt: attemptNumber } as WebSocketEventData,
         timestamp: Date.now(),
       });
     });
 
-    this.state.socket.on("reconnect", (attemptNumber) => {
+    this.state.socket.on("reconnect", (attemptNumber: number) => {
       websocketEventManager.emit("reconnect", {
         type: "reconnect",
-        payload: { attempt: attemptNumber },
+        payload: { attempt: attemptNumber } as WebSocketEventData,
         timestamp: Date.now(),
       });
     });
 
-    this.state.socket.on("reconnect_error", (error) => {
+    this.state.socket.on("reconnect_error", (error: Error) => {
       this.handleError(error);
     });
 
@@ -117,7 +117,7 @@ class WebSocketClient {
     });
   }
 
-  public emit(event: string, data: any): void {
+  public emit(event: string, data: unknown): void {
     if (!this.state.socket?.connected) {
       throw new Error("Socket.IO is not connected");
     }
@@ -129,7 +129,7 @@ class WebSocketClient {
     }
   }
 
-  public on(event: string, callback: (data: any) => void): void {
+  public on(event: string, callback: (data: unknown) => void): void {
     if (!this.state.socket) {
       throw new Error("Socket.IO is not initialized");
     }
@@ -137,7 +137,7 @@ class WebSocketClient {
     this.state.socket.on(event, callback);
   }
 
-  public off(event: string, callback?: (data: any) => void): void {
+  public off(event: string, callback?: (data: unknown) => void): void {
     if (!this.state.socket) return;
 
     if (callback) {
@@ -167,6 +167,6 @@ class WebSocketClient {
 }
 
 // Export a function to initialize the Socket.IO client
-export const initializeWebSocket = (baseUrl: string, options?: any) => {
+export const initializeWebSocket = (baseUrl: string, options?: WebSocketClientOptions) => {
   return WebSocketClient.getInstance(baseUrl, options);
 };

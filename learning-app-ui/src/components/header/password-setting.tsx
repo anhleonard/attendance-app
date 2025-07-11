@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Formik, Form, Field } from "formik";
+import { Formik, Form, Field, FieldProps } from "formik";
 import * as Yup from "yup";
 import Button from "@/lib/button";
 import TextField from "@/lib/textfield";
@@ -54,15 +54,6 @@ const PasswordSetting = () => {
           type: "success",
         }),
       );
-    } catch (error: any) {
-      dispatch(
-        openAlert({
-          isOpen: true,
-          title: "ERROR",
-          subtitle: error.message || "Something went wrong. Please try again.",
-          type: "error",
-        }),
-      );
     } finally {
       dispatch(closeLoading());
     }
@@ -81,14 +72,14 @@ const PasswordSetting = () => {
       {({ errors, touched }) => (
         <Form className="text-grey-c900 flex flex-col gap-5 px-2 py-3">
           <Field name="currentPassword">
-            {({ field }: any) => (
+            {({ field }: FieldProps) => (
               <TextField
                 {...field}
                 label="Current password"
                 inputType={isCurrentPasswordVisible ? "text" : "password"}
                 placeholder="Enter your current password"
-                error={touched.currentPassword && errors.currentPassword}
-                helperText={touched.currentPassword && errors.currentPassword}
+                error={Boolean(touched.currentPassword && errors.currentPassword)}
+                helperText={touched.currentPassword && errors.currentPassword ? errors.currentPassword : undefined}
                 endIcon={
                   <button
                     type="button"
@@ -107,14 +98,14 @@ const PasswordSetting = () => {
           </Field>
 
           <Field name="newPassword">
-            {({ field }: any) => (
+            {({ field }: FieldProps) => (
               <TextField
                 {...field}
                 label="New password"
                 inputType={isNewPasswordVisible ? "text" : "password"}
                 placeholder="Enter your new password"
-                error={touched.newPassword && errors.newPassword}
-                helperText={touched.newPassword && errors.newPassword}
+                error={Boolean(touched.newPassword && errors.newPassword)}
+                helperText={touched.newPassword && errors.newPassword ? errors.newPassword : undefined}
                 endIcon={
                   <button
                     type="button"
@@ -133,14 +124,14 @@ const PasswordSetting = () => {
           </Field>
 
           <Field name="confirmPassword">
-            {({ field }: any) => (
+            {({ field }: FieldProps) => (
               <TextField
                 {...field}
                 label="Confirm password"
                 inputType={isConfirmPasswordVisible ? "text" : "password"}
                 placeholder="Enter your confirm password"
-                error={touched.confirmPassword && errors.confirmPassword}
-                helperText={touched.confirmPassword && errors.confirmPassword}
+                error={Boolean(touched.confirmPassword && errors.confirmPassword)}
+                helperText={touched.confirmPassword && errors.confirmPassword ? errors.confirmPassword : undefined}
                 endIcon={
                   <button
                     type="button"

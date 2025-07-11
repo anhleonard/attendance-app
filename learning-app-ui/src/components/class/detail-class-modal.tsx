@@ -1,7 +1,6 @@
 import Label from "@/lib/label";
 import Image from "next/image";
 import React from "react";
-import { SessionKey } from "@/config/enums";
 import { Class, Session } from "@/config/types";
 import { getDayBySessionKey } from "@/config/functions";
 import { SESSION_KEYS } from "@/config/constants";

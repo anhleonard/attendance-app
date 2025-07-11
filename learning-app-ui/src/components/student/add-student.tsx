@@ -15,6 +15,7 @@ import { refetch } from "@/redux/slices/refetch-slice";
 import { closeDrawer } from "@/redux/slices/drawer-slice";
 import { RootState } from "@/redux/store";
 import { updateSystemInfo } from "@/redux/slices/system-slice";
+import { OptionState } from "@/config/types";
 
 interface AddStudentFormValues {
   studentName: string;
@@ -66,8 +67,8 @@ const initialValues: AddStudentFormValues = {
 
 const AddStudent = () => {
   const dispatch = useDispatch();
-  const activeClasses: any = useSelector((state: RootState) => state.system.activeClasses) || [];
-  const activeStudents: any = useSelector((state: RootState) => state.system.activeStudents) || [];
+  const activeClasses: OptionState[] = useSelector((state: RootState) => state.system.activeClasses) || [];
+  const activeStudents: OptionState[] = useSelector((state: RootState) => state.system.activeStudents) || [];
 
   const formik = useFormik({
     initialValues,
@@ -113,15 +114,6 @@ const AddStudent = () => {
           }),
         );
         dispatch(refetch());
-      } catch (error: any) {
-        dispatch(
-          openAlert({
-            isOpen: true,
-            title: "ERROR",
-            subtitle: error?.message || "Failed to create student",
-            type: "error",
-          }),
-        );
       } finally {
         dispatch(closeLoading());
         dispatch(closeDrawer());

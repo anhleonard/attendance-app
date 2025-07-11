@@ -13,8 +13,7 @@ import moment from "moment";
 import { generateBill, downloadAllBills } from "@/apis/services/bills";
 import { closeLoading, openLoading } from "@/redux/slices/loading-slice";
 import { useDispatch } from "react-redux";
-import { openAlert } from "@/redux/slices/alert-slice";
-import { PaymentData } from "@/config/types";
+import { PaymentData, OptionState } from "@/config/types";
 import { DownloadAllBillsDto } from "@/apis/dto";
 
 interface PaymentTableProps {
@@ -32,13 +31,12 @@ interface PaymentTableProps {
   onOpenModal: (payment: PaymentData) => void;
   onConfirmBill: (paymentId: number, totalPayment: string, paidAmount: number | null) => void;
   onConfirmSent: (id: number) => void;
-  onDownloadAll: () => void;
   selectedStudent?: string;
   selectedClass?: string;
   selectedStatus?: string;
   selectedMonth?: string;
   currentYear?: string;
-  activeClasses?: any[];
+  activeClasses?: OptionState[];
 }
 
 const PaymentTable = ({
@@ -53,7 +51,6 @@ const PaymentTable = ({
   onOpenModal,
   onConfirmBill,
   onConfirmSent,
-  onDownloadAll,
   selectedStudent = "",
   selectedClass = "",
   selectedStatus = "",
@@ -86,14 +83,6 @@ const PaymentTable = ({
         amountPerSession: `${formatCurrency(payment.totalMonthAmount / payment.totalAttend)} VNĐ`,
         totalAmount: `${formatCurrency(payment.totalPayment)} VNĐ`,
       });
-    } catch (error) {
-      dispatch(openAlert({
-        isOpen: true,
-        title: "ERROR",
-        subtitle: "Error downloading bill",
-        type: "error",
-        }),
-      );
     } finally {
       dispatch(closeLoading());
     }
@@ -111,7 +100,7 @@ const PaymentTable = ({
           name: selectedStudent,
         }),
         ...(selectedClass && {
-          classId: activeClasses.find((cls: any) => cls.name === selectedClass)?.id || parseInt(selectedClass),
+          classId: parseInt(activeClasses.find((cls: OptionState) => cls.label === selectedClass)?.value || selectedClass),
         }),
         ...(selectedStatus && {
           status: selectedStatus as PaymentStatus,
@@ -125,13 +114,6 @@ const PaymentTable = ({
       a.download = `bills-${moment().format("DD-MM-YYYY")}.zip`;
       a.click();
       window.URL.revokeObjectURL(url);
-    } catch (error) {
-      dispatch(openAlert({
-        isOpen: true,
-        title: "ERROR",
-        subtitle: "Error downloading all bills",
-        type: "error",
-      }));
     } finally {
       dispatch(closeLoading());
     }

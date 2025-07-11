@@ -15,7 +15,6 @@ interface Props {
   paymentId: number;
   totalPayment: string;
   paidAmount: number | null;
-  onSubmit?: (values: ConfirmBillFormValues) => void;
 }
 
 interface ConfirmBillFormValues {
@@ -28,7 +27,7 @@ const formatAmount = (amount: number): string => {
   return amount.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 };
 
-const ConfirmBillModal = ({ paymentId, totalPayment, paidAmount, onSubmit }: Props) => {
+const ConfirmBillModal = ({ paymentId, totalPayment, paidAmount }: Props) => {
   const dispatch = useDispatch();
 
   // Calculate payable amount (remaining amount that can be paid)
@@ -86,15 +85,6 @@ const ConfirmBillModal = ({ paymentId, totalPayment, paidAmount, onSubmit }: Pro
           }),
         );
         dispatch(refetch());
-      } catch (error: any) {
-        dispatch(
-          openAlert({
-            isOpen: true,
-            title: "ERROR",
-            subtitle: error?.message || "Failed to process payment",
-            type: "error",
-          }),
-        );
       } finally {
         dispatch(closeLoading());
         dispatch(closeModal());

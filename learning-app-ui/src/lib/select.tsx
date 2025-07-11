@@ -134,7 +134,7 @@ const Select = ({
     if (isOpen) {
       // Initial update
       updateDropdownPosition();
-
+      
       // Track scroll changes
       const handleScroll = () => {
         updateDropdownPosition();
@@ -144,7 +144,7 @@ const Select = ({
       const handleResize = () => {
         updateDropdownPosition();
       };
-
+      
       // Track zoom changes (actually track resize events)
       const handleZoom = () => {
         updateDropdownPosition();
@@ -157,7 +157,7 @@ const Select = ({
       window.addEventListener("orientationchange", handleResize);
 
       // Use MutationObserver to track DOM changes that might affect the position
-      const observer = new MutationObserver((mutations) => {
+      const observer = new MutationObserver(() => {
         updateDropdownPosition();
       });
 
@@ -179,6 +179,7 @@ const Select = ({
         observer.disconnect();
       };
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, position, customPosition, offsetX, offsetY]);
 
   const handleSelect = (value: string) => {

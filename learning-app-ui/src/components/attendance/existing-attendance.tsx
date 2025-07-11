@@ -10,69 +10,14 @@ import { FilterAttendanceDto, UpdateBatchAttendanceDto } from "@/apis/dto";
 import { useDispatch } from "react-redux";
 import { openLoading, closeLoading } from "@/redux/slices/loading-slice";
 import { openAlert } from "@/redux/slices/alert-slice";
-
-interface AttendanceRecord {
-  id: number;
-  isAttend: boolean;
-  noteAttendance: string;
-  learningDate: string;
-  createdAt: string;
-  updatedAt: string;
-  studentId: number;
-  sessionId: number;
-  paymentId: number | null;
-  createdById: number;
-  updatedById: number | null;
-  session: {
-    id: number;
-    sessionKey: string;
-    startTime: string;
-    endTime: string;
-    class: {
-      id: number;
-      name: string;
-    };
-  };
-  student: {
-    id: number;
-    name: string;
-    status: string;
-  };
-}
-
-interface AttendanceStatistic {
-  total: number;
-  attended: number;
-  absent: number;
-}
-
-interface AttendanceResponse {
-  statistic: AttendanceStatistic;
-  total: number;
-  page: number;
-  rowPerPage: number;
-  data: AttendanceRecord[];
-}
-
-interface ChangedItem {
-  id: number;
-  studentId: number;
-  originalData: {
-    isAttend: boolean;
-    noteAttendance: string;
-  };
-  currentData: {
-    isAttend: boolean;
-    noteAttendance: string;
-  };
-}
+import { AttendanceRecord, AttendanceStatistic, AttendanceResponse, ChangedItem } from "@/config/types";
 
 interface ExistingAttendanceProps {
   classId: number;
   date: string;
   onSaveSuccess: () => void;
   onUpdateStatistics: (statistics: AttendanceStatistic) => void;
-  initialAttendanceData?: AttendanceResponse; // Optional initial data to avoid API call
+  initialAttendanceData: AttendanceResponse; // Optional initial data to avoid API call
 }
 
 const ExistingAttendance: React.FC<ExistingAttendanceProps> = ({
@@ -226,8 +171,6 @@ const ExistingAttendance: React.FC<ExistingAttendanceProps> = ({
           },
         }));
       }
-    } catch (error) {
-      dispatch(openAlert({ isOpen: true, title: "ERROR", subtitle: "Error fetching attendance data", type: "error" }));
     } finally {
       setIsLoading(false);
     }
@@ -236,6 +179,7 @@ const ExistingAttendance: React.FC<ExistingAttendanceProps> = ({
   useEffect(() => {
     // Always fetch data when classId, date, page, or rowsPerPage changes
     fetchAttendanceData();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [classId, date, page, rowsPerPage]);
 
   // Handle initial data separately
@@ -350,15 +294,6 @@ const ExistingAttendance: React.FC<ExistingAttendanceProps> = ({
       fetchAttendanceData();
 
       onSaveSuccess();
-    } catch (error: any) {
-      dispatch(
-        openAlert({
-          isOpen: true,
-          title: "ERROR",
-          subtitle: error.message || "Failed to update attendance",
-          type: "error",
-        }),
-      );
     } finally {
       dispatch(closeLoading());
     }

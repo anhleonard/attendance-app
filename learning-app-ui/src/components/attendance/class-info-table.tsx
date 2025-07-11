@@ -1,43 +1,9 @@
 "use client";
 import React from "react";
 import moment from "moment";
-import Image from "next/image";
 import { getDayBySessionKey } from "@/config/functions";
-
-interface Session {
-  id: number;
-  sessionKey: string;
-  startTime: string;
-  endTime: string;
-  amount: number;
-  status: string;
-  validTo: string | null;
-}
-
-interface ClassInfo {
-  id: number;
-  name: string;
-  description: string;
-  sessions: Session[];
-  status: string;
-  statistic?: {
-    total: number;
-    attended: number;
-    absent: number;
-  };
-}
-
-interface AttendanceResponse {
-  statistic: {
-    total: number;
-    attended: number;
-    absent: number;
-  };
-  total: number;
-  page: number;
-  rowPerPage: number;
-  data: any[];
-}
+import { ClassInfo, AttendanceResponse } from "@/config/types";
+import { SessionKey } from "@/config/enums";
 
 interface ClassInfoTableProps {
   classInfo: ClassInfo | null;
@@ -81,7 +47,7 @@ const ClassInfoTable: React.FC<ClassInfoTableProps> = ({
     // Otherwise, find the session for the current day with validTo === null
     const currentDay = moment(date, "DD-MM-YYYY").format("dddd").toUpperCase();
     return classInfo.sessions.find((session) => {
-      const sessionDay = getDayBySessionKey(session.sessionKey as any);
+      const sessionDay = getDayBySessionKey(session.sessionKey as SessionKey);
       return sessionDay === currentDay && session.validTo === null;
     });
   };
@@ -119,7 +85,7 @@ const ClassInfoTable: React.FC<ClassInfoTableProps> = ({
                 <td className="pl-3 py-4 font-medium">{classInfo.name}</td>
                 <td className="px-1 py-4">{moment(date, "DD-MM-YYYY").format("DD/MM/YYYY")}</td>
                 <td className="px-1 py-4">
-                  {currentSession ? getDayBySessionKey(currentSession.sessionKey as any) : "No session"}
+                  {currentSession ? getDayBySessionKey(currentSession.sessionKey as SessionKey) : "No session"}
                 </td>
                 <td className="px-1 py-4">{currentSession ? currentSession.startTime : "-"}</td>
                 <td className="px-1 py-4">{currentSession ? currentSession.endTime : "-"}</td>

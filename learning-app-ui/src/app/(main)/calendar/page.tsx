@@ -7,7 +7,6 @@ import moment from "moment";
 import { getCalendar } from "@/apis/services/classes";
 import { FilterCalendarDto } from "@/apis/dto";
 import { openLoading, closeLoading } from "@/redux/slices/loading-slice";
-import { openAlert } from "@/redux/slices/alert-slice";
 import { useRouter } from "next/navigation";
 
 // Update interfaces to match backend response
@@ -43,15 +42,6 @@ const CalendarPage = () => {
         };
         const response = await getCalendar(filterData);
         setCalendarData(response || {});
-      } catch (error: any) {
-        dispatch(
-          openAlert({
-            isOpen: true,
-            title: "ERROR",
-            subtitle: error?.message || "Failed to fetch calendar data",
-            type: "error",
-          }),
-        );
       } finally {
         dispatch(closeLoading());
       }
@@ -91,6 +81,7 @@ const CalendarPage = () => {
       paddedDays.push(null);
     }
     setCalendarDays(paddedDays);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentDate]);
 
   const handlePreviousMonth = () => {

@@ -3,7 +3,7 @@ import { getStudents, updateStudent } from "@/apis/services/students";
 import { UpdateStudentDto } from "@/apis/dto";
 import AddStudent from "@/components/student/add-student";
 import EditStudent from "@/components/student/edit-student";
-import { ConfirmState, ModalState, Student, StudentClass } from "@/config/types";
+import { ConfirmState, ModalState, Student, StudentClass, OptionState } from "@/config/types";
 import Button from "@/lib/button";
 import Pagination from "@/lib/pagination";
 import Select from "@/lib/select";
@@ -32,11 +32,6 @@ interface StudentsResponse {
   data: Student[];
 }
 
-interface ClassesResponse {
-  total: number;
-  data: StudentClass[];
-}
-
 const Students = () => {
   const dispatch = useDispatch();
   const [studentsData, setStudentsData] = useState<StudentsResponse>({ total: 0, data: [] });
@@ -46,7 +41,7 @@ const Students = () => {
   const [filterStatus, setFilterStatus] = useState<Status | undefined>(undefined);
   const [filterClassId, setFilterClassId] = useState<number | undefined>(undefined);
   const refetchCount = useSelector((state: RootState) => state.refetch.count);
-  const activeClasses: any = useSelector((state: RootState) => state.system.activeClasses) || [];
+  const activeClasses: OptionState[] = useSelector((state: RootState) => state.system.activeClasses) || [];
   const { profile } = useSelector((state: RootState) => state.system);
 
   const fetchStudents = async (currentPage: number, currentRowsPerPage: number) => {
@@ -69,15 +64,6 @@ const Students = () => {
       if (response) {
         setStudentsData(response);
       }
-    } catch (err: any) {
-      dispatch(
-        openAlert({
-          isOpen: true,
-          title: "ERROR",
-          subtitle: err?.message || "Failed to fetch students",
-          type: "error",
-        }),
-      );
     } finally {
       dispatch(closeLoading());
     }
@@ -85,6 +71,7 @@ const Students = () => {
 
   useEffect(() => {
     fetchStudents(page, rowsPerPage);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, rowsPerPage, refetchCount]);
 
   const handleFilter = () => {
@@ -92,7 +79,7 @@ const Students = () => {
     fetchStudents(1, rowsPerPage);
   };
 
-  const handleResetFilter = () => {
+  const handleResetFilter = async () => {
     // Reset states first
     setFilterName("");
     setFilterStatus(undefined);
@@ -101,31 +88,20 @@ const Students = () => {
 
     // Call API with empty filters
     dispatch(openLoading());
-    getStudents({
-      page: 1,
-      rowPerPage: rowsPerPage,
-      name: "",
-      status: undefined,
-      classId: undefined,
-    })
-      .then((response) => {
-        if (response) {
-          setStudentsData(response);
-        }
-      })
-      .catch((err: any) => {
-        dispatch(
-          openAlert({
-            isOpen: true,
-            title: "ERROR",
-            subtitle: err?.message || "Failed to reset students list",
-            type: "error",
-          }),
-        );
-      })
-      .finally(() => {
-        dispatch(closeLoading());
+    try {
+      const response = await getStudents({
+        page: 1,
+        rowPerPage: rowsPerPage,
+        name: "",
+        status: undefined,
+        classId: undefined,
       });
+      if (response) {
+        setStudentsData(response);
+      }
+    } finally {
+      dispatch(closeLoading());
+    }
   };
 
   const handleNameChange = (value: string | React.ChangeEvent<HTMLInputElement>) => {
@@ -205,15 +181,6 @@ const Students = () => {
               title: "SUCCESS",
               subtitle: `Student ${student?.status === Status.ACTIVE ? "disabled" : "enabled"} successfully!`,
               type: "success",
-            }),
-          );
-        } catch (error: any) {
-          dispatch(
-            openAlert({
-              isOpen: true,
-              title: "ERROR",
-              subtitle: error?.message || "Failed to update student",
-              type: "error",
             }),
           );
         } finally {

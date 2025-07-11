@@ -5,12 +5,12 @@ import PaymentFilter from "@/components/payment/payment-filter";
 import PaymentTable from "@/components/payment/payment-table";
 import Image from "next/image";
 import React, { useState, useEffect } from "react";
-import { ConfirmState, ModalState } from "@/config/types";
+import { ConfirmState, ModalState, OptionState } from "@/config/types";
 import { useDispatch, useSelector } from "react-redux";
 import { openModal } from "@/redux/slices/modal-slice";
 import ConfirmBillModal from "@/components/payment/confirm-bill-modal";
 import { getPayments, updatePayment, updateBatchPayments } from "@/apis/services/payment";
-import { FilterPaymentDto } from "@/apis/dto";
+import { FilterPaymentDto, UpdateBatchPaymentsDto } from "@/apis/dto";
 import { openLoading, closeLoading } from "@/redux/slices/loading-slice";
 import { openAlert } from "@/redux/slices/alert-slice";
 import { RootState } from "@/redux/store";
@@ -82,7 +82,7 @@ const Payments = () => {
   const currentYear = moment().format("YYYY");
   const [selectedMonth, setSelectedMonth] = useState<string>(currentMonth);
   const refetchCount = useSelector((state: RootState) => state.refetch.count);
-  const activeClasses: any = useSelector((state: RootState) => state.system.activeClasses) || [];
+  const activeClasses: OptionState[] = useSelector((state: RootState) => state.system.activeClasses) || [];
 
   // Batch selection state
   const [allChecked, setAllChecked] = useState(false);
@@ -101,7 +101,7 @@ const Payments = () => {
           name: selectedStudent,
         }),
         ...(selectedClass && {
-          classId: activeClasses.find((cls: any) => cls.name === selectedClass)?.id || parseInt(selectedClass),
+          classId: parseInt(activeClasses.find((cls: OptionState) => cls.label === selectedClass)?.value || selectedClass),
         }),
         ...(selectedStatus && {
           status: selectedStatus as PaymentStatus,
@@ -111,15 +111,6 @@ const Payments = () => {
       };
       const response = await getPayments(filterData);
       setPaymentsData(response);
-    } catch (err: any) {
-      dispatch(
-        openAlert({
-          isOpen: true,
-          title: "ERROR",
-          subtitle: err?.message || "Failed to fetch payments",
-          type: "error",
-        }),
-      );
     } finally {
       dispatch(closeLoading());
     }
@@ -127,6 +118,7 @@ const Payments = () => {
 
   useEffect(() => {
     fetchPayments(page, rowsPerPage);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, rowsPerPage, refetchCount]);
 
   const handleFilter = () => {
@@ -140,7 +132,7 @@ const Payments = () => {
     fetchPayments(1, rowsPerPage);
   };
 
-  const handleResetFilter = () => {
+  const handleResetFilter = async () => {
     // Reset states first
     setSelectedStudent("");
     setSelectedClass("");
@@ -154,33 +146,22 @@ const Payments = () => {
 
     // Call API with empty filters
     dispatch(openLoading());
-    getPayments({
-      page: 1,
-      rowPerPage: rowsPerPage,
-      name: "",
-      classId: undefined,
-      status: undefined,
-      learningMonth: parseInt(currentMonth),
-      learningYear: parseInt(currentYear),
-    })
-      .then((response) => {
-        if (response) {
-          setPaymentsData(response);
-        }
-      })
-      .catch((err: any) => {
-        dispatch(
-          openAlert({
-            isOpen: true,
-            title: "ERROR",
-            subtitle: err?.message || "Failed to reset payments list",
-            type: "error",
-          }),
-        );
-      })
-      .finally(() => {
-        dispatch(closeLoading());
+    try {
+      const response = await getPayments({
+        page: 1,
+        rowPerPage: rowsPerPage,
+        name: "",
+        classId: undefined,
+        status: undefined,
+        learningMonth: parseInt(currentMonth),
+        learningYear: parseInt(currentYear),
       });
+      if (response) {
+        setPaymentsData(response);
+      }
+    } finally {
+      dispatch(closeLoading());
+    }
   };
 
   const handleFilterChange = () => {
@@ -240,15 +221,6 @@ const Payments = () => {
             }),
           );
           dispatch(refetch());
-        } catch (error: any) {
-          dispatch(
-            openAlert({
-              isOpen: true,
-              title: "ERROR",
-              subtitle: error?.message || "Failed to send payment",
-              type: "error",
-            }),
-          );
         } finally {
           dispatch(closeLoading());
           dispatch(closeConfirm());
@@ -369,11 +341,11 @@ const Payments = () => {
           dispatch(openLoading());
 
           // Use batch update instead of individual updates
-          const batchData: any = {
+          const batchData: UpdateBatchPaymentsDto = {
             status: status as PaymentStatus.SENT | PaymentStatus.DONE,
             filter: {
               name: selectedStudent || undefined,
-              classId: activeClasses.find((cls: any) => cls.name === selectedClass)?.id || undefined,
+              classId: parseInt(activeClasses.find((cls: OptionState) => cls.label === selectedClass)?.value || "0") || undefined,
               status: (selectedStatus as PaymentStatus) || undefined,
               learningMonth: parseInt(selectedMonth) || undefined,
               learningYear: parseInt(currentYear) || undefined,
@@ -405,15 +377,6 @@ const Payments = () => {
           setIsSelectedAll(false);
           setAllChecked(false);
           dispatch(refetch());
-        } catch (error: any) {
-          dispatch(
-            openAlert({
-              isOpen: true,
-              title: "ERROR",
-              subtitle: error?.message || "Failed to update payments",
-              type: "error",
-            }),
-          );
         } finally {
           setBatchLoading(false);
           dispatch(closeLoading());
@@ -459,7 +422,6 @@ const Payments = () => {
           onOpenModal={handleOpenModal}
           onConfirmBill={handleConfirmBill}
           onConfirmSent={handleConfirmSent}
-          onDownloadAll={() => {}}
           selectedStudent={selectedStudent}
           selectedClass={selectedClass}
           selectedStatus={selectedStatus}
@@ -473,7 +435,6 @@ const Payments = () => {
 
       {(isSelectedAll || selectedPaymentIds.length > 0) && (
         <BatchUpdateBar
-          count={isSelectedAll ? paymentsData.data.length - unselectedPaymentIds.length : selectedPaymentIds.length}
           onStatusChange={handleBatchStatusUpdate}
           onCancel={() => {
             setSelectedPaymentIds([]);

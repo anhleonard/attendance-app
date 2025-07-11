@@ -200,3 +200,84 @@ export interface PaymentData {
     absent: number;
   };
 }
+export interface ClassInfo {
+  id: number;
+  name: string;
+  description: string;
+  sessions: Session[];
+  status: string;
+  statistic?: {
+    total: number;
+    attended: number;
+    absent: number;
+  };
+}
+
+export interface AttendanceStatistic {
+  total: number;
+  attended: number;
+  absent: number;
+}
+
+export interface AttendanceResponse {
+  statistic: AttendanceStatistic;
+  total: number;
+  page: number;
+  rowPerPage: number;
+  data: AttendanceRecord[];
+}
+
+export interface DetailSessionForm {
+  day: string;
+  startTime: string;
+  endTime: string;
+  money: string;
+}
+
+export interface AttendanceRecord {
+  id: number;
+  isAttend: boolean;
+  noteAttendance: string;
+  learningDate: string;
+  createdAt: string;
+  updatedAt: string;
+  studentId: number;
+  sessionId: number;
+  paymentId: number | null;
+  createdById: number;
+  updatedById: number | null;
+  session: {
+    id: number;
+    sessionKey: string;
+    startTime: string;
+    endTime: string;
+    class: {
+      id: number;
+      name: string;
+    };
+  };
+  student: {
+    id: number;
+    name: string;
+    status: string;
+  };
+}
+
+export interface ChangedItem {
+  id: number;
+  studentId: number;
+  originalData: {
+    isAttend: boolean;
+    noteAttendance: string;
+  };
+  currentData: {
+    isAttend: boolean;
+    noteAttendance: string;
+  };
+}
+
+export interface ChatMessagePayload {
+  message: string;
+  temp_message_id: string;
+  chat_id?: number;
+}

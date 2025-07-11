@@ -7,25 +7,23 @@ import Image from "next/image";
 import { useSearchParams } from "next/navigation";
 import { useDispatch } from "react-redux";
 
-import Button from "@/lib/button";
-import Checkbox from "@/lib/checkbox";
 import DatePicker from "@/lib/date-picker";
 import Select from "@/lib/select";
 import ExistingAttendance from "@/components/attendance/existing-attendance";
 import NewAttendance from "@/components/attendance/new-attendance";
 import ClassInfoTable from "@/components/attendance/class-info-table";
-import { getDayBySessionKey } from "@/config/functions";
 import { Status } from "@/config/enums";
 import { getClasses } from "@/apis/services/classes";
 import { getAttendances } from "@/apis/services/attendances";
 import { FilterClassDto, FilterAttendanceDto } from "@/apis/dto";
 import { openLoading, closeLoading } from "@/redux/slices/loading-slice";
+import { AttendanceResponse, Session } from "@/config/types";
 
 interface ClassResponse {
   id: number;
   name: string;
   description: string;
-  sessions: any[];
+  sessions: Session[];
   status: Status;
   statistic?: {
     total: number;
@@ -45,7 +43,7 @@ const Attendance: React.FC = () => {
   const [isReady, setIsReady] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [currentClassInfo, setCurrentClassInfo] = useState<ClassResponse | null>(null);
-  const [attendanceData, setAttendanceData] = useState<any>(null);
+  const [attendanceData, setAttendanceData] = useState<AttendanceResponse | null>(null);
   const [selectedSessionId, setSelectedSessionId] = useState<number | null>(null);
 
   const classesFetchedRef = useRef<string>("");
@@ -75,6 +73,7 @@ const Attendance: React.FC = () => {
     if (classesFetchedRef.current === date) return;
 
     fetchClassesForDate(date);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [date, isReady]);
 
   useEffect(() => {
@@ -90,6 +89,7 @@ const Attendance: React.FC = () => {
         }
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedClassId, classesInfo, currentClassInfo, date]);
 
   useEffect(() => {
@@ -112,8 +112,6 @@ const Attendance: React.FC = () => {
       const response = await getClasses(filter);
       setClassesInfo(response?.data || []);
       classesFetchedRef.current = targetDate;
-    } catch (error) {
-      console.error("Error fetching classes:", error);
     } finally {
       dispatch(closeLoading());
     }
@@ -143,8 +141,7 @@ const Attendance: React.FC = () => {
         // Reset attendance data if no attendance exists
         setAttendanceData(null);
       }
-    } catch (e) {
-      console.error("Error in checkAttendanceAndSet:", e);
+    } catch {
       setAttendanceData(null);
     } finally {
       setIsLoading(false);
@@ -243,7 +240,7 @@ const Attendance: React.FC = () => {
                 checkAttendanceAndSet(selectedClassId);
               }}
               onUpdateStatistics={handleUpdateStatistics}
-              initialAttendanceData={attendanceData}
+              initialAttendanceData={attendanceData as AttendanceResponse}
             />
           ) : (
             <NewAttendance

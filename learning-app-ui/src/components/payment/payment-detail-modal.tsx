@@ -3,12 +3,10 @@ import React, { Fragment } from "react";
 import { Dialog, DialogPanel, Transition, TransitionChild } from "@headlessui/react";
 import Image from "next/image";
 import Button from "@/lib/button";
-import Html2CanvasPro from "html2canvas-pro";
 import moment from "moment";
 import { formatCurrency } from "@/config/functions";
 import { closeLoading, openLoading } from "@/redux/slices/loading-slice";
 import { generateBill } from "@/apis/services/bills";
-import { openAlert } from "@/redux/slices/alert-slice";
 import { useDispatch } from "react-redux";
 import { PaymentData } from "@/config/types";
 const DAYS_OF_WEEK = ["Chủ nhật", "Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7"];
@@ -111,14 +109,6 @@ const PaymentDetailModal = ({ show, handleCloseModal, payment }: Props) => {
         amountPerSession: `${formatCurrency(payment.totalMonthAmount / payment.totalAttend)} VNĐ`,
         totalAmount: `${formatCurrency(payment.totalPayment)} VNĐ`,
       });
-    } catch (error) {
-      dispatch(openAlert({
-        isOpen: true,
-        title: "ERROR",
-        subtitle: "Error downloading bill",
-        type: "error",
-        }),
-      );
     } finally {
       dispatch(closeLoading());
     }

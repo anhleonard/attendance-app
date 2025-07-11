@@ -1,4 +1,4 @@
-import { AmountSessions, Days, Times, SESSION_KEYS } from "@/config/constants";
+import { AmountSessions, Days, Times } from "@/config/constants";
 import Button from "@/lib/button";
 import Divider from "@/lib/divider";
 import Label from "@/lib/label";
@@ -11,7 +11,7 @@ import { useFormik } from "formik";
 import * as Yup from "yup";
 import { useDispatch } from "react-redux";
 import { closeLoading, openLoading } from "@/redux/slices/loading-slice";
-import { Class } from "@/config/types";
+import { Class, DetailSessionForm } from "@/config/types";
 import { getDayBySessionKey, getSessionKeyByDay } from "@/config/functions";
 import { CreateSessionDto, UpdateClassDto } from "@/apis/dto";
 import { updateClass } from "@/apis/services/classes";
@@ -27,16 +27,11 @@ interface Props {
   classItem: Class;
 }
 
-interface EditClassFormValues {
+interface FormValues {
   className: string;
   sessionsPerWeek: string;
   aboutClass: string;
-  sessions: {
-    day: string;
-    startTime: string;
-    endTime: string;
-    money: string;
-  }[];
+  sessions: DetailSessionForm[];
 }
 
 const validationSchema = Yup.object().shape({
@@ -74,25 +69,18 @@ const validationSchema = Yup.object().shape({
     }),
 });
 
-const initialSessionValue = {
+const initialSessionValue: DetailSessionForm = {
   day: "",
   startTime: "",
   endTime: "",
   money: "",
 };
 
-const initialValues: EditClassFormValues = {
-  className: "",
-  sessionsPerWeek: "",
-  aboutClass: "",
-  sessions: [initialSessionValue],
-};
-
 const EditClass = ({ classItem }: Props) => {
   const dispatch = useDispatch();
 
   // Sort sessions by day order: Monday to Sunday
-  const sortSessionsByDay = (sessions: any[]): any[] => {
+  const sortSessionsByDay = (sessions: DetailSessionForm[]): DetailSessionForm[] => {
     return [...sessions].sort((a, b) => {
       const aIndex = Days.findIndex((day) => day.value === a.day);
       const bIndex = Days.findIndex((day) => day.value === b.day);
@@ -100,7 +88,7 @@ const EditClass = ({ classItem }: Props) => {
     });
   };
 
-  const formik = useFormik({
+  const formik = useFormik<FormValues>({
     initialValues: {
       className: classItem.name,
       sessionsPerWeek: classItem.sessions.length !== 0 ? classItem.sessions.length.toString() : "",
@@ -141,15 +129,6 @@ const EditClass = ({ classItem }: Props) => {
             type: "success",
           }),
         );
-      } catch (error: any) {
-        dispatch(
-          openAlert({
-            isOpen: true,
-            title: "ERROR",
-            subtitle: error?.message || "Failed to update class",
-            type: "error",
-          }),
-        );
       } finally {
         dispatch(closeLoading());
         dispatch(closeDrawer());
@@ -161,12 +140,8 @@ const EditClass = ({ classItem }: Props) => {
   });
 
   const renderSessionForm = (index: number) => {
-    const sessionErrors = (formik.errors.sessions as any)?.[index] as
-      | { day?: string; startTime?: string; endTime?: string; money?: string }
-      | undefined;
-    const sessionTouched = (formik.touched.sessions as any)?.[index] as
-      | { day?: boolean; startTime?: boolean; endTime?: boolean; money?: boolean }
-      | undefined;
+    const sessionErrors = (formik.errors.sessions as DetailSessionForm[])?.[index];
+    const sessionTouched = (formik.touched.sessions as Record<keyof DetailSessionForm, boolean>[])?.[index];
 
     return (
       <div className="flex flex-col gap-4">

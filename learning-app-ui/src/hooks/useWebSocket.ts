@@ -61,5 +61,6 @@ export const useWebSocket = (userId: number | null | undefined) => {
     return () => {
       wsClient.disconnect();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId]);
 };

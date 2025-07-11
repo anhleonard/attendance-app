@@ -1,4 +1,3 @@
-import moment from "moment";
 import Image from "next/image";
 import React, { useEffect, useRef, useState } from "react";
 
@@ -125,6 +124,13 @@ interface Props {
   helperText?: string;
 }
 
+interface DayInfo {
+  day: number;
+  weekday: string; 
+  isBefore: boolean;
+  isNext: boolean;
+}
+
 const DatePicker = ({ defaultDate, onChange, label, error = false, helperText = "" }: Props) => {
   const today = new Date();
 
@@ -169,8 +175,7 @@ const DatePicker = ({ defaultDate, onChange, label, error = false, helperText = 
   const [topYear, setTopYear] = useState(initialDate.year);
   const [listYear, setListYear] = useState<Array<YearStyle>>([{ label: "0", value: 0 }]);
   const [direction, setDirection] = useState<"forward" | "backward" | null>(null);
-  const [renderDays, setRenderDays] = useState<any>([]);
-  const [currentDate, setCurrentDate] = useState(initialDate.day);
+  const [renderDays, setRenderDays] = useState<DayInfo[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const datePickerRef = useRef<HTMLDivElement>(null);
 
@@ -181,6 +186,7 @@ const DatePicker = ({ defaultDate, onChange, label, error = false, helperText = 
       monthIndex: today.getMonth(),
       year: today.getFullYear(),
     }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
   );
 
@@ -236,14 +242,13 @@ const DatePicker = ({ defaultDate, onChange, label, error = false, helperText = 
         setCurrentYear(parsedYear);
         setTopYear(parsedYear);
         setCurrentMonth(monthValue);
-        setCurrentDate(parsedDay);
       }
     } else {
       setCurrentYear(today.getFullYear());
       setTopYear(today.getFullYear());
       setCurrentMonth(abbreviationMonths[today.getMonth()]);
-      setCurrentDate(today.getDate());
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [defaultDate]);
 
   // Initialize years list
@@ -280,7 +285,6 @@ const DatePicker = ({ defaultDate, onChange, label, error = false, helperText = 
 
   const handleChangeDate = (value: number, stateMonth: "before" | "next" | "current") => {
     if (stateMonth === "current") {
-      setCurrentDate(value);
       setSelectedDate({ day: value, month: currentMonth, year: currentYear });
       handleDateChange(value, currentMonth, currentYear);
       setIsOpen(false);
@@ -296,7 +300,6 @@ const DatePicker = ({ defaultDate, onChange, label, error = false, helperText = 
         setSelectedDate({ day: value, month: Months[currentIndex - 1].value, year: currentYear });
         handleDateChange(value, Months[currentIndex - 1].value, currentYear);
       }
-      setCurrentDate(value);
       setIsOpen(false);
     } else if (stateMonth === "next") {
       const currentIndex = Months.findIndex((month) => month.value === currentMonth);
@@ -310,7 +313,6 @@ const DatePicker = ({ defaultDate, onChange, label, error = false, helperText = 
         setSelectedDate({ day: value, month: Months[currentIndex + 1].value, year: currentYear });
         handleDateChange(value, Months[currentIndex + 1].value, currentYear);
       }
-      setCurrentDate(value);
       setIsOpen(false);
     }
   };
@@ -374,7 +376,7 @@ const DatePicker = ({ defaultDate, onChange, label, error = false, helperText = 
       setListYear(generatedYears);
       setDirection(null);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [topYear]);
 
   useEffect(() => {
@@ -603,7 +605,7 @@ const DatePicker = ({ defaultDate, onChange, label, error = false, helperText = 
                     </div>
                     <div className="grid grid-cols-7 gap-y-0.5 my-1">
                       {renderDays.length &&
-                        renderDays.map((item: any, index: number) => {
+                        renderDays.map((item: DayInfo, index: number) => {
                           const isToday = isCurrentDate(
                             item?.day,
                             currentMonth,

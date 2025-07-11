@@ -1,4 +1,4 @@
-import { Student } from "@/config/types";
+import { Student, OptionState } from "@/config/types";
 import Button from "@/lib/button";
 import DatePicker from "@/lib/date-picker";
 import Divider from "@/lib/divider";
@@ -59,9 +59,9 @@ const validationSchema = Yup.object().shape({
     .nullable(),
 });
 
-const EditStudent = ({ student, disabled = false }: Props) => {
+const EditStudent = ({ student }: Props) => {
   const dispatch = useDispatch();
-  const activeClasses: any = useSelector((state: RootState) => state.system.activeClasses) || [];
+  const activeClasses: OptionState[] = useSelector((state: RootState) => state.system.activeClasses) || [];
   const { profile } = useSelector((state: RootState) => state.system);
 
   const formik = useFormik({
@@ -102,15 +102,6 @@ const EditStudent = ({ student, disabled = false }: Props) => {
           }),
         );
         dispatch(refetch());
-      } catch (error: any) {
-        dispatch(
-          openAlert({
-            isOpen: true,
-            title: "ERROR",
-            subtitle: error?.message || "Failed to update student",
-            type: "error",
-          }),
-        );
       } finally {
         dispatch(closeLoading());
         dispatch(closeDrawer());
