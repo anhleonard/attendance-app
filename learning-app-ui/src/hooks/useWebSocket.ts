@@ -35,13 +35,14 @@ export const useWebSocket = (userId: number | null | undefined) => {
     });
 
     // Listen for notifications
-    wsClient.on(NEW_NOTIFICATION, (payload: Notification) => {
+    wsClient.on(NEW_NOTIFICATION, (payload: unknown) => {
+      const notification = payload as Notification;
       // Open alert
       dispatch(
         openAlert({
           isOpen: true,
           title: "New notification",
-          subtitle: `You've got a new notification from ${payload.createdBy.fullname}`,
+          subtitle: `You've got a new notification from ${notification.createdBy.fullname}`,
           type: "info",
         }),
       );
@@ -50,7 +51,7 @@ export const useWebSocket = (userId: number | null | undefined) => {
       dispatch(
         updateSystemInfo({
           notifications: {
-            data: [payload, ...currentNotifications],
+            data: [notification, ...currentNotifications],
             total: notifications.total + 1,
             page: notifications.page,
           },
