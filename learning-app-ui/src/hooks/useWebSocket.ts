@@ -25,7 +25,7 @@ export const useWebSocket = (userId: number | null | undefined) => {
       return;
     }
 
-    const wsClient = initializeWebSocket("http://localhost:3010/notifications");
+    const wsClient = initializeWebSocket(`${process.env.NEXT_PUBLIC_HTTP_API_DOMAIN}/notifications`);
 
     wsClient.connect();
 

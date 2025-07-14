@@ -20,8 +20,13 @@ import { BillsModule } from './bills/bills.module';
 
 @Module({
   imports: [
+    ConfigModule.forRoot({
+      envFilePath: process.env.NODE_ENV === 'production' 
+        ? '.env.production' 
+        : '.env.local',
+      isGlobal: true,
+    }),
     UsersModule,
-    ConfigModule.forRoot(),
     PrismaModule,
     AuthModule,
     StudentsModule,

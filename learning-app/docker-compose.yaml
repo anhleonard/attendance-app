@@ -49,13 +49,14 @@ services:
     image: n8nio/n8n:latest
     container_name: attendance-app-n8n
     environment:
-      N8N_BASIC_AUTH_ACTIVE: true
+      N8N_BASIC_AUTH_ACTIVE: "true"
       N8N_BASIC_AUTH_USER: admin
       N8N_BASIC_AUTH_PASSWORD: admin123
       N8N_HOST: n8n
       N8N_PORT: 5678
       N8N_PROTOCOL: http
-      WEBHOOK_URL: http://localhost:5678
+      # WEBHOOK_URL: http://localhost:5678
+      WEBHOOK_URL: https://n8n.attendance-app.io.vn
       GENERIC_TIMEZONE: Asia/Ho_Chi_Minh
       N8N_DATABASE_TYPE: postgresdb
       N8N_DATABASE_POSTGRESDB_HOST: postgres

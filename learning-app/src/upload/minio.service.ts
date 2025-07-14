@@ -24,7 +24,8 @@ export class MinioService {
 
   async uploadFile(folder: string, file: Express.Multer.File) {
     const key = `${folder}/${Date.now()}-${file.originalname}`;
-
+    const minioEndpoint = this.configService.get('MINIO_ENDPOINT');
+    
     try {
       const command = new PutObjectCommand({
         Bucket: this.bucket,
@@ -39,7 +40,7 @@ export class MinioService {
       fs.unlinkSync(file.path);
 
       return {
-        url: `${this.configService.get('MINIO_ENDPOINT')}/${this.bucket}/${key}`,
+        url: `${minioEndpoint}/${this.bucket}/${key}`,
         key,
       };
     } catch (error) {

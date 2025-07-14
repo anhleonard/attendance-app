@@ -83,6 +83,10 @@ const LoginPage = () => {
 
         if (response?.token) {
           localStorage.setItem(ACCESS_TOKEN, response.token);
+          
+          // Set Authentication cookie from frontend
+          document.cookie = `Authentication=${response.token}; path=/; max-age=${24 * 60 * 60}; SameSite=Lax`;
+          
           // get user info
           const userInfo = await getUserInfo();
           // get active classes

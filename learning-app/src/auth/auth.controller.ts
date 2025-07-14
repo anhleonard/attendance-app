@@ -28,6 +28,7 @@ export class AuthController {
       httpOnly: true,
       expires: new Date(0),
       secure: true,
+      sameSite: 'none',
     });
 
     return response.send({ message: 'Logged out successfully' });
