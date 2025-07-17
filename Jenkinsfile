@@ -48,7 +48,7 @@ pipeline {
                     steps {
                         dir('learning-app') {
                             sh '''
-                                npm ci --only=production
+                                npm install --only=production
                                 npm install -g @nestjs/cli
                                 npm install -g prisma
                             '''
@@ -59,7 +59,7 @@ pipeline {
                 stage('Frontend Dependencies') {
                     steps {
                         dir('learning-app-ui') {
-                            sh 'npm ci'
+                            sh 'npm install'
                         }
                     }
                 }
@@ -265,8 +265,8 @@ pipeline {
         always {
             // Clean up Docker images
             sh '''
-                docker image prune -f
-                docker system prune -f
+                docker image prune -f || echo "Docker cleanup failed"
+                docker container prune -f || echo "Container cleanup failed"
             '''
         }
         
