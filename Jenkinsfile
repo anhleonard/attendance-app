@@ -48,7 +48,7 @@ pipeline {
                     steps {
                         dir('learning-app') {
                             sh '''
-                                npm install --only=production
+                                npm install --only=production --legacy-peer-deps
                                 npm install -g @nestjs/cli
                                 npm install -g prisma
                             '''
