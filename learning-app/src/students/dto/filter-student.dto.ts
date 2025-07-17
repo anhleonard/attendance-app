@@ -1,15 +1,11 @@
-import { Transform } from 'class-transformer';
 import {
-  IsDate,
   IsEnum,
   IsNumber,
   IsOptional,
   IsString,
   IsBoolean,
-  ValidateNested,
 } from 'class-validator';
 import { Status } from 'src/utils/enums';
-import { Type } from 'class-transformer';
 
 export class FilterStudentDto {
   @IsString()

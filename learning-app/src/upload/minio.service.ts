@@ -1,7 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import * as fs from 'fs';
-import * as path from 'path';
 import { ConfigService } from '@nestjs/config';
 
 @Injectable()
@@ -25,7 +24,7 @@ export class MinioService {
   async uploadFile(folder: string, file: Express.Multer.File) {
     const key = `${folder}/${Date.now()}-${file.originalname}`;
     const minioEndpoint = this.configService.get('MINIO_ENDPOINT');
-    
+
     try {
       const command = new PutObjectCommand({
         Bucket: this.bucket,

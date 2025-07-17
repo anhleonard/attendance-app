@@ -3,7 +3,6 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { CreatePaymentDto } from './dto/create-payment.dto';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { UpdatePaymentDto } from './dto/update-payment.dto';
 import { PaymentStatus } from 'src/utils/enums';
@@ -21,13 +20,6 @@ export class PaymentsService {
     private readonly prismaService: PrismaService,
     private readonly attendancesService: AttendancesService,
   ) {}
-
-  async createPayment(createPaymentDto: CreatePaymentDto) {
-    try {
-    } catch (error) {
-      throw new BadRequestException(error.message);
-    }
-  }
 
   async updatePayment(updatePaymentDto: UpdatePaymentDto) {
     try {

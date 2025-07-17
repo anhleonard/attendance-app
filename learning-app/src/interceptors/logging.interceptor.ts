@@ -16,18 +16,20 @@ export class LoggingInterceptor implements NestInterceptor {
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
     const request = context.switchToHttp().getRequest<Request>();
     const response = context.switchToHttp().getResponse<Response>();
-    const { method, originalUrl, body, query, params, headers } = request;
+    const { method, originalUrl, body } = request;
     const userAgent = request.get('user-agent') || '';
     const startTime = Date.now();
 
     return next.handle().pipe(
       tap({
-        next: (data) => {
+        next: () => {
           const responseTime = Date.now() - startTime;
           const statusCode = response.statusCode;
 
           // Log successful response
-          console.log(`🌐 [${method}] ${originalUrl} - ${statusCode} (${responseTime}ms)`);
+          console.log(
+            `🌐 [${method}] ${originalUrl} - ${statusCode} (${responseTime}ms)`,
+          );
           console.log(`📥 Request from: ${request.ip}`);
           console.log(`🔗 User-Agent: ${userAgent.substring(0, 50)}...`);
           if (Object.keys(body).length > 0) {

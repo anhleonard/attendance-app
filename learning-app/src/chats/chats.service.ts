@@ -71,7 +71,9 @@ export class ChatsService {
     }
 
     if (chat.userId !== userId) {
-      throw new ForbiddenException('You do not have permission to update this chat');
+      throw new ForbiddenException(
+        'You do not have permission to update this chat',
+      );
     }
 
     // Update chat title

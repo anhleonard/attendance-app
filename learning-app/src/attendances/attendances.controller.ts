@@ -1,11 +1,4 @@
-import {
-  Body,
-  Controller,
-  Post,
-  Get,
-  Param,
-  UseGuards,
-} from '@nestjs/common';
+import { Body, Controller, Post, Get, Param, UseGuards } from '@nestjs/common';
 import { CurrentUser } from 'src/auth/decorators/current-user.decorator';
 import { Permissions } from 'src/auth/decorators/permission.decorator';
 import { Roles } from 'src/auth/decorators/role.decorator';
@@ -66,13 +59,13 @@ export class AttendancesController {
       studentClassStatus: Status.ACTIVE,
       fetchAll: true,
     } as any);
-    
+
     const allStudents = studentsResult.data;
-    
+
     // Convert thành array của CreateAttendance cho tất cả students
-    const attendances: CreateAttendance[] = allStudents.map(student => {
+    const attendances: CreateAttendance[] = allStudents.map((student) => {
       let isAttend = true; // Mặc định là có mặt
-      
+
       if (isSelectedAll) {
         // Nếu chọn tất cả, những student trong unselectedStudentIds sẽ có isAttend = false
         if (unselectedStudentIds?.includes(student.id)) {
@@ -82,7 +75,7 @@ export class AttendancesController {
         // Nếu không chọn tất cả, chỉ những student trong selectedStudentIds mới có isAttend = true
         isAttend = selectedStudentIds?.includes(student.id) || false;
       }
-      
+
       return {
         studentId: student.id,
         sessionId,

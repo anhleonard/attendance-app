@@ -33,4 +33,4 @@ export class CreateBatchAttendanceDto {
   @IsArray()
   @IsOptional()
   unselectedStudentIds?: number[];
-} 
+}

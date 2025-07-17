@@ -1,6 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { CreateSessionDto } from './dto/create-session.dto';
-import { TokenPayload } from 'src/auth/token-payload/token-payload.auth';
 import { PrismaService } from 'src/prisma/prisma.service';
 
 @Injectable()

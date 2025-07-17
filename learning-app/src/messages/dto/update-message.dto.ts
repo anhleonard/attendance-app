@@ -8,4 +8,4 @@ export class UpdateMessageDto {
   @IsBoolean()
   @IsNotEmpty()
   isSaved: boolean;
-} 
+}

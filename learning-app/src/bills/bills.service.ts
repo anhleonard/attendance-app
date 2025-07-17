@@ -26,7 +26,7 @@ export class BillsService {
       const template = Handlebars.compile(templateContent);
 
       // Đăng ký helper cho index
-      Handlebars.registerHelper('add', function(a, b) {
+      Handlebars.registerHelper('add', function (a, b) {
         return a + b;
       });
 
@@ -60,7 +60,7 @@ export class BillsService {
             'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
           ignoreDefaultArgs: ['--disable-extensions'],
         });
-      } catch (chromeError) {
+      } catch {
         try {
           // Fallback với Edge
           browser = await puppeteer.launch({
@@ -70,7 +70,7 @@ export class BillsService {
               'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
             ignoreDefaultArgs: ['--disable-extensions'],
           });
-        } catch (edgeError) {
+        } catch {
           // Cuối cùng thử với Puppeteer default
           browser = await puppeteer.launch({
             headless: true,
@@ -82,10 +82,10 @@ export class BillsService {
       const page = await browser.newPage();
 
       // Set viewport để đảm bảo kích thước ảnh phù hợp
-      await page.setViewport({ 
-        width: 1000, 
+      await page.setViewport({
+        width: 1000,
         height: 800,
-        deviceScaleFactor: 2 // Tăng độ phân giải lên 2x (720p quality)
+        deviceScaleFactor: 2, // Tăng độ phân giải lên 2x (720p quality)
       });
 
       // Set content HTML
@@ -103,7 +103,7 @@ export class BillsService {
       await page.setViewport({
         width: Math.ceil(boundingBox.width) + 4,
         height: Math.ceil(boundingBox.height) - 1,
-        deviceScaleFactor: 2 // Giữ độ phân giải cao
+        deviceScaleFactor: 2, // Giữ độ phân giải cao
       });
 
       // Chụp ảnh vừa đúng nội dung với chất lượng cao
@@ -111,7 +111,7 @@ export class BillsService {
         type: 'png',
         fullPage: false,
         captureBeyondViewport: false,
-        omitBackground: false // Đảm bảo background được render đầy đủ
+        omitBackground: false, // Đảm bảo background được render đầy đủ
       })) as Buffer;
 
       // Đóng browser
@@ -125,13 +125,12 @@ export class BillsService {
 
   async downloadAllBills(downloadBillsDto: DownloadBillsDto): Promise<Buffer> {
     try {
-      const { name, classId, status, learningMonth, learningYear } = downloadBillsDto;
+      const { name, classId, status, learningMonth, learningYear } =
+        downloadBillsDto;
 
       // Validate required filter parameters
       if (!learningMonth || !learningYear) {
-        throw new BadRequestException(
-          'Learning month and year are required',
-        );
+        throw new BadRequestException('Learning month and year are required');
       }
 
       // Get current class students if classId is provided
@@ -154,9 +153,7 @@ export class BillsService {
 
       const where: Prisma.PaymentWhereInput = {
         student: {
-          name: name
-            ? { contains: name, mode: 'insensitive' }
-            : undefined,
+          name: name ? { contains: name, mode: 'insensitive' } : undefined,
           id: classId
             ? { in: currentClassStudents.map((sc) => sc.studentId) }
             : undefined,
@@ -211,22 +208,26 @@ export class BillsService {
       });
 
       if (payments.length === 0) {
-        throw new BadRequestException('No payments found matching the filter criteria');
+        throw new BadRequestException(
+          'No payments found matching the filter criteria',
+        );
       }
 
       // Generate bills for each payment
       const billPromises = payments.map(async (payment) => {
         const currentClass = payment.student.classes[0]?.class;
-        
+
         // Format learning dates as DD/MM/YYYY using moment, only for attended sessions
         const learningDates = payment.attendances
           .filter((attendance) => attendance.isAttend)
-          .map((attendance) => moment(attendance.learningDate).format('DD/MM/YYYY'));
+          .map((attendance) =>
+            moment(attendance.learningDate).format('DD/MM/YYYY'),
+          );
 
         const createBillDto: CreateBillDto = {
           studentName: payment.student.name,
-          class: currentClass?.name || "",
-          month: moment(payment.createdAt).format("MM/YYYY"),
+          class: currentClass?.name || '',
+          month: moment(payment.createdAt).format('MM/YYYY'),
           amount: payment.totalMonthAmount.toString(),
           learningDates: learningDates,
           sessionCount: payment.totalAttend.toString(),
@@ -235,10 +236,10 @@ export class BillsService {
         };
 
         const imageBuffer = await this.generateBillImage(createBillDto);
-        
+
         // Create filename for this bill - preserve Vietnamese characters
         const filename = `${payment.student.name}_${learningMonth}_${learningYear}.png`;
-        
+
         return {
           filename,
           buffer: imageBuffer,
@@ -250,11 +251,11 @@ export class BillsService {
       // Create ZIP file containing all bills
       return new Promise((resolve, reject) => {
         const archive = archiver('zip', {
-          zlib: { level: 9 } // Sets the compression level
+          zlib: { level: 9 }, // Sets the compression level
         });
 
         const chunks: Buffer[] = [];
-        
+
         archive.on('data', (chunk) => {
           chunks.push(chunk);
         });

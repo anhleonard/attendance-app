@@ -1,4 +1,12 @@
-import { IsString, IsInt, IsNotEmpty, IsEnum, Matches, IsOptional, IsDate } from 'class-validator';
+import {
+  IsString,
+  IsInt,
+  IsNotEmpty,
+  IsEnum,
+  Matches,
+  IsOptional,
+  IsDate,
+} from 'class-validator';
 import { Transform } from 'class-transformer';
 import { SessionKey } from 'src/utils/enums';
 

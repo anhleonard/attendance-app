@@ -17,7 +17,7 @@ export class HistoriesService {
     const skip = (page - 1) * rowPerPage;
 
     // Lấy danh sách học sinh có current class là classId được chọn
-    const currentClassStudents = classId 
+    const currentClassStudents = classId
       ? await this.prismaService.studentClass.findMany({
           where: {
             classId: classId,
@@ -40,8 +40,8 @@ export class HistoriesService {
           name: studentName
             ? { contains: studentName, mode: 'insensitive' }
             : undefined,
-          id: classId 
-            ? { in: currentClassStudents.map(sc => sc.studentId) }
+          id: classId
+            ? { in: currentClassStudents.map((sc) => sc.studentId) }
             : undefined,
         },
         select: {
@@ -68,8 +68,8 @@ export class HistoriesService {
           name: studentName
             ? { contains: studentName, mode: 'insensitive' }
             : undefined,
-          id: classId 
-            ? { in: currentClassStudents.map(sc => sc.studentId) }
+          id: classId
+            ? { in: currentClassStudents.map((sc) => sc.studentId) }
             : undefined,
         },
       }),
@@ -83,23 +83,25 @@ export class HistoriesService {
         let currentClass = null;
 
         // Tìm current class (class ACTIVE cuối cùng)
-        const activeClasses = classes.filter(c => c.status === Status.ACTIVE);
-        
+        const activeClasses = classes.filter((c) => c.status === Status.ACTIVE);
+
         if (activeClasses.length > 0) {
           // Có active class - class cuối cùng là current class
-          const currentClassEnrollment = activeClasses[activeClasses.length - 1];
-          
+          const currentClassEnrollment =
+            activeClasses[activeClasses.length - 1];
+
           // Tính số attendances cho current class
-          const currentClassAttendances = await this.prismaService.attendance.count({
-            where: {
-              studentId: student.id,
-              session: { classId: currentClassEnrollment.class.id },
-              createdAt: {
-                gte: currentClassEnrollment.createdAt,
+          const currentClassAttendances =
+            await this.prismaService.attendance.count({
+              where: {
+                studentId: student.id,
+                session: { classId: currentClassEnrollment.class.id },
+                createdAt: {
+                  gte: currentClassEnrollment.createdAt,
+                },
+                isAttend: true,
               },
-              isAttend: true,
-            },
-          });
+            });
 
           currentClass = {
             id: currentClassEnrollment.class.id,
@@ -112,8 +114,10 @@ export class HistoriesService {
           };
 
           // Tất cả classes (cả ACTIVE và INACTIVE) trước current class là past classes
-          const currentClassIndex = classes.findIndex(c => c.id === currentClassEnrollment.id);
-          
+          const currentClassIndex = classes.findIndex(
+            (c) => c.id === currentClassEnrollment.id,
+          );
+
           for (let i = 0; i < currentClassIndex; i++) {
             const studentClass = classes[i];
             const nextClass = classes[i + 1];

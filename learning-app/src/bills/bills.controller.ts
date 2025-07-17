@@ -34,13 +34,16 @@ export class BillsController {
       // Tạo tên file từ tên học sinh
       const studentName = createBillDto.studentName || 'bill_payment';
       const month = createBillDto.month || 'unknown';
-      
+
       // Format tên file: "Tên học sinh - Tháng/Năm"
       const fileName = `${studentName} - ${month}.png`;
 
       // Set headers để trả về ảnh với encoding UTF-8
       res.setHeader('Content-Type', 'image/png');
-      res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(fileName)}`);
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename*=UTF-8''${encodeURIComponent(fileName)}`,
+      );
       res.setHeader('Content-Length', imageBuffer.length);
 
       // Trả về ảnh
@@ -62,14 +65,18 @@ export class BillsController {
     @Res() res: Response,
   ) {
     try {
-      const zipBuffer = await this.billsService.downloadAllBills(downloadBillsDto);
+      const zipBuffer =
+        await this.billsService.downloadAllBills(downloadBillsDto);
 
       // Create filename based on filter criteria
       const fileName = 'bill-payments.zip';
 
       // Set headers for ZIP file download with UTF-8 encoding
       res.setHeader('Content-Type', 'application/zip');
-      res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(fileName)}`);
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename*=UTF-8''${encodeURIComponent(fileName)}`,
+      );
       res.setHeader('Content-Length', zipBuffer.length);
 
       // Return the ZIP file

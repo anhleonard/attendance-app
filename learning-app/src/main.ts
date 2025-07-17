@@ -14,7 +14,11 @@ async function bootstrap() {
   });
 
   app.enableCors({
-    origin: ['http://localhost:3015', 'http://14.225.217.9:3015', 'https://attendance-app.io.vn'],
+    origin: [
+      'http://localhost:3015',
+      'http://14.225.217.9:3015',
+      'https://attendance-app.io.vn',
+    ],
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],

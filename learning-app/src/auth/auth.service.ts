@@ -10,7 +10,6 @@ import { Response } from 'express';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { TokenPayload } from './token-payload/token-payload.auth';
-import ms from 'ms';
 import { Permission } from 'src/utils/enums';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { v4 as uuidv4 } from 'uuid';
@@ -127,7 +126,7 @@ export class AuthService {
       const resetLink = `${this.configService.get<string>('FE_ENDPOINT')}/auth/reset-password/${token}`;
 
       // Send email
-      const response = await axios.post(
+      await axios.post(
         // `${this.configService.get<string>('N8N_ENDPOINT')}/webhook/send-mail`,
         'http://localhost:5678/webhook/send-mail',
         {
@@ -140,12 +139,12 @@ export class AuthService {
             <p>If you didn't request this password reset, please ignore this email.</p>
             <p>Best regards,<br>
             Attendance System Team</p>
-          `
+          `,
         },
       );
 
       return { message: 'Password reset email sent successfully' };
-    } catch (error) {
+    } catch {
       // Don't reveal if email exists or not for security
       throw new BadRequestException(
         'If the email exists, a password reset link has been sent',

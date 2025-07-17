@@ -8,5 +8,5 @@ export function generateRandomPassword(length = 12) {
 }
 
 export function formatCurrency(amount: number) {
-  return amount.toLocaleString("vi-VN");
+  return amount.toLocaleString('vi-VN');
 }

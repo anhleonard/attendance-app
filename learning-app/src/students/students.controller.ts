@@ -19,7 +19,6 @@ import { PermissionsGuard } from 'src/auth/guards/permissions.guard';
 import { Permissions } from 'src/auth/decorators/permission.decorator';
 import { UpdateStudentDto } from './dto/update-student.dto';
 import { FilterStudentDto } from './dto/filter-student.dto';
-import { ImportFileStudentDto } from './dto/import-file-student.dto';
 
 @Controller('students')
 export class StudentsController {

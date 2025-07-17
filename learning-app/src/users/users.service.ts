@@ -50,7 +50,7 @@ export class UsersService {
               <p>Please change your password after first login.</p>
             `,
           });
-        } catch (emailError) {
+        } catch {
           throw new BadRequestException(
             'Failed to send email. Please try again later.',
           );
@@ -74,7 +74,7 @@ export class UsersService {
       });
 
       // Return user info with generated password for system users
-      const { password, ...userWithoutPassword } = user;
+      const { ...userWithoutPassword } = user;
       return createUserDto.type === UserType.SYSTEM_USER
         ? { ...userWithoutPassword, generatedPassword: finalPassword }
         : userWithoutPassword;

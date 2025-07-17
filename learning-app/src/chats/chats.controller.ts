@@ -2,8 +2,6 @@ import {
   Controller,
   Post,
   Body,
-  Get,
-  Param,
   ParseIntPipe,
   UseGuards,
 } from '@nestjs/common';
@@ -43,6 +41,10 @@ export class ChatsController {
     @Body() updateChatDto: UpdateChatDto,
     @CurrentUser() user: TokenPayload,
   ) {
-    return this.chatsService.updateChat(updateChatDto.chatId, updateChatDto, user.userId);
+    return this.chatsService.updateChat(
+      updateChatDto.chatId,
+      updateChatDto,
+      user.userId,
+    );
   }
 }

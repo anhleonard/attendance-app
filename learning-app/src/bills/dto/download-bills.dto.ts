@@ -31,4 +31,4 @@ export class DownloadBillsDto {
   )
   @IsNumber()
   learningYear?: number;
-} 
+}

@@ -47,12 +47,7 @@ export class AttendanceProcessor extends WorkerHost {
       // Even on error, we need to decrement the counter
       const { batchId, lockKey, counterKey } = job.data;
       if (batchId && lockKey && counterKey) {
-        await this.decrementAndCheckCompletion(
-          batchId,
-          lockKey,
-          counterKey,
-          true,
-        );
+        await this.decrementAndCheckCompletion(batchId, lockKey, counterKey);
       }
 
       throw error; // Re-throw to mark job as failed
@@ -66,7 +61,6 @@ export class AttendanceProcessor extends WorkerHost {
     batchId: string,
     lockKey: string,
     counterKey: string,
-    isError: boolean = false,
   ): Promise<void> {
     try {
       // Use Redis transaction to ensure atomicity

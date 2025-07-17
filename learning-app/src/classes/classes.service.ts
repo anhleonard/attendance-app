@@ -48,7 +48,7 @@ export class ClassesService {
         },
       });
 
-      let createdNewSessions = [];
+      const createdNewSessions = [];
       if (sessions.length > 0 && createdClass) {
         for (const session of sessions) {
           try {
@@ -180,8 +180,8 @@ export class ClassesService {
       console.log('Valid from date:', validFromDate.toISOString());
       console.log('New session keys:', newSessionKeys);
 
-      let createdNewSessions = [];
-      let updatedSessions = [];
+      const createdNewSessions = [];
+      const updatedSessions = [];
 
       for (const session of sessions) {
         const existingSession = activeSessionsMap.get(session.sessionKey);
@@ -311,8 +311,6 @@ export class ClassesService {
         rowPerPage = 10,
         learningDate,
         fetchAll = false,
-        month,
-        year,
         hasHistories = false,
       } = filterClassDto;
 
@@ -607,7 +605,7 @@ export class ClassesService {
         endOfDay.setHours(23, 59, 59, 999);
 
         const sessionKeyForDay = Object.entries(sessionKeyToDayMap).find(
-          ([_, day]) => day === dayOfWeek,
+          ([, day]) => day === dayOfWeek,
         )?.[0] as SessionKey;
 
         const compareDate = new Date(date);

@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateMessageDto } from './dto/create-message.dto';
 import { FilterMessagesDto } from './dto/filter-messages.dto';
@@ -44,10 +48,16 @@ export class MessagesService {
   }
 
   async findMessages(filterMessagesDto: FilterMessagesDto, userId: number) {
-    const { chatId, fetchAll = false, page = 1, limit = 10, isSaved } = filterMessagesDto;
-    
+    const {
+      chatId,
+      fetchAll = false,
+      page = 1,
+      limit = 10,
+      isSaved,
+    } = filterMessagesDto;
+
     const baseQuery = {
-      where: { 
+      where: {
         ...(chatId !== undefined && { chatId }), // Only add chatId if provided
         userId, // Only get messages of current user
         ...(isSaved !== undefined && { isSaved }), // Add isSaved filter if provided
@@ -57,8 +67,8 @@ export class MessagesService {
       },
     };
 
-    const queryOptions = fetchAll 
-      ? baseQuery 
+    const queryOptions = fetchAll
+      ? baseQuery
       : {
           ...baseQuery,
           skip: (page - 1) * limit,
@@ -68,7 +78,7 @@ export class MessagesService {
     const [messages, total] = await Promise.all([
       this.prisma.message.findMany(queryOptions),
       this.prisma.message.count({
-        where: { 
+        where: {
           ...(chatId !== undefined && { chatId }), // Only add chatId if provided
           userId, // Count only messages of current user
           ...(isSaved !== undefined && { isSaved }),
@@ -78,14 +88,16 @@ export class MessagesService {
 
     return {
       data: messages,
-      ...(fetchAll ? {} : {
-        meta: {
-          total,
-          page,
-          limit,
-          totalPages: Math.ceil(total / limit),
-        }
-      }),
+      ...(fetchAll
+        ? {}
+        : {
+            meta: {
+              total,
+              page,
+              limit,
+              totalPages: Math.ceil(total / limit),
+            },
+          }),
     };
   }
 

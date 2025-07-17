@@ -19,9 +19,9 @@ export class AuthController {
     @CurrentUser() user: User,
     @Res({ passthrough: true }) response: Response,
   ) {
-    console.log("🔐 Backend received login request");
-    console.log("👤 User:", user?.email || 'No user');
-    console.log("📅 Timestamp:", new Date().toISOString());
+    console.log('🔐 Backend received login request');
+    console.log('👤 User:', user?.email || 'No user');
+    console.log('📅 Timestamp:', new Date().toISOString());
     return this.authService.login(user, response);
   }
 

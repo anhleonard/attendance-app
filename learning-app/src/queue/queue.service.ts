@@ -18,12 +18,12 @@ export class QueueService {
     user: TokenPayload,
   ) {
     // Create a shared lock key for this batch
-    const batchId = this.generateBatchId(studentAttendances, user);
+    const batchId = this.generateBatchId(studentAttendances);
     const lockKey = `attendance-batch-lock:${batchId}`;
     const counterKey = `attendance-batch-counter:${batchId}`;
-    
+
     console.log(`🔐 Creating shared lock: ${lockKey}`);
-    
+
     // Check if this batch is already being processed
     const existingLock = await this.redis.get(lockKey);
     if (existingLock) {
@@ -31,13 +31,14 @@ export class QueueService {
       return {
         batchId,
         message: 'Batch is already being processed',
-        isSkipped: true
+        isSkipped: true,
       };
     }
 
     // Set lock and counter
     const totalJobs = studentAttendances.length;
-    await this.redis.multi()
+    await this.redis
+      .multi()
       .set(lockKey, 'processing', 'EX', 3600) // Lock for 1 hour max
       .set(counterKey, totalJobs.toString(), 'EX', 3600)
       .exec();
@@ -49,9 +50,9 @@ export class QueueService {
       const learningDate = new Date(studentAttendance.learningDate);
       const formattedDate = `${learningDate.getDate().toString().padStart(2, '0')}${(learningDate.getMonth() + 1).toString().padStart(2, '0')}${learningDate.getFullYear()}`;
       const uniqueJobId = `student-${studentAttendance.studentId}-session-${studentAttendance.sessionId}-date-${formattedDate}`;
-      
+
       console.log(`🔍 Creating job with uniqueJobId: ${uniqueJobId}`);
-      
+
       const jobObject = {
         name: 'createAttendance',
         data: {
@@ -63,36 +64,36 @@ export class QueueService {
         },
         jobId: uniqueJobId,
       };
-      
+
       return jobObject;
     });
 
     try {
       // Push all jobs into queue simultaneously
       const results = await this.attendanceQueue.addBulk(attendanceJobs);
-      
+
       // Log results
-      const successfulJobs = results.filter(job => job !== null);
-      const skippedJobs = results.filter(job => job === null);
-      
+      const successfulJobs = results.filter((job) => job !== null);
+      const skippedJobs = results.filter((job) => job === null);
+
       console.log(`Queue processing results for batch ${batchId}:`);
       console.log(`- Total jobs: ${attendanceJobs.length}`);
       console.log(`- Successfully added: ${successfulJobs.length}`);
       console.log(`- Skipped (duplicates): ${skippedJobs.length}`);
-      
+
       // If no jobs were added, release the lock
       if (successfulJobs.length === 0) {
         await this.releaseBatchLock(batchId);
         console.log(`🔓 Released lock for batch ${batchId} - no jobs added`);
       }
-      
+
       return {
         batchId,
         totalJobs: attendanceJobs.length,
         addedJobs: successfulJobs.length,
         skippedJobs: skippedJobs.length,
         lockKey,
-        message: `Processed ${successfulJobs.length} jobs, skipped ${skippedJobs.length} duplicates`
+        message: `Processed ${successfulJobs.length} jobs, skipped ${skippedJobs.length} duplicates`,
       };
     } catch (error) {
       // Release lock if error occurs
@@ -103,37 +104,41 @@ export class QueueService {
   }
 
   // Generate unique batch ID based on class, session, and learning date
-  private generateBatchId(attendances: CreateAttendance[], user: TokenPayload): string {
+  private generateBatchId(attendances: CreateAttendance[]): string {
     // Validate that all attendances are from same class, session, and date
     const firstAttendance = attendances[0];
-    const isValidBatch = attendances.every(att => 
-      att.classId === firstAttendance.classId &&
-      att.sessionId === firstAttendance.sessionId &&
-      new Date(att.learningDate).toDateString() === new Date(firstAttendance.learningDate).toDateString()
+    const isValidBatch = attendances.every(
+      (att) =>
+        att.classId === firstAttendance.classId &&
+        att.sessionId === firstAttendance.sessionId &&
+        new Date(att.learningDate).toDateString() ===
+          new Date(firstAttendance.learningDate).toDateString(),
     );
 
     if (!isValidBatch) {
-      throw new Error('All attendances must be from same class, session, and date');
+      throw new Error(
+        'All attendances must be from same class, session, and date',
+      );
     }
 
     // Format date: 21/12/2025 -> 21122025
     const learningDate = new Date(firstAttendance.learningDate);
     const formattedDate = `${learningDate.getDate().toString().padStart(2, '0')}${(learningDate.getMonth() + 1).toString().padStart(2, '0')}${learningDate.getFullYear()}`;
-    
+
     // Create batchId with pattern: class-123-session-456-date-21122025
     const batchId = `class-${firstAttendance.classId}-session-${firstAttendance.sessionId}-date-${formattedDate}`;
-    
+
     return batchId;
   }
 
   // Method to be called when each job completes
   async onJobComplete(batchId: string, lockKey: string, counterKey: string) {
     console.log(`✅ Job completed for batch ${batchId}`);
-    
+
     // Decrement counter atomically
     const remaining = await this.redis.decr(counterKey);
     console.log(`📊 Remaining jobs for batch ${batchId}: ${remaining}`);
-    
+
     // If all jobs are done, release the lock
     if (remaining <= 0) {
       await this.releaseBatchLock(batchId);
@@ -142,13 +147,18 @@ export class QueueService {
   }
 
   // Method to be called when a job fails
-  async onJobFailed(batchId: string, lockKey: string, counterKey: string, error: any) {
+  async onJobFailed(
+    batchId: string,
+    lockKey: string,
+    counterKey: string,
+    error: any,
+  ) {
     console.error(`❌ Job failed for batch ${batchId}:`, error);
-    
+
     // Decrement counter even on failure
     const remaining = await this.redis.decr(counterKey);
     console.log(`📊 Remaining jobs for batch ${batchId}: ${remaining}`);
-    
+
     // If all jobs are done (including failed ones), release the lock
     if (remaining <= 0) {
       await this.releaseBatchLock(batchId);
@@ -160,12 +170,9 @@ export class QueueService {
   private async releaseBatchLock(batchId: string) {
     const lockKey = `attendance-batch-lock:${batchId}`;
     const counterKey = `attendance-batch-counter:${batchId}`;
-    
-    await this.redis.multi()
-      .del(lockKey)
-      .del(counterKey)
-      .exec();
-    
+
+    await this.redis.multi().del(lockKey).del(counterKey).exec();
+
     console.log(`🔓 Released lock and counter for batch ${batchId}`);
   }
 
@@ -173,18 +180,18 @@ export class QueueService {
   async getBatchStatus(batchId: string) {
     const lockKey = `attendance-batch-lock:${batchId}`;
     const counterKey = `attendance-batch-counter:${batchId}`;
-    
+
     const [lockStatus, remainingJobs] = await Promise.all([
       this.redis.get(lockKey),
-      this.redis.get(counterKey)
+      this.redis.get(counterKey),
     ]);
-    
+
     return {
       batchId,
       isLocked: !!lockStatus,
       lockStatus,
       remainingJobs: remainingJobs ? parseInt(remainingJobs) : 0,
-      isCompleted: !lockStatus || remainingJobs === '0'
+      isCompleted: !lockStatus || remainingJobs === '0',
     };
   }
 }

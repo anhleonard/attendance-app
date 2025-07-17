@@ -65,7 +65,9 @@ export class StudentsService {
       const total = await Promise.all([
         this.prismaService.student.findMany({
           where: whereCondition,
-          ...(fetchAll ? {} : { skip: (page - 1) * rowPerPage, take: rowPerPage }),
+          ...(fetchAll
+            ? {}
+            : { skip: (page - 1) * rowPerPage, take: rowPerPage }),
           include: {
             classes: {
               where:
@@ -306,7 +308,8 @@ export class StudentsService {
     user: TokenPayload,
   ) {
     try {
-      let { classId, file } = importFileStudentDto;
+      let { classId } = importFileStudentDto;
+      const { file } = importFileStudentDto;
       if (typeof classId === 'string') {
         classId = Number(classId);
       }
