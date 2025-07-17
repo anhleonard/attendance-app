@@ -19,18 +19,19 @@ pipeline {
         
         stage('Setup Environment') {
             steps {
-                script {
-                    // Create necessary environment files if they don't exist
+                withCredentials([
+                    file(credentialsId: 'env-file-postgres', variable: 'ENV_POSTGRES'),
+                    file(credentialsId: 'env-file-minio', variable: 'ENV_MINIO'),
+                    file(credentialsId: 'env-file-n8n', variable: 'ENV_N8N'),
+                    file(credentialsId: 'env-file-backend', variable: 'ENV_BE'),
+                    file(credentialsId: 'env-file-frontend', variable: 'ENV_FE')
+                ]) {
                     sh '''
-                        if [ ! -f learning-app/.env ]; then
-                            echo "Creating .env file for backend"
-                            cp learning-app/.env.example learning-app/.env || echo "No .env.example found"
-                        fi
-                        
-                        if [ ! -f learning-app-ui/.env ]; then
-                            echo "Creating .env file for frontend"
-                            cp learning-app-ui/.env.example learning-app-ui/.env || echo "No .env.example found"
-                        fi
+                        cp $ENV_POSTGRES ./learning-app/.env.postgres
+                        cp $ENV_MINIO ./learning-app/.env.minio
+                        cp $ENV_N8N ./learning-app/.env.n8n
+                        cp $ENV_BE ./learning-app/.env
+                        cp $ENV_FE ./learning-app-ui/.env
                     '''
                 }
             }
