@@ -15,8 +15,8 @@ export class MinioService {
       region: 'us-east-1',
       endpoint: this.configService.get('MINIO_ENDPOINT'),
       credentials: {
-        accessKeyId: this.configService.get('MINIO_ACCESS_KEY'),
-        secretAccessKey: this.configService.get('MINIO_SECRET_KEY'),
+        accessKeyId: this.configService.get('MINIO_ROOT_USER'),
+        secretAccessKey: this.configService.get('MINIO_ROOT_PASSWORD'),
       },
       forcePathStyle: true, // Bắt buộc cho MinIO
     });

@@ -27,10 +27,12 @@ export class LoggingInterceptor implements NestInterceptor {
           const statusCode = response.statusCode;
 
           // Log successful response
-          // this.logger.log(
-          //   `[Response] ${method} ${originalUrl} ${statusCode} - ${responseTime}ms`,
-          // );
-          // this.logger.debug('Response Body:', data);
+          console.log(`🌐 [${method}] ${originalUrl} - ${statusCode} (${responseTime}ms)`);
+          console.log(`📥 Request from: ${request.ip}`);
+          console.log(`🔗 User-Agent: ${userAgent.substring(0, 50)}...`);
+          if (Object.keys(body).length > 0) {
+            console.log(`📦 Request body:`, body);
+          }
         },
         error: (error) => {
           const responseTime = Date.now() - startTime;

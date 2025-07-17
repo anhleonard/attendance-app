@@ -1,0 +1,119 @@
+services:
+  # Database - PostgreSQL
+  postgres:
+    image: postgres:15
+    container_name: attendance-app-postgres
+    env_file:
+      - ./learning-app/.env.postgres
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - attendance-app-network
+    restart: unless-stopped
+
+  # Redis for queues and caching
+  redis:
+    image: redis:7-alpine
+    container_name: attendance-app-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - attendance-app-network
+    restart: unless-stopped
+
+  # MinIO for file storage (S3-compatible)
+  minio:
+    image: minio/minio:latest
+    container_name: attendance-app-minio
+    command: server /data --console-address ":9001"
+    env_file:
+      - ./learning-app/.env.minio
+    ports:
+      - "9000:9000"  # API
+      - "9001:9001"  # Console
+    volumes:
+      - minio_data:/data
+    networks:
+      - attendance-app-network
+    restart: unless-stopped
+
+  # n8n for workflow automation (email sending)
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: attendance-app-n8n
+    env_file:
+      - ./learning-app/.env.n8n
+    ports:
+      - "5678:5678"
+    volumes:
+      - n8n_data:/home/node/.n8n
+    networks:
+      - attendance-app-network
+    depends_on:
+      - postgres
+    restart: unless-stopped
+
+  # Main NestJS application (Backend)
+  be-attendance:
+    build:
+      context: ./learning-app
+      dockerfile: Dockerfile
+    env_file:
+      - ./learning-app/.env
+    container_name: be-attendance
+    ports:
+      - "3010:3010"
+    command: >
+      sh -c "
+        npx prisma migrate deploy &&
+        node dist/main"
+        
+    volumes:
+      - ./learning-app/uploads:/app/uploads
+    networks:
+      - attendance-app-network
+    depends_on:
+      - postgres
+      - redis
+      - minio
+      - n8n
+    restart: unless-stopped
+
+  fe-attendance:
+    build:
+      context: ./learning-app-ui
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_HTTP_API_DOMAIN: http://localhost:3010
+        NEXT_PUBLIC_HTTP_AI_DOMAIN: http://localhost:8000
+    env_file:
+      - ./learning-app-ui/.env
+    container_name: fe-attendance
+    ports:
+      - "3015:3000"
+    networks:
+      - attendance-app-network
+    depends_on:
+      - postgres
+      - redis
+      - minio
+      - n8n
+    restart: unless-stopped
+
+networks:
+  attendance-app-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  minio_data:
+    driver: local
+  n8n_data:
+    driver: local 

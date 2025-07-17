@@ -1,16 +1,16 @@
-import axios from "axios";
 import { ChangePasswordDto, ForgotPasswordDto, LoginDto, RegisterDto, ResetPasswordDto } from "../dto";
 import axiosInstance from "../axios";
 
 const API_DOMAIN = process.env.NEXT_PUBLIC_HTTP_API_DOMAIN;
 
 export const login = async (data: LoginDto) => {
+  console.log(`${API_DOMAIN}/auth/login`, 'tesssssssssssssssss');
   const response = await axiosInstance.post(`${API_DOMAIN}/auth/login`, data);
   return response.data;
 };
 
 export const register = async (data: RegisterDto) => {
-  const response = await axios.post(`${API_DOMAIN}/users/create`, data);
+  const response = await axiosInstance.post(`${API_DOMAIN}/users/create`, data);
   return response.data;
 };
 

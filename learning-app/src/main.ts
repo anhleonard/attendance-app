@@ -5,17 +5,8 @@ import { ConfigService } from '@nestjs/config';
 import * as cookieParser from 'cookie-parser';
 import { LoggingInterceptor } from './interceptors/logging.interceptor';
 import { PrismaExceptionInterceptor } from './interceptors/prisma-exception.interceptor';
-import * as dotenv from 'dotenv';
-import * as path from 'path';
-import * as fs from 'fs';
-
-const envFile = process.env.NODE_ENV === 'production' 
-  ? '.env.production' 
-  : '.env.local';
-
-const envPath = path.resolve(process.cwd(), envFile);
-
-dotenv.config({ path: envPath });
+// Environment variables are injected by Docker Compose
+// No need to load .env files in production
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {

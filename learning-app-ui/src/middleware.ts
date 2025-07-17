@@ -31,7 +31,8 @@ export async function middleware(request: NextRequest) {
   }
 
   try {
-    const secret = new TextEncoder().encode(process.env.NEXT_PUBLIC_JWT_SECRET);
+    const secret = new TextEncoder().encode(process.env.JWT_SECRET);
+    console.log(process.env.JWT_SECRET, 'secret keyyyyyyyyyyyyy');
     const { payload } = await jwtVerify(token, secret);
 
     // Manual expiry check
