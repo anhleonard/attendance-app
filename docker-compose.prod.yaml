@@ -1,0 +1,109 @@
+services:
+  # Database - PostgreSQL
+  postgres:
+    image: postgres:15
+    container_name: attendance-app-postgres-prod
+    env_file:
+      - ./learning-app/.env.postgres
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data_prod:/var/lib/postgresql/data
+    networks:
+      - attendance-app-network-prod
+    restart: unless-stopped
+
+  # Redis for queues and caching
+  redis:
+    image: redis:7-alpine
+    container_name: attendance-app-redis-prod
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data_prod:/data
+    networks:
+      - attendance-app-network-prod
+    restart: unless-stopped
+
+  # MinIO for file storage (S3-compatible)
+  minio:
+    image: minio/minio:latest
+    container_name: attendance-app-minio-prod
+    command: server /data --console-address ":9001"
+    env_file:
+      - ./learning-app/.env.minio
+    ports:
+      - "9000:9000"  # API
+      - "9001:9001"  # Console
+    volumes:
+      - minio_data_prod:/data
+    networks:
+      - attendance-app-network-prod
+    restart: unless-stopped
+
+  # n8n for workflow automation (email sending)
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: attendance-app-n8n-prod
+    env_file:
+      - ./learning-app/.env.n8n
+    ports:
+      - "5678:5678"
+    volumes:
+      - n8n_data_prod:/home/node/.n8n
+    networks:
+      - attendance-app-network-prod
+    depends_on:
+      - postgres
+    restart: unless-stopped
+
+  # Main NestJS application (Backend) - Using pre-built image
+  be-attendance:
+    image: anhtt4512/attendance-app-backend:latest
+    env_file:
+      - ./learning-app/.env
+    container_name: be-attendance-prod
+    ports:
+      - "3010:3010"
+    command: >
+      sh -c "
+        npx prisma migrate deploy &&
+        node dist/main"
+    volumes:
+      - ./learning-app/uploads:/app/uploads
+    networks:
+      - attendance-app-network-prod
+    depends_on:
+      - postgres
+      - redis
+      - minio
+      - n8n
+    restart: unless-stopped
+
+  # Frontend application - Using pre-built image
+  fe-attendance:
+    image: anhtt4512/attendance-app-frontend:latest
+    env_file:
+      - ./learning-app-ui/.env
+    container_name: fe-attendance-prod
+    ports:
+      - "3015:3000"
+    networks:
+      - attendance-app-network-prod
+    depends_on:
+      - be-attendance
+    restart: unless-stopped
+
+networks:
+  attendance-app-network-prod:
+    driver: bridge
+
+volumes:
+  postgres_data_prod:
+    driver: local
+  redis_data_prod:
+    driver: local
+  minio_data_prod:
+    driver: local
+  n8n_data_prod:
+    driver: local 

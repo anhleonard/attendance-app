@@ -239,61 +239,9 @@ pipeline {
             }
         }
         
-        stage('Deploy to Staging') {
-            when {
-                anyOf {
-                    branch 'master'
-                    branch 'main'
-                    expression { 
-                        def currentBranch = env.BRANCH_NAME ?: env.GIT_BRANCH ?: sh(script: 'git rev-parse --abbrev-ref HEAD', returnStdout: true).trim()
-                        return currentBranch == 'master' || currentBranch == 'main' || currentBranch.endsWith('/master') || currentBranch.endsWith('/main')
-                    }
-                }
-            }
-            steps {
-                script {
-                    // Deploy to staging environment
-                    sh '''
-                        # Update docker-compose with new image versions
-                        sed -i "s|image: ${DOCKER_USERNAME}/learning-app-backend:.*|image: ${BACKEND_IMAGE}:${VERSION}|g" docker-compose.staging.yaml
-                        sed -i "s|image: ${DOCKER_USERNAME}/learning-app-frontend:.*|image: ${FRONTEND_IMAGE}:${VERSION}|g" docker-compose.staging.yaml
-                        
-                        # Deploy using docker-compose
-                        docker-compose -f docker-compose.staging.yaml down
-                        docker-compose -f docker-compose.staging.yaml pull
-                        docker-compose -f docker-compose.staging.yaml up -d
-                    '''
-                }
-            }
-        }
+
         
-        stage('Integration Tests') {
-            when {
-                anyOf {
-                    branch 'master'
-                    branch 'main'
-                    expression { 
-                        def currentBranch = env.BRANCH_NAME ?: env.GIT_BRANCH ?: sh(script: 'git rev-parse --abbrev-ref HEAD', returnStdout: true).trim()
-                        return currentBranch == 'master' || currentBranch == 'main' || currentBranch.endsWith('/master') || currentBranch.endsWith('/main')
-                    }
-                }
-            }
-            steps {
-                script {
-                    // Wait for services to be ready
-                    sh 'sleep 30'
-                    
-                    // Run integration tests
-                    sh '''
-                        # Test backend health
-                        curl -f http://staging-backend:3010/health || exit 1
-                        
-                        # Test frontend
-                        curl -f http://staging-frontend:3000 || exit 1
-                    '''
-                }
-            }
-        }
+
         
         stage('Deploy to Production') {
             when {
@@ -312,8 +260,8 @@ pipeline {
                     // Deploy to production environment
                     sh '''
                         # Update docker-compose with new image versions
-                        sed -i "s|image: ${DOCKER_USERNAME}/learning-app-backend:.*|image: ${BACKEND_IMAGE}:${VERSION}|g" docker-compose.prod.yaml
-                        sed -i "s|image: ${DOCKER_USERNAME}/learning-app-frontend:.*|image: ${FRONTEND_IMAGE}:${VERSION}|g" docker-compose.prod.yaml
+                        sed -i "s|image: anhtt4512/attendance-app-backend:.*|image: ${BACKEND_IMAGE}:${VERSION}|g" docker-compose.prod.yaml
+                        sed -i "s|image: anhtt4512/attendance-app-frontend:.*|image: ${FRONTEND_IMAGE}:${VERSION}|g" docker-compose.prod.yaml
                         
                         # Deploy using docker-compose
                         docker-compose -f docker-compose.prod.yaml down
