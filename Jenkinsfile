@@ -8,10 +8,6 @@ pipeline {
 
         BACKEND_IMAGE = "${DOCKER_USERNAME}/attendance-app-backend"
         FRONTEND_IMAGE = "${DOCKER_USERNAME}/attendance-app-frontend"
-        
-        // Cache keys for better performance
-        NODE_CACHE_KEY = "node-modules-${env.BUILD_NUMBER}"
-        DOCKER_CACHE_KEY = "docker-cache-${env.BUILD_NUMBER}"
     }
     
     stages {
@@ -46,14 +42,11 @@ pipeline {
                 stage('Backend Dependencies') {
                     steps {
                         dir('learning-app') {
-                            // Cache node_modules for faster builds
-                            cache(path: 'node_modules', key: "${NODE_CACHE_KEY}-backend", restoreKeys: ['node-modules-backend-']) {
-                                sh '''
-                                    # Use npm ci for faster, reliable installs
-                                    npm ci --legacy-peer-deps --prefer-offline --no-audit --no-fund
-                                    npm install -g @nestjs/cli prisma
-                                '''
-                            }
+                            sh '''
+                                # Use npm ci for faster, reliable installs
+                                npm ci --legacy-peer-deps --prefer-offline --no-audit --no-fund
+                                npm install -g @nestjs/cli prisma
+                            '''
                         }
                     }
                 }
@@ -61,13 +54,10 @@ pipeline {
                 stage('Frontend Dependencies') {
                     steps {
                         dir('learning-app-ui') {
-                            // Cache node_modules for faster builds
-                            cache(path: 'node_modules', key: "${NODE_CACHE_KEY}-frontend", restoreKeys: ['node-modules-frontend-']) {
-                                sh '''
-                                    # Use npm ci for faster, reliable installs
-                                    npm ci --prefer-offline --no-audit --no-fund
-                                '''
-                            }
+                            sh '''
+                                # Use npm ci for faster, reliable installs
+                                npm ci --prefer-offline --no-audit --no-fund
+                            '''
                         }
                     }
                 }
@@ -87,8 +77,8 @@ pipeline {
                         dir('learning-app') {
                             sh '''
                                 # Run tests with coverage and quiet output
-                                npm run test -- --coverage --silent || echo "Tests skipped - no test script found"
-                                npm run test:e2e -- --silent || echo "E2E tests skipped - no test script found"
+                                npm run test || echo "Tests skipped - no test script found"
+                                npm run test:e2e || echo "E2E tests skipped - no test script found"
                             '''
                         }
                     }
@@ -115,8 +105,8 @@ pipeline {
                         dir('learning-app-ui') {
                             sh '''
                                 # Run tests with coverage and quiet output
-                                npm run test -- --coverage --silent || echo "Tests skipped - no test script found"
-                                npm run test:e2e -- --silent || echo "E2E tests skipped - no test script found"
+                                npm run test || echo "Tests skipped - no test script found"
+                                npm run test:e2e || echo "E2E tests skipped - no test script found"
                             '''
                         }
                     }
@@ -147,7 +137,7 @@ pipeline {
                         dir('learning-app') {
                             sh '''
                                 # Run lint with quiet output and cache
-                                npm run lint -- --quiet --cache || echo "Lint skipped - eslint not found"
+                                npm run lint || echo "Lint skipped - eslint not found"
                             '''
                         }
                     }
@@ -164,7 +154,7 @@ pipeline {
                         dir('learning-app-ui') {
                             sh '''
                                 # Run lint with quiet output and cache
-                                npm run lint -- --quiet --cache
+                                npm run lint
                             '''
                         }
                     }
@@ -185,7 +175,7 @@ pipeline {
                         dir('learning-app') {
                             sh '''
                                 # Build with optimizations
-                                npm run build -- --optimize
+                                npm run build
                                 npx prisma generate
                             '''
                         }
@@ -203,7 +193,7 @@ pipeline {
                         dir('learning-app-ui') {
                             sh '''
                                 # Build with optimizations and quiet output
-                                npm run build -- --quiet
+                                npm run build
                             '''
                         }
                     }
