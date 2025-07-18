@@ -186,7 +186,10 @@ pipeline {
         
         stage('Push to Registry') {
             when {
-                branch 'master'
+                anyOf {
+                    branch 'master'
+                    expression { env.BRANCH_NAME ==~ /.*master$/ }
+                }
             }
             steps {
                 script {

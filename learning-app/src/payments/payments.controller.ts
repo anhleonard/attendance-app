@@ -4,7 +4,6 @@ import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/auth/guards/roles.guard';
 import { Roles } from 'src/auth/decorators/role.decorator';
 import { Role } from 'src/utils/enums';
-import { CreatePaymentDto } from './dto/create-payment.dto';
 import { UpdatePaymentDto } from './dto/update-payment.dto';
 import { FilterPaymentDto } from './dto/filter-payment.dto';
 import { FindDetailPaymentDto } from './dto/find-detail-payment.dto';
