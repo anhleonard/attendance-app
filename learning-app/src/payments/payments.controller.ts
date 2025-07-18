@@ -16,13 +16,6 @@ export class PaymentsController {
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN)
-  @Post('/create')
-  createPayment(@Body() createPaymentDto: CreatePaymentDto) {
-    return this.paymentsService.createPayment(createPaymentDto);
-  }
-
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN)
   @Post('/update')
   updatePayment(@Body() updatePaymentDto: UpdatePaymentDto) {
     return this.paymentsService.updatePayment(updatePaymentDto);
