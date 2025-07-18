@@ -263,10 +263,24 @@ pipeline {
                         sed -i "s|image: anhtt4512/attendance-app-backend:.*|image: ${BACKEND_IMAGE}:${VERSION}|g" docker-compose.prod.yaml
                         sed -i "s|image: anhtt4512/attendance-app-frontend:.*|image: ${FRONTEND_IMAGE}:${VERSION}|g" docker-compose.prod.yaml
                         
-                        # Deploy using docker-compose
-                        docker-compose -f docker-compose.prod.yaml down
-                        docker-compose -f docker-compose.prod.yaml pull
-                        docker-compose -f docker-compose.prod.yaml up -d
+                        # Check if docker compose is available, otherwise install docker-compose
+                        if ! command -v docker compose &> /dev/null; then
+                            echo "docker compose not found, trying to install docker-compose..."
+                            curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+                            chmod +x /usr/local/bin/docker-compose
+                            export PATH="/usr/local/bin:$PATH"
+                        fi
+                        
+                        # Deploy using docker compose (with fallback to docker-compose)
+                        if command -v docker compose &> /dev/null; then
+                            docker compose -f docker-compose.prod.yaml down
+                            docker compose -f docker-compose.prod.yaml pull
+                            docker compose -f docker-compose.prod.yaml up -d
+                        else
+                            docker-compose -f docker-compose.prod.yaml down
+                            docker-compose -f docker-compose.prod.yaml pull
+                            docker-compose -f docker-compose.prod.yaml up -d
+                        fi
                     '''
                 }
             }
