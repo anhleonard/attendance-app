@@ -79,7 +79,7 @@ pipeline {
                 stage('Backend Tests') {
                     when {
                         anyOf {
-                            changeset glob: "learning-app/**/*", comparator: "REGEXP"
+                            changeset pattern: "learning-app/**/*"
                             expression { return env.BRANCH_NAME == 'master' || env.BRANCH_NAME == 'main' }
                         }
                     }
@@ -107,7 +107,7 @@ pipeline {
                 stage('Frontend Tests') {
                     when {
                         anyOf {
-                            changeset glob: "learning-app-ui/**/*", comparator: "REGEXP"
+                            changeset pattern: "learning-app-ui/**/*"
                             expression { return env.BRANCH_NAME == 'master' || env.BRANCH_NAME == 'main' }
                         }
                     }
@@ -139,7 +139,7 @@ pipeline {
                 stage('Backend Lint') {
                     when {
                         anyOf {
-                            changeset glob: "learning-app/**/*.{ts,js}", comparator: "REGEXP"
+                            changeset pattern: "learning-app/**/*.{ts,js}"
                             expression { return env.BRANCH_NAME == 'master' || env.BRANCH_NAME == 'main' }
                         }
                     }
@@ -156,7 +156,7 @@ pipeline {
                 stage('Frontend Lint') {
                     when {
                         anyOf {
-                            changeset glob: "learning-app-ui/**/*.{ts,js,tsx,jsx}", comparator: "REGEXP"
+                            changeset pattern: "learning-app-ui/**/*.{ts,js,tsx,jsx}"
                             expression { return env.BRANCH_NAME == 'master' || env.BRANCH_NAME == 'main' }
                         }
                     }
@@ -177,7 +177,7 @@ pipeline {
                 stage('Build Backend') {
                     when {
                         anyOf {
-                            changeset glob: "learning-app/**/*", comparator: "REGEXP"
+                            changeset pattern: "learning-app/**/*"
                             expression { return env.BRANCH_NAME == 'master' || env.BRANCH_NAME == 'main' }
                         }
                     }
@@ -195,7 +195,7 @@ pipeline {
                 stage('Build Frontend') {
                     when {
                         anyOf {
-                            changeset glob: "learning-app-ui/**/*", comparator: "REGEXP"
+                            changeset pattern: "learning-app-ui/**/*"
                             expression { return env.BRANCH_NAME == 'master' || env.BRANCH_NAME == 'main' }
                         }
                     }
