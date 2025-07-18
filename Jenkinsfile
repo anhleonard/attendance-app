@@ -169,6 +169,31 @@ pipeline {
             }
         }
         
+        stage('Debug Branch') {
+            steps {
+                script {
+                    echo "=== BRANCH DEBUG INFO ==="
+                    echo "BRANCH_NAME: '${env.BRANCH_NAME}'"
+                    echo "GIT_BRANCH: '${env.GIT_BRANCH}'"
+                    echo "GIT_LOCAL_BRANCH: '${env.GIT_LOCAL_BRANCH}'"
+                    echo "CHANGE_BRANCH: '${env.CHANGE_BRANCH}'"
+                    echo "CHANGE_TARGET: '${env.CHANGE_TARGET}'"
+                    echo "BRANCH_NAME length: ${env.BRANCH_NAME?.length() ?: 'null'}"
+                    echo "GIT_BRANCH length: ${env.GIT_BRANCH?.length() ?: 'null'}"
+                    
+                    sh '''
+                        echo "=== GIT COMMANDS ==="
+                        echo "Current branch:"
+                        git rev-parse --abbrev-ref HEAD
+                        echo "All branches:"
+                        git branch -a
+                        echo "Remote branches:"
+                        git branch -r
+                    '''
+                }
+            }
+        }
+        
         stage('Security Scan') {
             steps {
                 script {
@@ -188,7 +213,12 @@ pipeline {
             when {
                 anyOf {
                     branch 'master'
-                    expression { env.BRANCH_NAME ==~ /.*master$/ }
+                    branch 'main'
+                    expression { 
+                        def currentBranch = env.BRANCH_NAME ?: env.GIT_BRANCH ?: sh(script: 'git rev-parse --abbrev-ref HEAD', returnStdout: true).trim()
+                        echo "Current branch for push condition: '${currentBranch}'"
+                        return currentBranch == 'master' || currentBranch == 'main' || currentBranch.endsWith('/master') || currentBranch.endsWith('/main')
+                    }
                 }
             }
             steps {
@@ -211,7 +241,14 @@ pipeline {
         
         stage('Deploy to Staging') {
             when {
-                branch 'master'
+                anyOf {
+                    branch 'master'
+                    branch 'main'
+                    expression { 
+                        def currentBranch = env.BRANCH_NAME ?: env.GIT_BRANCH ?: sh(script: 'git rev-parse --abbrev-ref HEAD', returnStdout: true).trim()
+                        return currentBranch == 'master' || currentBranch == 'main' || currentBranch.endsWith('/master') || currentBranch.endsWith('/main')
+                    }
+                }
             }
             steps {
                 script {
@@ -232,7 +269,14 @@ pipeline {
         
         stage('Integration Tests') {
             when {
-                branch 'master'
+                anyOf {
+                    branch 'master'
+                    branch 'main'
+                    expression { 
+                        def currentBranch = env.BRANCH_NAME ?: env.GIT_BRANCH ?: sh(script: 'git rev-parse --abbrev-ref HEAD', returnStdout: true).trim()
+                        return currentBranch == 'master' || currentBranch == 'main' || currentBranch.endsWith('/master') || currentBranch.endsWith('/main')
+                    }
+                }
             }
             steps {
                 script {
@@ -253,7 +297,14 @@ pipeline {
         
         stage('Deploy to Production') {
             when {
-                branch 'master'
+                anyOf {
+                    branch 'master'
+                    branch 'main'
+                    expression { 
+                        def currentBranch = env.BRANCH_NAME ?: env.GIT_BRANCH ?: sh(script: 'git rev-parse --abbrev-ref HEAD', returnStdout: true).trim()
+                        return currentBranch == 'master' || currentBranch == 'main' || currentBranch.endsWith('/master') || currentBranch.endsWith('/main')
+                    }
+                }
             }
             steps {
                 input message: 'Deploy to production?', ok: 'Deploy'
