@@ -43,8 +43,8 @@ pipeline {
                     steps {
                         dir('learning-app') {
                             sh '''
-                                # Use npm ci for faster, reliable installs
-                                npm ci --legacy-peer-deps --prefer-offline --no-audit --no-fund
+                                # Use npm install for faster, reliable installs
+                                npm install --legacy-peer-deps --prefer-offline --no-audit --no-fund
                                 npm install -g @nestjs/cli prisma
                             '''
                         }
@@ -55,8 +55,8 @@ pipeline {
                     steps {
                         dir('learning-app-ui') {
                             sh '''
-                                # Use npm ci for faster, reliable installs
-                                npm ci --prefer-offline --no-audit --no-fund
+                                # Use npm install for faster, reliable installs
+                                npm install --prefer-offline --no-audit --no-fund
                             '''
                         }
                     }
