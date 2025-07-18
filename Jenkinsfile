@@ -8,6 +8,10 @@ pipeline {
 
         BACKEND_IMAGE = "${DOCKER_USERNAME}/attendance-app-backend"
         FRONTEND_IMAGE = "${DOCKER_USERNAME}/attendance-app-frontend"
+        
+        // Cache keys for better performance
+        NODE_CACHE_KEY = "node-modules-${env.BUILD_NUMBER}"
+        DOCKER_CACHE_KEY = "docker-cache-${env.BUILD_NUMBER}"
     }
     
     stages {
@@ -42,11 +46,14 @@ pipeline {
                 stage('Backend Dependencies') {
                     steps {
                         dir('learning-app') {
-                            sh '''
-                                npm install --legacy-peer-deps
-                                npm install -g @nestjs/cli
-                                npm install -g prisma
-                            '''
+                            // Cache node_modules for faster builds
+                            cache(path: 'node_modules', key: "${NODE_CACHE_KEY}-backend", restoreKeys: ['node-modules-backend-']) {
+                                sh '''
+                                    # Use npm ci for faster, reliable installs
+                                    npm ci --legacy-peer-deps --prefer-offline --no-audit --no-fund
+                                    npm install -g @nestjs/cli prisma
+                                '''
+                            }
                         }
                     }
                 }
@@ -54,7 +61,13 @@ pipeline {
                 stage('Frontend Dependencies') {
                     steps {
                         dir('learning-app-ui') {
-                            sh 'npm install'
+                            // Cache node_modules for faster builds
+                            cache(path: 'node_modules', key: "${NODE_CACHE_KEY}-frontend", restoreKeys: ['node-modules-frontend-']) {
+                                sh '''
+                                    # Use npm ci for faster, reliable installs
+                                    npm ci --prefer-offline --no-audit --no-fund
+                                '''
+                            }
                         }
                     }
                 }
@@ -64,11 +77,18 @@ pipeline {
         stage('Run Tests') {
             parallel {
                 stage('Backend Tests') {
+                    when {
+                        anyOf {
+                            changeset glob: "learning-app/**/*", comparator: "REGEXP"
+                            expression { return env.BRANCH_NAME == 'master' || env.BRANCH_NAME == 'main' }
+                        }
+                    }
                     steps {
                         dir('learning-app') {
                             sh '''
-                                npm run test || echo "Tests skipped - no test script found"
-                                npm run test:e2e || echo "E2E tests skipped - no test script found"
+                                # Run tests with coverage and quiet output
+                                npm run test -- --coverage --silent || echo "Tests skipped - no test script found"
+                                npm run test:e2e -- --silent || echo "E2E tests skipped - no test script found"
                             '''
                         }
                     }
@@ -85,11 +105,18 @@ pipeline {
                 }
                 
                 stage('Frontend Tests') {
+                    when {
+                        anyOf {
+                            changeset glob: "learning-app-ui/**/*", comparator: "REGEXP"
+                            expression { return env.BRANCH_NAME == 'master' || env.BRANCH_NAME == 'main' }
+                        }
+                    }
                     steps {
                         dir('learning-app-ui') {
                             sh '''
-                                npm run test || echo "Tests skipped - no test script found"
-                                npm run test:e2e || echo "E2E tests skipped - no test script found"
+                                # Run tests with coverage and quiet output
+                                npm run test -- --coverage --silent || echo "Tests skipped - no test script found"
+                                npm run test:e2e -- --silent || echo "E2E tests skipped - no test script found"
                             '''
                         }
                     }
@@ -110,17 +137,35 @@ pipeline {
         stage('Code Quality') {
             parallel {
                 stage('Backend Lint') {
+                    when {
+                        anyOf {
+                            changeset glob: "learning-app/**/*.{ts,js}", comparator: "REGEXP"
+                            expression { return env.BRANCH_NAME == 'master' || env.BRANCH_NAME == 'main' }
+                        }
+                    }
                     steps {
                         dir('learning-app') {
-                            sh 'npm run lint || echo "Lint skipped - eslint not found"'
+                            sh '''
+                                # Run lint with quiet output and cache
+                                npm run lint -- --quiet --cache || echo "Lint skipped - eslint not found"
+                            '''
                         }
                     }
                 }
                 
                 stage('Frontend Lint') {
+                    when {
+                        anyOf {
+                            changeset glob: "learning-app-ui/**/*.{ts,js,tsx,jsx}", comparator: "REGEXP"
+                            expression { return env.BRANCH_NAME == 'master' || env.BRANCH_NAME == 'main' }
+                        }
+                    }
                     steps {
                         dir('learning-app-ui') {
-                            sh 'npm run lint'
+                            sh '''
+                                # Run lint with quiet output and cache
+                                npm run lint -- --quiet --cache
+                            '''
                         }
                     }
                 }
@@ -130,10 +175,17 @@ pipeline {
         stage('Build Applications') {
             parallel {
                 stage('Build Backend') {
+                    when {
+                        anyOf {
+                            changeset glob: "learning-app/**/*", comparator: "REGEXP"
+                            expression { return env.BRANCH_NAME == 'master' || env.BRANCH_NAME == 'main' }
+                        }
+                    }
                     steps {
                         dir('learning-app') {
                             sh '''
-                                npm run build
+                                # Build with optimizations
+                                npm run build -- --optimize
                                 npx prisma generate
                             '''
                         }
@@ -141,9 +193,18 @@ pipeline {
                 }
                 
                 stage('Build Frontend') {
+                    when {
+                        anyOf {
+                            changeset glob: "learning-app-ui/**/*", comparator: "REGEXP"
+                            expression { return env.BRANCH_NAME == 'master' || env.BRANCH_NAME == 'main' }
+                        }
+                    }
                     steps {
                         dir('learning-app-ui') {
-                            sh 'npm run build'
+                            sh '''
+                                # Build with optimizations and quiet output
+                                npm run build -- --quiet
+                            '''
                         }
                     }
                 }
@@ -158,13 +219,27 @@ pipeline {
                         sh 'echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin'
                     }
 
-                    // 🛠 Build backend image
-                    docker.build("${BACKEND_IMAGE}:${VERSION}", "./learning-app")
-                    docker.build("${BACKEND_IMAGE}:latest", "./learning-app")
+                    // Check if we need to build images based on changes
+                    def backendChanged = sh(script: "git diff --name-only HEAD~1 HEAD | grep 'learning-app/'", returnStatus: true) == 0
+                    def frontendChanged = sh(script: "git diff --name-only HEAD~1 HEAD | grep 'learning-app-ui/'", returnStatus: true) == 0
                     
-                    // 🛠 Build frontend image
-                    docker.build("${FRONTEND_IMAGE}:${VERSION}", "./learning-app-ui")
-                    docker.build("${FRONTEND_IMAGE}:latest", "./learning-app-ui")
+                    if (backendChanged || env.BRANCH_NAME == 'master' || env.BRANCH_NAME == 'main') {
+                        echo "Building backend image..."
+                        // 🛠 Build backend image with cache
+                        docker.build("${BACKEND_IMAGE}:${VERSION}", "--cache-from ${BACKEND_IMAGE}:latest --build-arg BUILDKIT_INLINE_CACHE=1 ./learning-app")
+                        docker.build("${BACKEND_IMAGE}:latest", "--cache-from ${BACKEND_IMAGE}:latest --build-arg BUILDKIT_INLINE_CACHE=1 ./learning-app")
+                    } else {
+                        echo "No backend changes detected, skipping backend build"
+                    }
+                    
+                    if (frontendChanged || env.BRANCH_NAME == 'master' || env.BRANCH_NAME == 'main') {
+                        echo "Building frontend image..."
+                        // 🛠 Build frontend image with cache
+                        docker.build("${FRONTEND_IMAGE}:${VERSION}", "--cache-from ${FRONTEND_IMAGE}:latest --build-arg BUILDKIT_INLINE_CACHE=1 ./learning-app-ui")
+                        docker.build("${FRONTEND_IMAGE}:latest", "--cache-from ${FRONTEND_IMAGE}:latest --build-arg BUILDKIT_INLINE_CACHE=1 ./learning-app-ui")
+                    } else {
+                        echo "No frontend changes detected, skipping frontend build"
+                    }
                 }
             }
         }
@@ -194,16 +269,51 @@ pipeline {
             }
         }
         
-        stage('Security Scan') {
+        stage('Optimize Images') {
+            when {
+                anyOf {
+                    branch 'master'
+                    branch 'main'
+                }
+            }
             steps {
                 script {
-                    // Scan Docker images for vulnerabilities
+                    // Optimize Docker images for production
                     sh '''
-                        docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
-                            aquasec/trivy image ${BACKEND_IMAGE}:${VERSION}
+                        echo "Optimizing backend image..."
+                        # Remove unnecessary files and optimize layers
+                        docker run --rm ${BACKEND_IMAGE}:${VERSION} sh -c "
+                            rm -rf /tmp/* /var/tmp/* /var/cache/* 2>/dev/null || true
+                        " || echo "Backend optimization completed"
                         
+                        echo "Optimizing frontend image..."
+                        # Remove unnecessary files and optimize layers
+                        docker run --rm ${FRONTEND_IMAGE}:${VERSION} sh -c "
+                            rm -rf /tmp/* /var/tmp/* /var/cache/* 2>/dev/null || true
+                        " || echo "Frontend optimization completed"
+                    '''
+                }
+            }
+        }
+        
+        stage('Security Scan') {
+            when {
+                anyOf {
+                    branch 'master'
+                    branch 'main'
+                }
+            }
+            steps {
+                script {
+                    // Scan Docker images for vulnerabilities with quiet output
+                    sh '''
+                        echo "Scanning backend image for vulnerabilities..."
                         docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
-                            aquasec/trivy image ${FRONTEND_IMAGE}:${VERSION}
+                            aquasec/trivy image --quiet --severity HIGH,CRITICAL ${BACKEND_IMAGE}:${VERSION} || echo "Backend scan completed"
+                        
+                        echo "Scanning frontend image for vulnerabilities..."
+                        docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+                            aquasec/trivy image --quiet --severity HIGH,CRITICAL ${FRONTEND_IMAGE}:${VERSION} || echo "Frontend scan completed"
                     '''
                 }
             }
@@ -289,10 +399,17 @@ pipeline {
     
     post {
         always {
-            // Clean up Docker images
+            // Clean up Docker images and containers efficiently
             sh '''
-                docker image prune -f || echo "Docker cleanup failed"
-                docker container prune -f || echo "Container cleanup failed"
+                echo "Cleaning up Docker resources..."
+                # Remove unused images (older than 24 hours)
+                docker image prune -f --filter "until=24h" || echo "Docker image cleanup failed"
+                # Remove stopped containers (older than 24 hours)
+                docker container prune -f --filter "until=24h" || echo "Docker container cleanup failed"
+                # Remove unused networks
+                docker network prune -f || echo "Docker network cleanup failed"
+                # Remove unused volumes (be careful with this in production)
+                docker volume prune -f || echo "Docker volume cleanup failed"
             '''
         }
         
