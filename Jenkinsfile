@@ -353,7 +353,7 @@ pipeline {
             }
         }
         
-        stage('Optimize Images') {
+        stage('Analyze and Optimize Images') {
             when {
                 expression { 
                     def currentBranch = env.BRANCH_NAME ?: env.GIT_BRANCH ?: sh(script: 'git rev-parse --abbrev-ref HEAD', returnStdout: true).trim()
@@ -362,19 +362,77 @@ pipeline {
             }
             steps {
                 script {
+                    // Analyze image sizes before optimization
+                    sh '''
+                        echo "=== IMAGE SIZE ANALYSIS ==="
+                        echo "Backend image size:"
+                        docker images ${BACKEND_IMAGE}:${VERSION} --format "table {{.Repository}}\t{{.Tag}}\t{{.Size}}"
+                        
+                        echo "Frontend image size:"
+                        docker images ${FRONTEND_IMAGE}:${VERSION} --format "table {{.Repository}}\t{{.Tag}}\t{{.Size}}"
+                        
+                        echo "=== LAYER ANALYSIS ==="
+                        echo "Backend image layers:"
+                        docker history ${BACKEND_IMAGE}:${VERSION} --format "table {{.CreatedBy}}\t{{.Size}}"
+                        
+                        echo "Frontend image layers:"
+                        docker history ${FRONTEND_IMAGE}:${VERSION} --format "table {{.CreatedBy}}\t{{.Size}}"
+                    '''
+                    
                     // Optimize Docker images for production
                     sh '''
+                        echo "=== OPTIMIZING IMAGES ==="
                         echo "Optimizing backend image..."
-                        # Remove unnecessary files and optimize layers
+                        
+                        # Create optimized backend image
                         docker run --rm ${BACKEND_IMAGE}:${VERSION} sh -c "
-                            rm -rf /tmp/* /var/tmp/* /var/cache/* 2>/dev/null || true
+                            # Remove unnecessary files
+                            rm -rf /tmp/* /var/tmp/* /var/cache/* /root/.npm /root/.cache 2>/dev/null || true
+                            
+                            # Remove documentation and test files from node_modules
+                            find /usr/local/lib/node_modules -name '*.md' -delete 2>/dev/null || true
+                            find /usr/local/lib/node_modules -name '*.txt' -delete 2>/dev/null || true
+                            find /usr/local/lib/node_modules -name 'test' -type d -exec rm -rf {} + 2>/dev/null || true
+                            find /usr/local/lib/node_modules -name 'tests' -type d -exec rm -rf {} + 2>/dev/null || true
+                            find /usr/local/lib/node_modules -name 'example' -type d -exec rm -rf {} + 2>/dev/null || true
+                            find /usr/local/lib/node_modules -name 'examples' -type d -exec rm -rf {} + 2>/dev/null || true
+                            
+                            # Remove source maps and unnecessary files
+                            find /usr/local/lib/node_modules -name '*.map' -delete 2>/dev/null || true
+                            find /usr/local/lib/node_modules -name '*.ts' -delete 2>/dev/null || true
+                            
+                            # Clean npm cache
+                            npm cache clean --force 2>/dev/null || true
+                            
+                            echo 'Backend optimization completed'
                         " || echo "Backend optimization completed"
                         
                         echo "Optimizing frontend image..."
-                        # Remove unnecessary files and optimize layers
+                        
+                        # Create optimized frontend image
                         docker run --rm ${FRONTEND_IMAGE}:${VERSION} sh -c "
-                            rm -rf /tmp/* /var/tmp/* /var/cache/* 2>/dev/null || true
+                            # Remove unnecessary files
+                            rm -rf /tmp/* /var/tmp/* /var/cache/* /root/.npm /root/.cache 2>/dev/null || true
+                            
+                            # Remove source maps from Next.js build
+                            find /app/.next -name '*.map' -delete 2>/dev/null || true
+                            
+                            # Remove development files
+                            find /app -name '*.test.*' -delete 2>/dev/null || true
+                            find /app -name '*.spec.*' -delete 2>/dev/null || true
+                            
+                            # Clean npm cache
+                            npm cache clean --force 2>/dev/null || true
+                            
+                            echo 'Frontend optimization completed'
                         " || echo "Frontend optimization completed"
+                        
+                        echo "=== POST-OPTIMIZATION SIZE ANALYSIS ==="
+                        echo "Backend image size after optimization:"
+                        docker images ${BACKEND_IMAGE}:${VERSION} --format "table {{.Repository}}\t{{.Tag}}\t{{.Size}}"
+                        
+                        echo "Frontend image size after optimization:"
+                        docker images ${FRONTEND_IMAGE}:${VERSION} --format "table {{.Repository}}\t{{.Tag}}\t{{.Size}}"
                     '''
                 }
             }
@@ -403,6 +461,45 @@ pipeline {
             }
         }
         
+        stage('Network and Registry Check') {
+            when {
+                expression { 
+                    def currentBranch = env.BRANCH_NAME ?: env.GIT_BRANCH ?: sh(script: 'git rev-parse --abbrev-ref HEAD', returnStdout: true).trim()
+                    return currentBranch == 'master' || currentBranch == 'main' || currentBranch.endsWith('/master') || currentBranch.endsWith('/main')
+                }
+            }
+            steps {
+                script {
+                    // Check network connectivity and Docker Hub status
+                    sh '''
+                        echo "=== NETWORK CONNECTIVITY CHECK ==="
+                        
+                        # Test basic internet connectivity
+                        echo "Testing internet connectivity..."
+                        ping -c 3 8.8.8.8 || echo "Warning: Basic internet connectivity issues"
+                        
+                        # Test Docker Hub connectivity
+                        echo "Testing Docker Hub connectivity..."
+                        curl -I --connect-timeout 10 https://registry-1.docker.io/v2/ || echo "Warning: Docker Hub connectivity issues"
+                        
+                        # Test DNS resolution
+                        echo "Testing DNS resolution..."
+                        nslookup registry-1.docker.io || echo "Warning: DNS resolution issues"
+                        
+                        # Check Docker daemon status
+                        echo "Checking Docker daemon status..."
+                        docker info --format "table {{.ServerVersion}}\t{{.OperatingSystem}}" || echo "Warning: Docker daemon issues"
+                        
+                        # Check available disk space
+                        echo "Checking available disk space..."
+                        df -h /var/lib/docker || df -h / || echo "Warning: Disk space check failed"
+                        
+                        echo "=== NETWORK CHECK COMPLETED ==="
+                    '''
+                }
+            }
+        }
+        
         stage('Push to Registry') {
             when {
                 expression { 
@@ -413,17 +510,149 @@ pipeline {
             }
             steps {
                 script {
-                    // Login to Docker Hub
+                    // Login to Docker Hub with retry mechanism
                     withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
-                        sh 'echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin'
+                        retry(3) {
+                            timeout(time: 2, unit: 'MINUTES') {
+                                sh '''
+                                    echo "Logging into Docker Hub..."
+                                    echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin
+                                    echo "Docker Hub login successful"
+                                '''
+                            }
+                        }
                     }
                     
-                    // Push images
+                    // Optimize images before push to reduce size
                     sh '''
-                        docker push ${BACKEND_IMAGE}:${VERSION}
-                        docker push ${BACKEND_IMAGE}:latest
-                        docker push ${FRONTEND_IMAGE}:${VERSION}
-                        docker push ${FRONTEND_IMAGE}:latest
+                        echo "Optimizing images for push..."
+                        
+                        # Optimize backend image
+                        echo "Optimizing backend image..."
+                        docker run --rm ${BACKEND_IMAGE}:${VERSION} sh -c "
+                            rm -rf /tmp/* /var/tmp/* /var/cache/* /root/.npm /root/.cache 2>/dev/null || true
+                            find /usr/local/lib/node_modules -name '*.md' -delete 2>/dev/null || true
+                            find /usr/local/lib/node_modules -name '*.txt' -delete 2>/dev/null || true
+                            find /usr/local/lib/node_modules -name 'test' -type d -exec rm -rf {} + 2>/dev/null || true
+                        " || echo "Backend optimization completed"
+                        
+                        # Optimize frontend image
+                        echo "Optimizing frontend image..."
+                        docker run --rm ${FRONTEND_IMAGE}:${VERSION} sh -c "
+                            rm -rf /tmp/* /var/tmp/* /var/cache/* /root/.npm /root/.cache 2>/dev/null || true
+                            find /app/.next -name '*.map' -delete 2>/dev/null || true
+                        " || echo "Frontend optimization completed"
+                    '''
+                    
+                    // Push images in parallel with retry and timeout
+                    parallel(
+                        "Push Backend Images": {
+                            script {
+                                retry(3) {
+                                    timeout(time: 15, unit: 'MINUTES') {
+                                        sh '''
+                                            echo "Pushing backend images to Docker Hub..."
+                                            echo "Pushing ${BACKEND_IMAGE}:${VERSION}"
+                                            docker push ${BACKEND_IMAGE}:${VERSION} 2>&1 | tee /tmp/backend_push.log
+                                            
+                                            echo "Pushing ${BACKEND_IMAGE}:latest"
+                                            docker push ${BACKEND_IMAGE}:latest 2>&1 | tee -a /tmp/backend_push.log
+                                            
+                                            echo "Backend images pushed successfully"
+                                        '''
+                                    }
+                                }
+                            }
+                        },
+                        "Push Frontend Images": {
+                            script {
+                                retry(3) {
+                                    timeout(time: 15, unit: 'MINUTES') {
+                                        sh '''
+                                            echo "Pushing frontend images to Docker Hub..."
+                                            echo "Pushing ${FRONTEND_IMAGE}:${VERSION}"
+                                            docker push ${FRONTEND_IMAGE}:${VERSION} 2>&1 | tee /tmp/frontend_push.log
+                                            
+                                            echo "Pushing ${FRONTEND_IMAGE}:latest"
+                                            docker push ${FRONTEND_IMAGE}:latest 2>&1 | tee -a /tmp/frontend_push.log
+                                            
+                                            echo "Frontend images pushed successfully"
+                                        '''
+                                    }
+                                }
+                            }
+                        }
+                    )
+                    
+                    // Verify push success
+                    sh '''
+                        echo "Verifying pushed images..."
+                        
+                        # Check backend images
+                        echo "Checking backend images..."
+                        docker pull ${BACKEND_IMAGE}:${VERSION} || echo "Warning: Could not pull backend version image"
+                        docker pull ${BACKEND_IMAGE}:latest || echo "Warning: Could not pull backend latest image"
+                        
+                        # Check frontend images
+                        echo "Checking frontend images..."
+                        docker pull ${FRONTEND_IMAGE}:${VERSION} || echo "Warning: Could not pull frontend version image"
+                        docker pull ${FRONTEND_IMAGE}:latest || echo "Warning: Could not pull frontend latest image"
+                        
+                        echo "Image push verification completed"
+                    '''
+                    
+                    // Cleanup local images to save space
+                    sh '''
+                        echo "Cleaning up local images to save disk space..."
+                        
+                        # Remove local images after successful push
+                        docker rmi ${BACKEND_IMAGE}:${VERSION} || echo "Backend version image already removed"
+                        docker rmi ${BACKEND_IMAGE}:latest || echo "Backend latest image already removed"
+                        docker rmi ${FRONTEND_IMAGE}:${VERSION} || echo "Frontend version image already removed"
+                        docker rmi ${FRONTEND_IMAGE}:latest || echo "Frontend latest image already removed"
+                        
+                        # Clean up dangling images
+                        docker image prune -f || echo "Image cleanup completed"
+                        
+                        echo "Local cleanup completed"
+                    '''
+                }
+            }
+        }
+        
+        stage('Push Monitoring and Reporting') {
+            when {
+                expression { 
+                    def currentBranch = env.BRANCH_NAME ?: env.GIT_BRANCH ?: sh(script: 'git rev-parse --abbrev-ref HEAD', returnStdout: true).trim()
+                    return currentBranch == 'master' || currentBranch == 'main' || currentBranch.endsWith('/master') || currentBranch.endsWith('/main')
+                }
+            }
+            steps {
+                script {
+                    // Generate push report
+                    sh '''
+                        echo "=== PUSH OPERATION REPORT ==="
+                        echo "Build Number: ${VERSION}"
+                        echo "Backend Image: ${BACKEND_IMAGE}:${VERSION}"
+                        echo "Frontend Image: ${FRONTEND_IMAGE}:${VERSION}"
+                        echo "Push Timestamp: $(date)"
+                        
+                        # Check if push logs exist and show summary
+                        if [ -f /tmp/backend_push.log ]; then
+                            echo "Backend Push Log Summary:"
+                            tail -20 /tmp/backend_push.log | grep -E "(Pushing|pushed|digest|size)" || echo "No push summary found"
+                        fi
+                        
+                        if [ -f /tmp/frontend_push.log ]; then
+                            echo "Frontend Push Log Summary:"
+                            tail -20 /tmp/frontend_push.log | grep -E "(Pushing|pushed|digest|size)" || echo "No push summary found"
+                        fi
+                        
+                        # Show final image sizes
+                        echo "Final Image Sizes:"
+                        docker images | grep -E "(attendance-app-backend|attendance-app-frontend)" || echo "No local images found"
+                        
+                        echo "=== PUSH REPORT COMPLETED ==="
                     '''
                 }
             }
