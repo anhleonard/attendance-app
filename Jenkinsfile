@@ -77,16 +77,33 @@ pipeline {
                                     dir('learning-app') {
                                         // Download and extract the latest artifact
                                         sh '''
-                                            # Find the latest backend artifact
-                                            wget -O backend_cache.tar.gz "\$(curl -s "http://localhost:8080/job/attendance-pineline/lastSuccessfulBuild/api/json" | grep -o '"url":"[^"]*backend_node_modules[^"]*"' | cut -d'"' -f4 | head -1)" || echo "No artifact found"
+                                            # Find the latest backend artifact using Jenkins API
+                                            echo "Fetching Jenkins API for artifacts..."
+                                            ARTIFACT_URL=""
                                             
-                                            if [ -f "backend_cache.tar.gz" ]; then
+                                            # Try to get artifact URL from Jenkins API
+                                            API_RESPONSE=\$(curl -s "http://localhost:8080/job/attendance-pineline/lastSuccessfulBuild/api/json?tree=artifacts[fileName,relativePath]")
+                                            echo "API Response: \$API_RESPONSE"
+                                            
+                                            if [ ! -z "\$API_RESPONSE" ]; then
+                                                ARTIFACT_URL=\$(echo "\$API_RESPONSE" | grep -o '"fileName":"backend_node_modules[^"]*"' | head -1 | cut -d'"' -f4)
+                                                if [ ! -z "\$ARTIFACT_URL" ]; then
+                                                    echo "Found artifact: \$ARTIFACT_URL"
+                                                    wget -O backend_cache.tar.gz "http://localhost:8080/job/attendance-pineline/lastSuccessfulBuild/artifact/learning-app/\$ARTIFACT_URL"
+                                                else
+                                                    echo "No backend artifact found in API response"
+                                                fi
+                                            else
+                                                echo "Failed to fetch Jenkins API"
+                                            fi
+                                            
+                                            if [ -f "backend_cache.tar.gz" ] && [ -s "backend_cache.tar.gz" ]; then
                                                 echo "Extracting backend cache from artifact..."
                                                 tar -xzf backend_cache.tar.gz
                                                 echo "Backend cache restored from artifact"
                                                 rm -f backend_cache.tar.gz
                                             else
-                                                echo "No backend artifact found"
+                                                echo "No valid backend artifact found"
                                             fi
                                         '''
                                     }
@@ -101,8 +118,28 @@ pipeline {
                                     }
                                 } catch (Exception e) {
                                     echo "Failed to restore from artifact: ${e.getMessage()}"
-                                    env.BACKEND_CACHE_RESTORED = 'false'
-                                    env.BACKEND_CACHE_TYPE = 'none'
+                                    
+                                    // Fallback: Try to copy from previous build workspace
+                                    try {
+                                        echo "Trying fallback: copy from previous build workspace..."
+                                        def previousWorkspace = "${env.WORKSPACE}@2"
+                                        if (fileExists("${previousWorkspace}/learning-app/node_modules")) {
+                                            sh """
+                                                cp -r ${previousWorkspace}/learning-app/node_modules ${env.WORKSPACE}/learning-app/
+                                                cp ${previousWorkspace}/learning-app/package-lock.json ${env.WORKSPACE}/learning-app/ || echo "No package-lock.json found"
+                                            """
+                                            env.BACKEND_CACHE_RESTORED = 'true'
+                                            env.BACKEND_CACHE_TYPE = 'workspace_fallback'
+                                            echo "Backend cache restored from workspace fallback"
+                                        } else {
+                                            env.BACKEND_CACHE_RESTORED = 'false'
+                                            env.BACKEND_CACHE_TYPE = 'none'
+                                        }
+                                    } catch (Exception e2) {
+                                        echo "Fallback also failed: ${e2.getMessage()}"
+                                        env.BACKEND_CACHE_RESTORED = 'false'
+                                        env.BACKEND_CACHE_TYPE = 'none'
+                                    }
                                 }
                             }
                         }
@@ -142,16 +179,33 @@ pipeline {
                                     dir('learning-app-ui') {
                                         // Download and extract the latest artifact
                                         sh '''
-                                            # Find the latest frontend artifact
-                                            wget -O frontend_cache.tar.gz "\$(curl -s "http://localhost:8080/job/attendance-pineline/lastSuccessfulBuild/api/json" | grep -o '"url":"[^"]*frontend_node_modules[^"]*"' | cut -d'"' -f4 | head -1)" || echo "No artifact found"
+                                            # Find the latest frontend artifact using Jenkins API
+                                            echo "Fetching Jenkins API for artifacts..."
+                                            ARTIFACT_URL=""
                                             
-                                            if [ -f "frontend_cache.tar.gz" ]; then
+                                            # Try to get artifact URL from Jenkins API
+                                            API_RESPONSE=\$(curl -s "http://localhost:8080/job/attendance-pineline/lastSuccessfulBuild/api/json?tree=artifacts[fileName,relativePath]")
+                                            echo "API Response: \$API_RESPONSE"
+                                            
+                                            if [ ! -z "\$API_RESPONSE" ]; then
+                                                ARTIFACT_URL=\$(echo "\$API_RESPONSE" | grep -o '"fileName":"frontend_node_modules[^"]*"' | head -1 | cut -d'"' -f4)
+                                                if [ ! -z "\$ARTIFACT_URL" ]; then
+                                                    echo "Found artifact: \$ARTIFACT_URL"
+                                                    wget -O frontend_cache.tar.gz "http://localhost:8080/job/attendance-pineline/lastSuccessfulBuild/artifact/learning-app-ui/\$ARTIFACT_URL"
+                                                else
+                                                    echo "No frontend artifact found in API response"
+                                                fi
+                                            else
+                                                echo "Failed to fetch Jenkins API"
+                                            fi
+                                            
+                                            if [ -f "frontend_cache.tar.gz" ] && [ -s "frontend_cache.tar.gz" ]; then
                                                 echo "Extracting frontend cache from artifact..."
                                                 tar -xzf frontend_cache.tar.gz
                                                 echo "Frontend cache restored from artifact"
                                                 rm -f frontend_cache.tar.gz
                                             else
-                                                echo "No frontend artifact found"
+                                                echo "No valid frontend artifact found"
                                             fi
                                         '''
                                     }
@@ -166,8 +220,28 @@ pipeline {
                                     }
                                 } catch (Exception e) {
                                     echo "Failed to restore from artifact: ${e.getMessage()}"
-                                    env.FRONTEND_CACHE_RESTORED = 'false'
-                                    env.FRONTEND_CACHE_TYPE = 'none'
+                                    
+                                    // Fallback: Try to copy from previous build workspace
+                                    try {
+                                        echo "Trying fallback: copy from previous build workspace..."
+                                        def previousWorkspace = "${env.WORKSPACE}@2"
+                                        if (fileExists("${previousWorkspace}/learning-app-ui/node_modules")) {
+                                            sh """
+                                                cp -r ${previousWorkspace}/learning-app-ui/node_modules ${env.WORKSPACE}/learning-app-ui/
+                                                cp ${previousWorkspace}/learning-app-ui/package-lock.json ${env.WORKSPACE}/learning-app-ui/ || echo "No package-lock.json found"
+                                            """
+                                            env.FRONTEND_CACHE_RESTORED = 'true'
+                                            env.FRONTEND_CACHE_TYPE = 'workspace_fallback'
+                                            echo "Frontend cache restored from workspace fallback"
+                                        } else {
+                                            env.FRONTEND_CACHE_RESTORED = 'false'
+                                            env.FRONTEND_CACHE_TYPE = 'none'
+                                        }
+                                    } catch (Exception e2) {
+                                        echo "Fallback also failed: ${e2.getMessage()}"
+                                        env.FRONTEND_CACHE_RESTORED = 'false'
+                                        env.FRONTEND_CACHE_TYPE = 'none'
+                                    }
                                 }
                             }
                         }
