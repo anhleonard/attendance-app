@@ -78,7 +78,7 @@ pipeline {
                                         // Download and extract the latest artifact
                                         sh '''
                                             # Find the latest backend artifact
-                                            wget -O backend_cache.tar.gz "$(curl -s "http://localhost:8080/job/attendance-pineline/lastSuccessfulBuild/api/json" | grep -o '"url":"[^"]*backend_node_modules[^"]*"' | cut -d'"' -f4 | head -1)" || echo "No artifact found"
+                                            wget -O backend_cache.tar.gz "\$(curl -s "http://localhost:8080/job/attendance-pineline/lastSuccessfulBuild/api/json" | grep -o '"url":"[^"]*backend_node_modules[^"]*"' | cut -d'"' -f4 | head -1)" || echo "No artifact found"
                                             
                                             if [ -f "backend_cache.tar.gz" ]; then
                                                 echo "Extracting backend cache from artifact..."
@@ -143,7 +143,7 @@ pipeline {
                                         // Download and extract the latest artifact
                                         sh '''
                                             # Find the latest frontend artifact
-                                            wget -O frontend_cache.tar.gz "$(curl -s "http://localhost:8080/job/attendance-pineline/lastSuccessfulBuild/api/json" | grep -o '"url":"[^"]*frontend_node_modules[^"]*"' | cut -d'"' -f4 | head -1)" || echo "No artifact found"
+                                            wget -O frontend_cache.tar.gz "\$(curl -s "http://localhost:8080/job/attendance-pineline/lastSuccessfulBuild/api/json" | grep -o '"url":"[^"]*frontend_node_modules[^"]*"' | cut -d'"' -f4 | head -1)" || echo "No artifact found"
                                             
                                             if [ -f "frontend_cache.tar.gz" ]; then
                                                 echo "Extracting frontend cache from artifact..."
@@ -280,9 +280,9 @@ pipeline {
                                 cp learning-app/package.json ${backendCacheDir}/
                                 
                                 # Add cache metadata for debugging
-                                echo "Cache created: $(date)" > ${backendCacheDir}/cache_metadata.txt
+                                echo "Cache created: \$(date)" > ${backendCacheDir}/cache_metadata.txt
                                 echo "Build number: ${env.BUILD_NUMBER}" >> ${backendCacheDir}/cache_metadata.txt
-                                echo "Cache size: $(du -sh ${backendCacheDir}/node_modules | cut -f1)" >> ${backendCacheDir}/cache_metadata.txt
+                                echo "Cache size: \$(du -sh ${backendCacheDir}/node_modules | cut -f1)" >> ${backendCacheDir}/cache_metadata.txt
                             """
                             echo "Backend cache saved to shared directory with package.json"
                             
@@ -308,9 +308,9 @@ pipeline {
                                 cp learning-app-ui/package.json ${frontendCacheDir}/
                                 
                                 # Add cache metadata for debugging
-                                echo "Cache created: $(date)" > ${frontendCacheDir}/cache_metadata.txt
+                                echo "Cache created: \$(date)" > ${frontendCacheDir}/cache_metadata.txt
                                 echo "Build number: ${env.BUILD_NUMBER}" >> ${frontendCacheDir}/cache_metadata.txt
-                                echo "Cache size: $(du -sh ${frontendCacheDir}/node_modules | cut -f1)" >> ${frontendCacheDir}/cache_metadata.txt
+                                echo "Cache size: \$(du -sh ${frontendCacheDir}/node_modules | cut -f1)" >> ${frontendCacheDir}/cache_metadata.txt
                             """
                             echo "Frontend cache saved to shared directory with package.json"
                             
