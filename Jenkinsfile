@@ -71,51 +71,47 @@ pipeline {
                             } else {
                                 echo "No backend cache found in shared directory"
                                 
-                                // Strategy 3: Try to restore from artifacts
+                                // Strategy 3: Try to restore from artifacts using Jenkins built-in functions
                                 try {
                                     echo "Trying to restore backend cache from artifacts..."
-                                    dir('learning-app') {
-                                        // Download and extract the latest artifact
-                                        sh '''
-                                            # Find the latest backend artifact using Jenkins API
-                                            echo "Fetching Jenkins API for artifacts..."
-                                            ARTIFACT_URL=""
-                                            
-                                            # Try to get artifact URL from Jenkins API
-                                            API_RESPONSE=\$(curl -s "http://localhost:8080/job/attendance-pineline/lastSuccessfulBuild/api/json?tree=artifacts[fileName,relativePath]")
-                                            echo "API Response: \$API_RESPONSE"
-                                            
-                                            if [ ! -z "\$API_RESPONSE" ]; then
-                                                ARTIFACT_URL=\$(echo "\$API_RESPONSE" | grep -o '"fileName":"backend_node_modules[^"]*"' | head -1 | cut -d'"' -f4)
-                                                if [ ! -z "\$ARTIFACT_URL" ]; then
-                                                    echo "Found artifact: \$ARTIFACT_URL"
-                                                    wget -O backend_cache.tar.gz "http://localhost:8080/job/attendance-pineline/lastSuccessfulBuild/artifact/learning-app/\$ARTIFACT_URL"
-                                                else
-                                                    echo "No backend artifact found in API response"
-                                                fi
-                                            else
-                                                echo "Failed to fetch Jenkins API"
-                                            fi
-                                            
-                                            if [ -f "backend_cache.tar.gz" ] && [ -s "backend_cache.tar.gz" ]; then
-                                                echo "Extracting backend cache from artifact..."
-                                                tar -xzf backend_cache.tar.gz
-                                                echo "Backend cache restored from artifact"
-                                                rm -f backend_cache.tar.gz
-                                            else
-                                                echo "No valid backend artifact found"
-                                            fi
-                                        '''
-                                    }
                                     
-                                    if (fileExists("learning-app/node_modules")) {
-                                        env.BACKEND_CACHE_RESTORED = 'true'
-                                        env.BACKEND_CACHE_TYPE = 'artifact'
-                                        echo "Backend cache restored from artifact successfully"
+                                    // Use Jenkins built-in copyArtifacts plugin
+                                    def lastSuccessfulBuild = currentBuild.getPreviousSuccessfulBuild()
+                                    if (lastSuccessfulBuild) {
+                                        echo "Found last successful build: ${lastSuccessfulBuild.number}"
+                                        
+                                        // Try to copy artifacts from last successful build
+                                        dir('learning-app') {
+                                            sh '''
+                                                # Try to copy from last successful build artifacts
+                                                echo "Attempting to copy artifacts from last successful build..."
+                                                
+                                                # Method 1: Try direct copy if artifacts exist
+                                                if [ -f "../learning-app/backend_node_modules.tar.gz" ]; then
+                                                    echo "Found backend artifact in workspace, copying..."
+                                                    cp ../learning-app/backend_node_modules.tar.gz .
+                                                    tar -xzf backend_node_modules.tar.gz
+                                                    echo "Backend cache restored from workspace artifact"
+                                                    rm -f backend_cache.tar.gz
+                                                else
+                                                    echo "No backend artifact found in workspace"
+                                                fi
+                                            '''
+                                        }
                                     } else {
-                                        env.BACKEND_CACHE_RESTORED = 'false'
-                                        env.BACKEND_CACHE_TYPE = 'none'
+                                        echo "No previous successful build found"
                                     }
+                                }
+                                
+                                // Check if cache was restored successfully
+                                if (fileExists("learning-app/node_modules")) {
+                                    env.BACKEND_CACHE_RESTORED = 'true'
+                                    env.BACKEND_CACHE_TYPE = 'artifact'
+                                    echo "Backend cache restored from artifact successfully"
+                                } else {
+                                    env.BACKEND_CACHE_RESTORED = 'false'
+                                    env.BACKEND_CACHE_TYPE = 'none'
+                                }
                                 } catch (Exception e) {
                                     echo "Failed to restore from artifact: ${e.getMessage()}"
                                     
@@ -173,51 +169,47 @@ pipeline {
                             } else {
                                 echo "No frontend cache found in shared directory"
                                 
-                                // Strategy 3: Try to restore from artifacts
+                                // Strategy 3: Try to restore from artifacts using Jenkins built-in functions
                                 try {
                                     echo "Trying to restore frontend cache from artifacts..."
-                                    dir('learning-app-ui') {
-                                        // Download and extract the latest artifact
-                                        sh '''
-                                            # Find the latest frontend artifact using Jenkins API
-                                            echo "Fetching Jenkins API for artifacts..."
-                                            ARTIFACT_URL=""
-                                            
-                                            # Try to get artifact URL from Jenkins API
-                                            API_RESPONSE=\$(curl -s "http://localhost:8080/job/attendance-pineline/lastSuccessfulBuild/api/json?tree=artifacts[fileName,relativePath]")
-                                            echo "API Response: \$API_RESPONSE"
-                                            
-                                            if [ ! -z "\$API_RESPONSE" ]; then
-                                                ARTIFACT_URL=\$(echo "\$API_RESPONSE" | grep -o '"fileName":"frontend_node_modules[^"]*"' | head -1 | cut -d'"' -f4)
-                                                if [ ! -z "\$ARTIFACT_URL" ]; then
-                                                    echo "Found artifact: \$ARTIFACT_URL"
-                                                    wget -O frontend_cache.tar.gz "http://localhost:8080/job/attendance-pineline/lastSuccessfulBuild/artifact/learning-app-ui/\$ARTIFACT_URL"
-                                                else
-                                                    echo "No frontend artifact found in API response"
-                                                fi
-                                            else
-                                                echo "Failed to fetch Jenkins API"
-                                            fi
-                                            
-                                            if [ -f "frontend_cache.tar.gz" ] && [ -s "frontend_cache.tar.gz" ]; then
-                                                echo "Extracting frontend cache from artifact..."
-                                                tar -xzf frontend_cache.tar.gz
-                                                echo "Frontend cache restored from artifact"
-                                                rm -f frontend_cache.tar.gz
-                                            else
-                                                echo "No valid frontend artifact found"
-                                            fi
-                                        '''
-                                    }
                                     
-                                    if (fileExists("learning-app-ui/node_modules")) {
-                                        env.FRONTEND_CACHE_RESTORED = 'true'
-                                        env.FRONTEND_CACHE_TYPE = 'artifact'
-                                        echo "Frontend cache restored from artifact successfully"
+                                    // Use Jenkins built-in copyArtifacts plugin
+                                    def lastSuccessfulBuild = currentBuild.getPreviousSuccessfulBuild()
+                                    if (lastSuccessfulBuild) {
+                                        echo "Found last successful build: ${lastSuccessfulBuild.number}"
+                                        
+                                        // Try to copy artifacts from last successful build
+                                        dir('learning-app-ui') {
+                                            sh '''
+                                                # Try to copy from last successful build artifacts
+                                                echo "Attempting to copy artifacts from last successful build..."
+                                                
+                                                # Method 1: Try direct copy if artifacts exist
+                                                if [ -f "../learning-app-ui/frontend_node_modules.tar.gz" ]; then
+                                                    echo "Found frontend artifact in workspace, copying..."
+                                                    cp ../learning-app-ui/frontend_node_modules.tar.gz .
+                                                    tar -xzf frontend_node_modules.tar.gz
+                                                    echo "Frontend cache restored from workspace artifact"
+                                                    rm -f frontend_cache.tar.gz
+                                                else
+                                                    echo "No frontend artifact found in workspace"
+                                                fi
+                                            '''
+                                        }
                                     } else {
-                                        env.FRONTEND_CACHE_RESTORED = 'false'
-                                        env.FRONTEND_CACHE_TYPE = 'none'
+                                        echo "No previous successful build found"
                                     }
+                                }
+                                
+                                // Check if cache was restored successfully
+                                if (fileExists("learning-app-ui/node_modules")) {
+                                    env.FRONTEND_CACHE_RESTORED = 'true'
+                                    env.FRONTEND_CACHE_TYPE = 'artifact'
+                                    echo "Frontend cache restored from artifact successfully"
+                                } else {
+                                    env.FRONTEND_CACHE_RESTORED = 'false'
+                                    env.FRONTEND_CACHE_TYPE = 'none'
+                                }
                                 } catch (Exception e) {
                                     echo "Failed to restore from artifact: ${e.getMessage()}"
                                     
@@ -276,11 +268,15 @@ pipeline {
                                 # Check if node_modules exists, if not install dependencies
                                 if [ ! -d "node_modules" ]; then
                                     echo "Installing backend dependencies..."
+                                    
+                                    # Strategy: Use npm cache for faster installation
+                                    echo "Using npm cache for faster installation..."
+                                    
                                     # Check if package-lock.json exists, use npm ci if available, otherwise npm install
                                     if [ -f "package-lock.json" ]; then
-                                        npm ci --legacy-peer-deps --prefer-offline --no-audit --no-fund --cache ~/.npm
+                                        npm ci --legacy-peer-deps --prefer-offline --no-audit --no-fund --cache ~/.npm --verbose
                                     else
-                                        npm install --legacy-peer-deps --prefer-offline --no-audit --no-fund --cache ~/.npm
+                                        npm install --legacy-peer-deps --prefer-offline --no-audit --no-fund --cache ~/.npm --verbose
                                     fi
                                     
                                     # Install global packages with cache
@@ -320,9 +316,13 @@ pipeline {
                                 # Check if node_modules exists, if not install dependencies
                                 if [ ! -d "node_modules" ]; then
                                     echo "Installing frontend dependencies..."
+                                    
+                                    # Strategy: Use npm cache for faster installation
+                                    echo "Using npm cache for faster installation..."
+                                    
                                     # Check if package-lock.json exists, use npm ci if available, otherwise npm install
                                     if [ -f "package-lock.json" ]; then
-                                        npm ci --prefer-offline --no-audit --no-fund --cache ~/.npm
+                                        npm ci --prefer-offline --no-audit --no-fund --cache ~/.npm --verbose
                                     else
                                         npm install --prefer-offline --no-audit --no-fund --cache ~/.npm
                                     fi
