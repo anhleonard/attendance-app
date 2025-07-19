@@ -64,8 +64,12 @@ pipeline {
                                 # Check if node_modules exists, if not install dependencies
                                 if [ ! -d "node_modules" ]; then
                                     echo "Installing backend dependencies..."
-                                    # Use npm ci for faster, reliable installs with cache
-                                    npm ci --legacy-peer-deps --prefer-offline --no-audit --no-fund --cache ~/.npm || npm install --legacy-peer-deps --prefer-offline --no-audit --no-fund --cache ~/.npm
+                                    # Check if package-lock.json exists, use npm ci if available, otherwise npm install
+                                    if [ -f "package-lock.json" ]; then
+                                        npm ci --legacy-peer-deps --prefer-offline --no-audit --no-fund --cache ~/.npm
+                                    else
+                                        npm install --legacy-peer-deps --prefer-offline --no-audit --no-fund --cache ~/.npm
+                                    fi
                                     
                                     # Install global packages with cache
                                     npm install -g @nestjs/cli prisma --cache ~/.npm
@@ -100,8 +104,12 @@ pipeline {
                                 # Check if node_modules exists, if not install dependencies
                                 if [ ! -d "node_modules" ]; then
                                     echo "Installing frontend dependencies..."
-                                    # Use npm ci for faster, reliable installs with cache
-                                    npm ci --prefer-offline --no-audit --no-fund --cache ~/.npm || npm install --prefer-offline --no-audit --no-fund --cache ~/.npm
+                                    # Check if package-lock.json exists, use npm ci if available, otherwise npm install
+                                    if [ -f "package-lock.json" ]; then
+                                        npm ci --prefer-offline --no-audit --no-fund --cache ~/.npm
+                                    else
+                                        npm install --prefer-offline --no-audit --no-fund --cache ~/.npm
+                                    fi
                                 else
                                     echo "Frontend dependencies already installed"
                                 fi
@@ -121,7 +129,10 @@ pipeline {
                     when {
                         anyOf {
                             changeset pattern: "learning-app/**/*"
-                            expression { return env.BRANCH_NAME == 'master' || env.BRANCH_NAME == 'main' }
+                            expression { 
+                                def currentBranch = env.BRANCH_NAME ?: env.GIT_BRANCH ?: sh(script: 'git rev-parse --abbrev-ref HEAD', returnStdout: true).trim()
+                                return currentBranch == 'master' || currentBranch == 'main' || currentBranch.endsWith('/master') || currentBranch.endsWith('/main')
+                            }
                         }
                     }
                     steps {
@@ -149,7 +160,10 @@ pipeline {
                     when {
                         anyOf {
                             changeset pattern: "learning-app-ui/**/*"
-                            expression { return env.BRANCH_NAME == 'master' || env.BRANCH_NAME == 'main' }
+                            expression { 
+                                def currentBranch = env.BRANCH_NAME ?: env.GIT_BRANCH ?: sh(script: 'git rev-parse --abbrev-ref HEAD', returnStdout: true).trim()
+                                return currentBranch == 'master' || currentBranch == 'main' || currentBranch.endsWith('/master') || currentBranch.endsWith('/main')
+                            }
                         }
                     }
                     steps {
@@ -181,7 +195,10 @@ pipeline {
                     when {
                         anyOf {
                             changeset pattern: "learning-app/**/*.{ts,js}"
-                            expression { return env.BRANCH_NAME == 'master' || env.BRANCH_NAME == 'main' }
+                            expression { 
+                                def currentBranch = env.BRANCH_NAME ?: env.GIT_BRANCH ?: sh(script: 'git rev-parse --abbrev-ref HEAD', returnStdout: true).trim()
+                                return currentBranch == 'master' || currentBranch == 'main' || currentBranch.endsWith('/master') || currentBranch.endsWith('/main')
+                            }
                         }
                     }
                     steps {
@@ -198,7 +215,10 @@ pipeline {
                     when {
                         anyOf {
                             changeset pattern: "learning-app-ui/**/*.{ts,js,tsx,jsx}"
-                            expression { return env.BRANCH_NAME == 'master' || env.BRANCH_NAME == 'main' }
+                            expression { 
+                                def currentBranch = env.BRANCH_NAME ?: env.GIT_BRANCH ?: sh(script: 'git rev-parse --abbrev-ref HEAD', returnStdout: true).trim()
+                                return currentBranch == 'master' || currentBranch == 'main' || currentBranch.endsWith('/master') || currentBranch.endsWith('/main')
+                            }
                         }
                     }
                     steps {
@@ -219,7 +239,10 @@ pipeline {
                     when {
                         anyOf {
                             changeset pattern: "learning-app/**/*"
-                            expression { return env.BRANCH_NAME == 'master' || env.BRANCH_NAME == 'main' }
+                            expression { 
+                                def currentBranch = env.BRANCH_NAME ?: env.GIT_BRANCH ?: sh(script: 'git rev-parse --abbrev-ref HEAD', returnStdout: true).trim()
+                                return currentBranch == 'master' || currentBranch == 'main' || currentBranch.endsWith('/master') || currentBranch.endsWith('/main')
+                            }
                         }
                     }
                     steps {
@@ -237,7 +260,10 @@ pipeline {
                     when {
                         anyOf {
                             changeset pattern: "learning-app-ui/**/*"
-                            expression { return env.BRANCH_NAME == 'master' || env.BRANCH_NAME == 'main' }
+                            expression { 
+                                def currentBranch = env.BRANCH_NAME ?: env.GIT_BRANCH ?: sh(script: 'git rev-parse --abbrev-ref HEAD', returnStdout: true).trim()
+                                return currentBranch == 'master' || currentBranch == 'main' || currentBranch.endsWith('/master') || currentBranch.endsWith('/main')
+                            }
                         }
                     }
                     steps {
@@ -260,26 +286,43 @@ pipeline {
                         sh 'echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin'
                     }
 
-                    // Check if we need to build images based on changes
-                    def backendChanged = sh(script: "git diff --name-only HEAD~1 HEAD | grep 'learning-app/'", returnStatus: true) == 0
-                    def frontendChanged = sh(script: "git diff --name-only HEAD~1 HEAD | grep 'learning-app-ui/'", returnStatus: true) == 0
+                    // Get current branch name
+                    def currentBranch = env.BRANCH_NAME ?: env.GIT_BRANCH ?: sh(script: 'git rev-parse --abbrev-ref HEAD', returnStdout: true).trim()
+                    echo "Current branch: ${currentBranch}"
                     
-                    if (backendChanged || env.BRANCH_NAME == 'master' || env.BRANCH_NAME == 'main') {
-                        echo "Building backend image..."
+                    // Always build on master/main branch, or check for changes on other branches
+                    def isMasterBranch = currentBranch == 'master' || currentBranch == 'main' || currentBranch.endsWith('/master') || currentBranch.endsWith('/main')
+                    
+                    if (isMasterBranch) {
+                        echo "Building backend image (master branch)..."
                         // 🛠 Build backend image with cache
                         docker.build("${BACKEND_IMAGE}:${VERSION}", "--cache-from ${BACKEND_IMAGE}:latest --build-arg BUILDKIT_INLINE_CACHE=1 ./learning-app")
                         docker.build("${BACKEND_IMAGE}:latest", "--cache-from ${BACKEND_IMAGE}:latest --build-arg BUILDKIT_INLINE_CACHE=1 ./learning-app")
-                    } else {
-                        echo "No backend changes detected, skipping backend build"
-                    }
-                    
-                    if (frontendChanged || env.BRANCH_NAME == 'master' || env.BRANCH_NAME == 'main') {
-                        echo "Building frontend image..."
+                        
+                        echo "Building frontend image (master branch)..."
                         // 🛠 Build frontend image with cache
                         docker.build("${FRONTEND_IMAGE}:${VERSION}", "--cache-from ${FRONTEND_IMAGE}:latest --build-arg BUILDKIT_INLINE_CACHE=1 ./learning-app-ui")
                         docker.build("${FRONTEND_IMAGE}:latest", "--cache-from ${FRONTEND_IMAGE}:latest --build-arg BUILDKIT_INLINE_CACHE=1 ./learning-app-ui")
                     } else {
-                        echo "No frontend changes detected, skipping frontend build"
+                        // Check if we need to build images based on changes
+                        def backendChanged = sh(script: "git diff --name-only HEAD~1 HEAD | grep 'learning-app/'", returnStatus: true) == 0
+                        def frontendChanged = sh(script: "git diff --name-only HEAD~1 HEAD | grep 'learning-app-ui/'", returnStatus: true) == 0
+                        
+                        if (backendChanged) {
+                            echo "Building backend image (changes detected)..."
+                            docker.build("${BACKEND_IMAGE}:${VERSION}", "--cache-from ${BACKEND_IMAGE}:latest --build-arg BUILDKIT_INLINE_CACHE=1 ./learning-app")
+                            docker.build("${BACKEND_IMAGE}:latest", "--cache-from ${BACKEND_IMAGE}:latest --build-arg BUILDKIT_INLINE_CACHE=1 ./learning-app")
+                        } else {
+                            echo "No backend changes detected, skipping backend build"
+                        }
+                        
+                        if (frontendChanged) {
+                            echo "Building frontend image (changes detected)..."
+                            docker.build("${FRONTEND_IMAGE}:${VERSION}", "--cache-from ${FRONTEND_IMAGE}:latest --build-arg BUILDKIT_INLINE_CACHE=1 ./learning-app-ui")
+                            docker.build("${FRONTEND_IMAGE}:latest", "--cache-from ${FRONTEND_IMAGE}:latest --build-arg BUILDKIT_INLINE_CACHE=1 ./learning-app-ui")
+                        } else {
+                            echo "No frontend changes detected, skipping frontend build"
+                        }
                     }
                 }
             }
@@ -312,9 +355,9 @@ pipeline {
         
         stage('Optimize Images') {
             when {
-                anyOf {
-                    branch 'master'
-                    branch 'main'
+                expression { 
+                    def currentBranch = env.BRANCH_NAME ?: env.GIT_BRANCH ?: sh(script: 'git rev-parse --abbrev-ref HEAD', returnStdout: true).trim()
+                    return currentBranch == 'master' || currentBranch == 'main' || currentBranch.endsWith('/master') || currentBranch.endsWith('/main')
                 }
             }
             steps {
@@ -339,9 +382,9 @@ pipeline {
         
         stage('Security Scan') {
             when {
-                anyOf {
-                    branch 'master'
-                    branch 'main'
+                expression { 
+                    def currentBranch = env.BRANCH_NAME ?: env.GIT_BRANCH ?: sh(script: 'git rev-parse --abbrev-ref HEAD', returnStdout: true).trim()
+                    return currentBranch == 'master' || currentBranch == 'main' || currentBranch.endsWith('/master') || currentBranch.endsWith('/main')
                 }
             }
             steps {
@@ -362,14 +405,10 @@ pipeline {
         
         stage('Push to Registry') {
             when {
-                anyOf {
-                    branch 'master'
-                    branch 'main'
-                    expression { 
-                        def currentBranch = env.BRANCH_NAME ?: env.GIT_BRANCH ?: sh(script: 'git rev-parse --abbrev-ref HEAD', returnStdout: true).trim()
-                        echo "Current branch for push condition: '${currentBranch}'"
-                        return currentBranch == 'master' || currentBranch == 'main' || currentBranch.endsWith('/master') || currentBranch.endsWith('/main')
-                    }
+                expression { 
+                    def currentBranch = env.BRANCH_NAME ?: env.GIT_BRANCH ?: sh(script: 'git rev-parse --abbrev-ref HEAD', returnStdout: true).trim()
+                    echo "Current branch for push condition: '${currentBranch}'"
+                    return currentBranch == 'master' || currentBranch == 'main' || currentBranch.endsWith('/master') || currentBranch.endsWith('/main')
                 }
             }
             steps {
@@ -396,13 +435,9 @@ pipeline {
         
         stage('Deploy to Production') {
             when {
-                anyOf {
-                    branch 'master'
-                    branch 'main'
-                    expression { 
-                        def currentBranch = env.BRANCH_NAME ?: env.GIT_BRANCH ?: sh(script: 'git rev-parse --abbrev-ref HEAD', returnStdout: true).trim()
-                        return currentBranch == 'master' || currentBranch == 'main' || currentBranch.endsWith('/master') || currentBranch.endsWith('/main')
-                    }
+                expression { 
+                    def currentBranch = env.BRANCH_NAME ?: env.GIT_BRANCH ?: sh(script: 'git rev-parse --abbrev-ref HEAD', returnStdout: true).trim()
+                    return currentBranch == 'master' || currentBranch == 'main' || currentBranch.endsWith('/master') || currentBranch.endsWith('/main')
                 }
             }
             steps {
