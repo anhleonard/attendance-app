@@ -31,9 +31,9 @@ pipeline {
                     file(credentialsId: 'env-file-frontend', variable: 'ENV_FE')
                 ]) {
                     sh '''
-                        # Create cache base directory with proper permissions
-                        sudo mkdir -p ${CACHE_BASE_DIR} || mkdir -p ${CACHE_BASE_DIR}
-                        sudo chmod 755 ${CACHE_BASE_DIR} || true
+                        # Create cache base directory (no sudo needed in container)
+                        mkdir -p ${CACHE_BASE_DIR}
+                        chmod 755 ${CACHE_BASE_DIR}
                         
                         # Setup environment files
                         cp $ENV_POSTGRES ./learning-app/.env.postgres
@@ -60,8 +60,11 @@ pipeline {
                             env.BACKEND_CACHE_PATH = "${backendCacheDir}/${packageHash}"
                             
                             sh '''
-                                echo "Backend package hash: ${BACKEND_PACKAGE_HASH}"
-                                echo "Cache path: ${BACKEND_CACHE_PATH}"
+                                echo "🔍 Backend package hash: ${BACKEND_PACKAGE_HASH}"
+                                echo "📂 Cache path: ${BACKEND_CACHE_PATH}"
+                                
+                                # Create cache directory structure
+                                mkdir -p ${BACKEND_CACHE_DIR}
                                 
                                 # Check if cache exists for this package.json hash
                                 if [ -d "${BACKEND_CACHE_PATH}/node_modules" ]; then
@@ -69,10 +72,16 @@ pipeline {
                                     cp -r "${BACKEND_CACHE_PATH}/node_modules" ./learning-app/
                                     cp "${BACKEND_CACHE_PATH}/package-lock.json" ./learning-app/ 2>/dev/null || true
                                     touch ./learning-app/.cache_restored
+                                    
+                                    # Show cache info
+                                    echo "📊 Cache size: $(du -sh ${BACKEND_CACHE_PATH}/node_modules | cut -f1)"
+                                    echo "📅 Cache date: $(stat -c %y ${BACKEND_CACHE_PATH}/node_modules)"
                                 else
                                     echo "❌ Backend cache MISS - will install fresh"
                                     # Clean old cache entries (keep only last 3)
-                                    find ${BACKEND_CACHE_DIR} -maxdepth 1 -type d -name "*" | head -n -3 | xargs rm -rf 2>/dev/null || true
+                                    if [ -d "${BACKEND_CACHE_DIR}" ]; then
+                                        find ${BACKEND_CACHE_DIR} -maxdepth 1 -type d -name "*" | sort | head -n -3 | xargs rm -rf 2>/dev/null || true
+                                    fi
                                 fi
                             '''
                         }
@@ -91,8 +100,11 @@ pipeline {
                             env.FRONTEND_CACHE_PATH = "${frontendCacheDir}/${packageHash}"
                             
                             sh '''
-                                echo "Frontend package hash: ${FRONTEND_PACKAGE_HASH}"
-                                echo "Cache path: ${FRONTEND_CACHE_PATH}"
+                                echo "🔍 Frontend package hash: ${FRONTEND_PACKAGE_HASH}"
+                                echo "📂 Cache path: ${FRONTEND_CACHE_PATH}"
+                                
+                                # Create cache directory structure
+                                mkdir -p ${FRONTEND_CACHE_DIR}
                                 
                                 # Check if cache exists for this package.json hash
                                 if [ -d "${FRONTEND_CACHE_PATH}/node_modules" ]; then
@@ -100,10 +112,16 @@ pipeline {
                                     cp -r "${FRONTEND_CACHE_PATH}/node_modules" ./learning-app-ui/
                                     cp "${FRONTEND_CACHE_PATH}/package-lock.json" ./learning-app-ui/ 2>/dev/null || true
                                     touch ./learning-app-ui/.cache_restored
+                                    
+                                    # Show cache info
+                                    echo "📊 Cache size: $(du -sh ${FRONTEND_CACHE_PATH}/node_modules | cut -f1)"
+                                    echo "📅 Cache date: $(stat -c %y ${FRONTEND_CACHE_PATH}/node_modules)"
                                 else
                                     echo "❌ Frontend cache MISS - will install fresh"
                                     # Clean old cache entries (keep only last 3)
-                                    find ${FRONTEND_CACHE_DIR} -maxdepth 1 -type d -name "*" | head -n -3 | xargs rm -rf 2>/dev/null || true
+                                    if [ -d "${FRONTEND_CACHE_DIR}" ]; then
+                                        find ${FRONTEND_CACHE_DIR} -maxdepth 1 -type d -name "*" | sort | head -n -3 | xargs rm -rf 2>/dev/null || true
+                                    fi
                                 fi
                             '''
                         }
@@ -124,22 +142,33 @@ pipeline {
                                 else
                                     echo "📦 Installing backend dependencies..."
                                     
-                                    # Use npm ci for faster, reliable installs
+                                    # Use --legacy-peer-deps to resolve dependency conflicts
                                     if [ -f package-lock.json ]; then
-                                        npm ci --prefer-offline --no-audit --no-fund
+                                        echo "🔧 Using npm ci with legacy peer deps..."
+                                        npm ci --legacy-peer-deps --prefer-offline --no-audit --no-fund
                                     else
-                                        npm install --prefer-offline --no-audit --no-fund
+                                        echo "🔧 Using npm install with legacy peer deps..."
+                                        npm install --legacy-peer-deps --prefer-offline --no-audit --no-fund
                                     fi
                                     
                                     # Global packages
-                                    npm install -g @nestjs/cli prisma
+                                    echo "🌐 Installing global packages..."
+                                    npm install -g @nestjs/cli prisma --silent
                                     
                                     echo "💾 Saving to cache..."
                                     mkdir -p "${BACKEND_CACHE_PATH}"
                                     cp -r node_modules "${BACKEND_CACHE_PATH}/"
                                     cp package-lock.json "${BACKEND_CACHE_PATH}/" 2>/dev/null || true
-                                    echo "Cache saved to: ${BACKEND_CACHE_PATH}"
+                                    
+                                    echo "✅ Cache saved to: ${BACKEND_CACHE_PATH}"
+                                    echo "📊 Cache size: $(du -sh ${BACKEND_CACHE_PATH}/node_modules | cut -f1)"
                                 fi
+                                
+                                # Verify installation
+                                echo "🔍 Verifying installation..."
+                                echo "Node modules count: $(find node_modules -maxdepth 1 -type d | wc -l)"
+                                echo "NestJS CLI: $(which nest || echo 'not found')"
+                                echo "Prisma: $(which prisma || echo 'not found')"
                             '''
                         }
                     }
@@ -155,10 +184,12 @@ pipeline {
                                 else
                                     echo "📦 Installing frontend dependencies..."
                                     
-                                    # Use npm ci for faster, reliable installs
+                                    # Frontend usually doesn't need legacy-peer-deps
                                     if [ -f package-lock.json ]; then
+                                        echo "🔧 Using npm ci..."
                                         npm ci --prefer-offline --no-audit --no-fund
                                     else
+                                        echo "🔧 Using npm install..."
                                         npm install --prefer-offline --no-audit --no-fund
                                     fi
                                     
@@ -166,8 +197,15 @@ pipeline {
                                     mkdir -p "${FRONTEND_CACHE_PATH}"
                                     cp -r node_modules "${FRONTEND_CACHE_PATH}/"
                                     cp package-lock.json "${FRONTEND_CACHE_PATH}/" 2>/dev/null || true
-                                    echo "Cache saved to: ${FRONTEND_CACHE_PATH}"
+                                    
+                                    echo "✅ Cache saved to: ${FRONTEND_CACHE_PATH}"
+                                    echo "📊 Cache size: $(du -sh ${FRONTEND_CACHE_PATH}/node_modules | cut -f1)"
                                 fi
+                                
+                                # Verify installation
+                                echo "🔍 Verifying installation..."
+                                echo "Node modules count: $(find node_modules -maxdepth 1 -type d | wc -l)"
+                                echo "Next.js: $(npx next --version || echo 'not found')"
                             '''
                         }
                     }
@@ -178,22 +216,45 @@ pipeline {
         stage('Cache Statistics') {
             steps {
                 sh '''
-                    echo "=== CACHE STATISTICS ==="
-                    echo "Backend Cache Directory: ${BACKEND_CACHE_DIR}"
-                    if [ -d "${BACKEND_CACHE_DIR}" ]; then
-                        echo "Backend cache entries:"
-                        ls -la "${BACKEND_CACHE_DIR}" | grep "^d" || echo "No cache entries"
-                        echo "Backend cache size: $(du -sh "${BACKEND_CACHE_DIR}" 2>/dev/null | cut -f1 || echo "0")"
-                    fi
+                    echo "=== 📊 CACHE STATISTICS ==="
+                    echo "📍 Cache Base Directory: ${CACHE_BASE_DIR}"
                     
-                    echo "Frontend Cache Directory: ${FRONTEND_CACHE_DIR}"
-                    if [ -d "${FRONTEND_CACHE_DIR}" ]; then
-                        echo "Frontend cache entries:"
-                        ls -la "${FRONTEND_CACHE_DIR}" | grep "^d" || echo "No cache entries"
-                        echo "Frontend cache size: $(du -sh "${FRONTEND_CACHE_DIR}" 2>/dev/null | cut -f1 || echo "0")"
+                    if [ -d "${CACHE_BASE_DIR}" ]; then
+                        echo "💾 Total cache size: $(du -sh ${CACHE_BASE_DIR} 2>/dev/null | cut -f1 || echo '0')"
+                        echo ""
+                        
+                        echo "🔙 Backend Cache:"
+                        if [ -d "${BACKEND_CACHE_DIR}" ]; then
+                            echo "  📂 Directory: ${BACKEND_CACHE_DIR}"
+                            echo "  📊 Size: $(du -sh ${BACKEND_CACHE_DIR} 2>/dev/null | cut -f1 || echo '0')"
+                            echo "  🗂️  Entries: $(ls -1 ${BACKEND_CACHE_DIR} 2>/dev/null | wc -l || echo '0')"
+                            if [ -d "${BACKEND_CACHE_PATH}" ]; then
+                                echo "  ✅ Current hash cached: ${BACKEND_PACKAGE_HASH}"
+                            else
+                                echo "  ❌ Current hash not cached: ${BACKEND_PACKAGE_HASH}"
+                            fi
+                        else
+                            echo "  ❌ No backend cache directory"
+                        fi
+                        
+                        echo ""
+                        echo "🎨 Frontend Cache:"
+                        if [ -d "${FRONTEND_CACHE_DIR}" ]; then
+                            echo "  📂 Directory: ${FRONTEND_CACHE_DIR}"
+                            echo "  📊 Size: $(du -sh ${FRONTEND_CACHE_DIR} 2>/dev/null | cut -f1 || echo '0')"
+                            echo "  🗂️  Entries: $(ls -1 ${FRONTEND_CACHE_DIR} 2>/dev/null | wc -l || echo '0')"
+                            if [ -d "${FRONTEND_CACHE_PATH}" ]; then
+                                echo "  ✅ Current hash cached: ${FRONTEND_PACKAGE_HASH}"
+                            else
+                                echo "  ❌ Current hash not cached: ${FRONTEND_PACKAGE_HASH}"
+                            fi
+                        else
+                            echo "  ❌ No frontend cache directory"
+                        fi
+                    else
+                        echo "❌ Cache directory not found: ${CACHE_BASE_DIR}"
                     fi
-                    
-                    echo "Total cache size: $(du -sh "${CACHE_BASE_DIR}" 2>/dev/null | cut -f1 || echo "0")"
+                    echo "=========================="
                 '''
             }
         }
@@ -213,8 +274,9 @@ pipeline {
                     steps {
                         dir('learning-app') {
                             sh '''
-                                npm run test || echo "Tests skipped - no test script found"
-                                npm run test:e2e || echo "E2E tests skipped - no test script found"
+                                echo "🧪 Running backend tests..."
+                                npm run test || echo "⚠️ Tests skipped - no test script found"
+                                npm run test:e2e || echo "⚠️ E2E tests skipped - no test script found"
                             '''
                         }
                     }
@@ -233,8 +295,9 @@ pipeline {
                     steps {
                         dir('learning-app-ui') {
                             sh '''
-                                npm run test || echo "Tests skipped - no test script found"
-                                npm run test:e2e || echo "E2E tests skipped - no test script found"
+                                echo "🧪 Running frontend tests..."
+                                npm run test || echo "⚠️ Tests skipped - no test script found"
+                                npm run test:e2e || echo "⚠️ E2E tests skipped - no test script found"
                             '''
                         }
                     }
@@ -257,7 +320,8 @@ pipeline {
                     steps {
                         dir('learning-app') {
                             sh '''
-                                npm run lint || echo "Lint skipped - eslint not found"
+                                echo "🔍 Running backend lint..."
+                                npm run lint || echo "⚠️ Lint skipped - eslint not found"
                             '''
                         }
                     }
@@ -276,6 +340,7 @@ pipeline {
                     steps {
                         dir('learning-app-ui') {
                             sh '''
+                                echo "🔍 Running frontend lint..."
                                 npm run lint
                             '''
                         }
@@ -299,8 +364,13 @@ pipeline {
                     steps {
                         dir('learning-app') {
                             sh '''
+                                echo "🏗️ Building backend application..."
                                 npm run build
+                                
+                                echo "🔧 Generating Prisma client..."
                                 npx prisma generate
+                                
+                                echo "✅ Backend build completed"
                             '''
                         }
                     }
@@ -319,7 +389,10 @@ pipeline {
                     steps {
                         dir('learning-app-ui') {
                             sh '''
+                                echo "🏗️ Building frontend application..."
                                 npm run build
+                                
+                                echo "✅ Frontend build completed"
                             '''
                         }
                     }
@@ -386,11 +459,11 @@ pipeline {
                 script {
                     // Scan Docker images for vulnerabilities
                     sh '''
-                        echo "Scanning backend image for vulnerabilities..."
+                        echo "🔒 Scanning backend image for vulnerabilities..."
                         docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
                             aquasec/trivy image --quiet --severity HIGH,CRITICAL ${BACKEND_IMAGE}:${VERSION} || echo "Backend scan completed"
                         
-                        echo "Scanning frontend image for vulnerabilities..."
+                        echo "🔒 Scanning frontend image for vulnerabilities..."
                         docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
                             aquasec/trivy image --quiet --severity HIGH,CRITICAL ${FRONTEND_IMAGE}:${VERSION} || echo "Frontend scan completed"
                     '''
@@ -412,9 +485,9 @@ pipeline {
                         retry(3) {
                             timeout(time: 2, unit: 'MINUTES') {
                                 sh '''
-                                    echo "Logging into Docker Hub..."
+                                    echo "🔐 Logging into Docker Hub..."
                                     echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin
-                                    echo "Docker Hub login successful"
+                                    echo "✅ Docker Hub login successful"
                                 '''
                             }
                         }
@@ -427,10 +500,10 @@ pipeline {
                                 retry(3) {
                                     timeout(time: 15, unit: 'MINUTES') {
                                         sh '''
-                                            echo "Pushing backend images to Docker Hub..."
+                                            echo "📤 Pushing backend images to Docker Hub..."
                                             docker push ${BACKEND_IMAGE}:${VERSION}
                                             docker push ${BACKEND_IMAGE}:latest
-                                            echo "Backend images pushed successfully"
+                                            echo "✅ Backend images pushed successfully"
                                         '''
                                     }
                                 }
@@ -441,10 +514,10 @@ pipeline {
                                 retry(3) {
                                     timeout(time: 15, unit: 'MINUTES') {
                                         sh '''
-                                            echo "Pushing frontend images to Docker Hub..."
+                                            echo "📤 Pushing frontend images to Docker Hub..."
                                             docker push ${FRONTEND_IMAGE}:${VERSION}
                                             docker push ${FRONTEND_IMAGE}:latest
-                                            echo "Frontend images pushed successfully"
+                                            echo "✅ Frontend images pushed successfully"
                                         '''
                                     }
                                 }
@@ -454,7 +527,7 @@ pipeline {
                     
                     // Cleanup local images to save space
                     sh '''
-                        echo "Cleaning up local images to save disk space..."
+                        echo "🧹 Cleaning up local images to save disk space..."
                         docker rmi ${BACKEND_IMAGE}:${VERSION} || echo "Backend version image already removed"
                         docker rmi ${BACKEND_IMAGE}:latest || echo "Backend latest image already removed"
                         docker rmi ${FRONTEND_IMAGE}:${VERSION} || echo "Frontend version image already removed"
@@ -477,13 +550,15 @@ pipeline {
                 script {
                     // Deploy to production environment
                     sh '''
+                        echo "🚀 Deploying to production..."
+                        
                         # Update docker-compose with new image versions
                         sed -i "s|image: anhtt4512/attendance-app-backend:.*|image: ${BACKEND_IMAGE}:${VERSION}|g" docker-compose.prod.yaml
                         sed -i "s|image: anhtt4512/attendance-app-frontend:.*|image: ${FRONTEND_IMAGE}:${VERSION}|g" docker-compose.prod.yaml
                         
                         # Check if docker compose is available, otherwise install docker-compose
                         if ! command -v docker compose &> /dev/null; then
-                            echo "docker compose not found, trying to install docker-compose..."
+                            echo "📦 docker compose not found, trying to install docker-compose..."
                             curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
                             chmod +x /usr/local/bin/docker-compose
                             export PATH="/usr/local/bin:$PATH"
@@ -491,14 +566,22 @@ pipeline {
                         
                         # Deploy using docker compose (with fallback to docker-compose)
                         if command -v docker compose &> /dev/null; then
+                            echo "🔄 Stopping existing containers..."
                             docker compose -f docker-compose.prod.yaml down
+                            echo "📥 Pulling latest images..."
                             docker compose -f docker-compose.prod.yaml pull
+                            echo "🚀 Starting containers..."
                             docker compose -f docker-compose.prod.yaml up -d
                         else
+                            echo "🔄 Stopping existing containers..."
                             docker-compose -f docker-compose.prod.yaml down
+                            echo "📥 Pulling latest images..."
                             docker-compose -f docker-compose.prod.yaml pull
+                            echo "🚀 Starting containers..."
                             docker-compose -f docker-compose.prod.yaml up -d
                         fi
+                        
+                        echo "✅ Deployment completed successfully!"
                     '''
                 }
             }
@@ -509,7 +592,7 @@ pipeline {
         always {
             // Clean up Docker resources efficiently
             sh '''
-                echo "Cleaning up Docker resources..."
+                echo "🧹 Cleaning up Docker resources..."
                 docker image prune -f --filter "until=24h" || echo "Docker image cleanup failed"
                 docker container prune -f --filter "until=24h" || echo "Docker container cleanup failed"
                 docker network prune -f || echo "Docker network cleanup failed"
@@ -519,6 +602,14 @@ pipeline {
         
         success {
             script {
+                sh '''
+                    echo "✅ Pipeline completed successfully!"
+                    echo "📊 Final cache statistics:"
+                    if [ -d "${CACHE_BASE_DIR}" ]; then
+                        echo "Total cache size: $(du -sh ${CACHE_BASE_DIR} 2>/dev/null | cut -f1 || echo 'unknown')"
+                    fi
+                '''
+                
                 // Send success notification
                 emailext (
                     subject: "Pipeline Successful: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
@@ -530,6 +621,19 @@ pipeline {
         
         failure {
             script {
+                sh '''
+                    echo "❌ Pipeline failed!"
+                    echo "🔍 Debugging info:"
+                    echo "Backend cache path: ${BACKEND_CACHE_PATH:-'not set'}"
+                    echo "Frontend cache path: ${FRONTEND_CACHE_PATH:-'not set'}"
+                    if [ -d "${CACHE_BASE_DIR}" ]; then
+                        echo "Cache directory exists: ✅"
+                        echo "Cache size: $(du -sh ${CACHE_BASE_DIR} 2>/dev/null | cut -f1 || echo 'unknown')"
+                    else
+                        echo "Cache directory exists: ❌"
+                    fi
+                '''
+                
                 // Send failure notification
                 emailext (
                     subject: "Pipeline Failed: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
@@ -542,9 +646,15 @@ pipeline {
         cleanup {
             // Clean workspace but preserve cache
             sh '''
-                echo "Cleaning workspace but preserving cache..."
-                # Don't clean the cache directory
-                find . -maxdepth 1 -name "*" -not -path "./.*" -not -name "." -exec rm -rf {} + 2>/dev/null || true
+                echo "🧹 Cleaning workspace but preserving cache..."
+                # Clean workspace except hidden files and cache
+                find . -maxdepth 1 -name "*" -not -path "./.*" -not -name "." -not -path "${CACHE_BASE_DIR}*" -exec rm -rf {} + 2>/dev/null || true
+            '''
+            
+            // Optional: Clean very old cache entries (older than 30 days)
+            sh '''
+                echo "🗑️ Cleaning old cache entries..."
+                find ${CACHE_BASE_DIR} -type d -mtime +30 -exec rm -rf {} + 2>/dev/null || true
             '''
         }
     }
