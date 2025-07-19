@@ -42,18 +42,92 @@ pipeline {
             }
         }
         
+        stage('Restore Dependencies Cache') {
+            parallel {
+                stage('Restore Backend Cache') {
+                    steps {
+                        script {
+                            def backendCacheDir = "${env.WORKSPACE}/.cache_backend_node_modules"
+                            def backendDir = "${env.WORKSPACE}/learning-app"
+                            
+                            // Strategy 1: Smart cache with package.json comparison
+                            if (fileExists("${backendCacheDir}/package.json") && fileExists("${backendCacheDir}/package-lock.json")) {
+                                // Compare package.json files to check if dependencies changed
+                                def packageJsonChanged = sh(script: "diff ${backendDir}/package.json ${backendCacheDir}/package.json", returnStatus: true)
+                                
+                                if (packageJsonChanged == 0) {
+                                    echo "Backend package.json unchanged, using cache..."
+                                    sh """
+                                        cp -r ${backendCacheDir}/node_modules ${backendDir}/
+                                        cp ${backendCacheDir}/package-lock.json ${backendDir}/
+                                    """
+                                    env.BACKEND_CACHE_RESTORED = 'true'
+                                    env.BACKEND_CACHE_TYPE = 'shared_directory'
+                                } else {
+                                    echo "Backend package.json changed, cache invalid"
+                                    env.BACKEND_CACHE_RESTORED = 'false'
+                                    env.BACKEND_CACHE_TYPE = 'none'
+                                }
+                            } else {
+                                echo "No backend cache found in shared directory"
+                                env.BACKEND_CACHE_RESTORED = 'false'
+                                env.BACKEND_CACHE_TYPE = 'none'
+                            }
+                        }
+                    }
+                }
+                
+                stage('Restore Frontend Cache') {
+                    steps {
+                        script {
+                            def frontendCacheDir = "${env.WORKSPACE}/.cache_frontend_node_modules"
+                            def frontendDir = "${env.WORKSPACE}/learning-app-ui"
+                            
+                            // Strategy 1: Smart cache with package.json comparison
+                            if (fileExists("${frontendCacheDir}/package.json") && fileExists("${frontendCacheDir}/package-lock.json")) {
+                                // Compare package.json files to check if dependencies changed
+                                def packageJsonChanged = sh(script: "diff ${frontendDir}/package.json ${frontendCacheDir}/package.json", returnStatus: true)
+                                
+                                if (packageJsonChanged == 0) {
+                                    echo "Frontend package.json unchanged, using cache..."
+                                    sh """
+                                        cp -r ${frontendCacheDir}/node_modules ${frontendDir}/
+                                        cp ${frontendCacheDir}/package-lock.json ${frontendDir}/
+                                    """
+                                    env.FRONTEND_CACHE_RESTORED = 'true'
+                                    env.FRONTEND_CACHE_TYPE = 'shared_directory'
+                                } else {
+                                    echo "Frontend package.json changed, cache invalid"
+                                    env.FRONTEND_CACHE_RESTORED = 'false'
+                                    env.FRONTEND_CACHE_TYPE = 'none'
+                                }
+                            } else {
+                                echo "No frontend cache found in shared directory"
+                                env.FRONTEND_CACHE_RESTORED = 'false'
+                                env.FRONTEND_CACHE_TYPE = 'none'
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
         stage('Install Dependencies') {
             parallel {
                 stage('Backend Dependencies') {
                     steps {
                         dir('learning-app') {
-                            // Try to unstash cached dependencies first
                             script {
-                                try {
-                                    unstash 'backend-deps'
-                                    echo 'Using cached backend dependencies'
-                                } catch (Exception e) {
-                                    echo 'No cached dependencies found, installing fresh'
+                                // Strategy 2: Try to unstash cached dependencies
+                                if (env.BACKEND_CACHE_RESTORED != 'true') {
+                                    try {
+                                        unstash 'backend-deps'
+                                        echo 'Using stashed backend dependencies'
+                                        env.BACKEND_CACHE_RESTORED = 'true'
+                                    } catch (Exception e) {
+                                        echo 'No stashed dependencies found, installing fresh'
+                                        env.BACKEND_CACHE_RESTORED = 'false'
+                                    }
                                 }
                             }
                             
@@ -87,13 +161,17 @@ pipeline {
                 stage('Frontend Dependencies') {
                     steps {
                         dir('learning-app-ui') {
-                            // Try to unstash cached dependencies first
                             script {
-                                try {
-                                    unstash 'frontend-deps'
-                                    echo 'Using cached frontend dependencies'
-                                } catch (Exception e) {
-                                    echo 'No cached dependencies found, installing fresh'
+                                // Strategy 2: Try to unstash cached dependencies
+                                if (env.FRONTEND_CACHE_RESTORED != 'true') {
+                                    try {
+                                        unstash 'frontend-deps'
+                                        echo 'Using stashed frontend dependencies'
+                                        env.FRONTEND_CACHE_RESTORED = 'true'
+                                    } catch (Exception e) {
+                                        echo 'No stashed dependencies found, installing fresh'
+                                        env.FRONTEND_CACHE_RESTORED = 'false'
+                                    }
                                 }
                             }
                             
@@ -117,6 +195,56 @@ pipeline {
                             
                             // Stash dependencies for next build
                             stash includes: 'node_modules/**/*,package-lock.json', name: 'frontend-deps'
+                        }
+                    }
+                }
+            }
+        }
+        
+        stage('Save Dependencies Cache') {
+            parallel {
+                stage('Save Backend Cache') {
+                    steps {
+                        script {
+                            def backendCacheDir = "${env.WORKSPACE}/.cache_backend_node_modules"
+                            
+                            // Strategy 1: Save to shared directory with package.json
+                            sh """
+                                mkdir -p ${backendCacheDir}
+                                cp -r learning-app/node_modules ${backendCacheDir}/
+                                cp learning-app/package-lock.json ${backendCacheDir}/
+                                cp learning-app/package.json ${backendCacheDir}/
+                            """
+                            echo "Backend cache saved to shared directory with package.json"
+                            
+                            // Strategy 2: Archive as artifacts
+                            dir('learning-app') {
+                                sh 'tar -czf backend_node_modules.tar.gz node_modules package-lock.json package.json'
+                                archiveArtifacts artifacts: 'backend_node_modules.tar.gz', fingerprint: true
+                            }
+                        }
+                    }
+                }
+                
+                stage('Save Frontend Cache') {
+                    steps {
+                        script {
+                            def frontendCacheDir = "${env.WORKSPACE}/.cache_frontend_node_modules"
+                            
+                            // Strategy 1: Save to shared directory with package.json
+                            sh """
+                                mkdir -p ${frontendCacheDir}
+                                cp -r learning-app-ui/node_modules ${frontendCacheDir}/
+                                cp learning-app-ui/package-lock.json ${frontendCacheDir}/
+                                cp learning-app-ui/package.json ${frontendCacheDir}/
+                            """
+                            echo "Frontend cache saved to shared directory with package.json"
+                            
+                            // Strategy 2: Archive as artifacts
+                            dir('learning-app-ui') {
+                                sh 'tar -czf frontend_node_modules.tar.gz node_modules package-lock.json package.json'
+                                archiveArtifacts artifacts: 'frontend_node_modules.tar.gz', fingerprint: true
+                            }
                         }
                     }
                 }
