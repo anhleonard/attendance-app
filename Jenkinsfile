@@ -101,17 +101,16 @@ pipeline {
                                     } else {
                                         echo "No previous successful build found"
                                     }
-                                }
-                                
-                                // Check if cache was restored successfully
-                                if (fileExists("learning-app/node_modules")) {
-                                    env.BACKEND_CACHE_RESTORED = 'true'
-                                    env.BACKEND_CACHE_TYPE = 'artifact'
-                                    echo "Backend cache restored from artifact successfully"
-                                } else {
-                                    env.BACKEND_CACHE_RESTORED = 'false'
-                                    env.BACKEND_CACHE_TYPE = 'none'
-                                }
+                                    
+                                    // Check if cache was restored successfully
+                                    if (fileExists("learning-app/node_modules")) {
+                                        env.BACKEND_CACHE_RESTORED = 'true'
+                                        env.BACKEND_CACHE_TYPE = 'artifact'
+                                        echo "Backend cache restored from artifact successfully"
+                                    } else {
+                                        env.BACKEND_CACHE_RESTORED = 'false'
+                                        env.BACKEND_CACHE_TYPE = 'none'
+                                    }
                                 } catch (Exception e) {
                                     echo "Failed to restore from artifact: ${e.getMessage()}"
                                     
@@ -199,17 +198,16 @@ pipeline {
                                     } else {
                                         echo "No previous successful build found"
                                     }
-                                }
-                                
-                                // Check if cache was restored successfully
-                                if (fileExists("learning-app-ui/node_modules")) {
-                                    env.FRONTEND_CACHE_RESTORED = 'true'
-                                    env.FRONTEND_CACHE_TYPE = 'artifact'
-                                    echo "Frontend cache restored from artifact successfully"
-                                } else {
-                                    env.FRONTEND_CACHE_RESTORED = 'false'
-                                    env.FRONTEND_CACHE_TYPE = 'none'
-                                }
+                                    
+                                    // Check if cache was restored successfully
+                                    if (fileExists("learning-app-ui/node_modules")) {
+                                        env.FRONTEND_CACHE_RESTORED = 'true'
+                                        env.FRONTEND_CACHE_TYPE = 'artifact'
+                                        echo "Frontend cache restored from artifact successfully"
+                                    } else {
+                                        env.FRONTEND_CACHE_RESTORED = 'false'
+                                        env.FRONTEND_CACHE_TYPE = 'none'
+                                    }
                                 } catch (Exception e) {
                                     echo "Failed to restore from artifact: ${e.getMessage()}"
                                     
