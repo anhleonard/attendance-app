@@ -70,8 +70,40 @@ pipeline {
                                 }
                             } else {
                                 echo "No backend cache found in shared directory"
-                                env.BACKEND_CACHE_RESTORED = 'false'
-                                env.BACKEND_CACHE_TYPE = 'none'
+                                
+                                // Strategy 3: Try to restore from artifacts
+                                try {
+                                    echo "Trying to restore backend cache from artifacts..."
+                                    dir('learning-app') {
+                                        // Download and extract the latest artifact
+                                        sh '''
+                                            # Find the latest backend artifact
+                                            wget -O backend_cache.tar.gz "$(curl -s "http://localhost:8080/job/attendance-pineline/lastSuccessfulBuild/api/json" | grep -o '"url":"[^"]*backend_node_modules[^"]*"' | cut -d'"' -f4 | head -1)" || echo "No artifact found"
+                                            
+                                            if [ -f "backend_cache.tar.gz" ]; then
+                                                echo "Extracting backend cache from artifact..."
+                                                tar -xzf backend_cache.tar.gz
+                                                echo "Backend cache restored from artifact"
+                                                rm -f backend_cache.tar.gz
+                                            else
+                                                echo "No backend artifact found"
+                                            fi
+                                        '''
+                                    }
+                                    
+                                    if (fileExists("learning-app/node_modules")) {
+                                        env.BACKEND_CACHE_RESTORED = 'true'
+                                        env.BACKEND_CACHE_TYPE = 'artifact'
+                                        echo "Backend cache restored from artifact successfully"
+                                    } else {
+                                        env.BACKEND_CACHE_RESTORED = 'false'
+                                        env.BACKEND_CACHE_TYPE = 'none'
+                                    }
+                                } catch (Exception e) {
+                                    echo "Failed to restore from artifact: ${e.getMessage()}"
+                                    env.BACKEND_CACHE_RESTORED = 'false'
+                                    env.BACKEND_CACHE_TYPE = 'none'
+                                }
                             }
                         }
                     }
@@ -103,8 +135,40 @@ pipeline {
                                 }
                             } else {
                                 echo "No frontend cache found in shared directory"
-                                env.FRONTEND_CACHE_RESTORED = 'false'
-                                env.FRONTEND_CACHE_TYPE = 'none'
+                                
+                                // Strategy 3: Try to restore from artifacts
+                                try {
+                                    echo "Trying to restore frontend cache from artifacts..."
+                                    dir('learning-app-ui') {
+                                        // Download and extract the latest artifact
+                                        sh '''
+                                            # Find the latest frontend artifact
+                                            wget -O frontend_cache.tar.gz "$(curl -s "http://localhost:8080/job/attendance-pineline/lastSuccessfulBuild/api/json" | grep -o '"url":"[^"]*frontend_node_modules[^"]*"' | cut -d'"' -f4 | head -1)" || echo "No artifact found"
+                                            
+                                            if [ -f "frontend_cache.tar.gz" ]; then
+                                                echo "Extracting frontend cache from artifact..."
+                                                tar -xzf frontend_cache.tar.gz
+                                                echo "Frontend cache restored from artifact"
+                                                rm -f frontend_cache.tar.gz
+                                            else
+                                                echo "No frontend artifact found"
+                                            fi
+                                        '''
+                                    }
+                                    
+                                    if (fileExists("learning-app-ui/node_modules")) {
+                                        env.FRONTEND_CACHE_RESTORED = 'true'
+                                        env.FRONTEND_CACHE_TYPE = 'artifact'
+                                        echo "Frontend cache restored from artifact successfully"
+                                    } else {
+                                        env.FRONTEND_CACHE_RESTORED = 'false'
+                                        env.FRONTEND_CACHE_TYPE = 'none'
+                                    }
+                                } catch (Exception e) {
+                                    echo "Failed to restore from artifact: ${e.getMessage()}"
+                                    env.FRONTEND_CACHE_RESTORED = 'false'
+                                    env.FRONTEND_CACHE_TYPE = 'none'
+                                }
                             }
                         }
                     }
@@ -214,6 +278,11 @@ pipeline {
                                 cp -r learning-app/node_modules ${backendCacheDir}/
                                 cp learning-app/package-lock.json ${backendCacheDir}/
                                 cp learning-app/package.json ${backendCacheDir}/
+                                
+                                # Add cache metadata for debugging
+                                echo "Cache created: $(date)" > ${backendCacheDir}/cache_metadata.txt
+                                echo "Build number: ${env.BUILD_NUMBER}" >> ${backendCacheDir}/cache_metadata.txt
+                                echo "Cache size: $(du -sh ${backendCacheDir}/node_modules | cut -f1)" >> ${backendCacheDir}/cache_metadata.txt
                             """
                             echo "Backend cache saved to shared directory with package.json"
                             
@@ -237,6 +306,11 @@ pipeline {
                                 cp -r learning-app-ui/node_modules ${frontendCacheDir}/
                                 cp learning-app-ui/package-lock.json ${frontendCacheDir}/
                                 cp learning-app-ui/package.json ${frontendCacheDir}/
+                                
+                                # Add cache metadata for debugging
+                                echo "Cache created: $(date)" > ${frontendCacheDir}/cache_metadata.txt
+                                echo "Build number: ${env.BUILD_NUMBER}" >> ${frontendCacheDir}/cache_metadata.txt
+                                echo "Cache size: $(du -sh ${frontendCacheDir}/node_modules | cut -f1)" >> ${frontendCacheDir}/cache_metadata.txt
                             """
                             echo "Frontend cache saved to shared directory with package.json"
                             
