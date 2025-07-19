@@ -47,22 +47,35 @@ pipeline {
                 stage('Backend Dependencies') {
                     steps {
                         dir('learning-app') {
-                            // Cache npm dependencies
-                            cache(maxCacheSize: 250, caches: [
-                                arbitraryFileCache(path: 'node_modules', includes: '**/*'),
-                                arbitraryFileCache(path: '.npm', includes: '**/*')
-                            ]) {
-                                sh '''
-                                    # Setup npm cache directory
-                                    mkdir -p ~/.npm
-                                    
+                            // Try to unstash cached dependencies first
+                            script {
+                                try {
+                                    unstash 'backend-deps'
+                                    echo 'Using cached backend dependencies'
+                                } catch (Exception e) {
+                                    echo 'No cached dependencies found, installing fresh'
+                                }
+                            }
+                            
+                            sh '''
+                                # Setup npm cache directory
+                                mkdir -p ~/.npm
+                                
+                                # Check if node_modules exists, if not install dependencies
+                                if [ ! -d "node_modules" ]; then
+                                    echo "Installing backend dependencies..."
                                     # Use npm ci for faster, reliable installs with cache
                                     npm ci --legacy-peer-deps --prefer-offline --no-audit --no-fund --cache ~/.npm || npm install --legacy-peer-deps --prefer-offline --no-audit --no-fund --cache ~/.npm
                                     
                                     # Install global packages with cache
                                     npm install -g @nestjs/cli prisma --cache ~/.npm
-                                '''
-                            }
+                                else
+                                    echo "Backend dependencies already installed"
+                                fi
+                            '''
+                            
+                            // Stash dependencies for next build
+                            stash includes: 'node_modules/**/*,package-lock.json', name: 'backend-deps'
                         }
                     }
                 }
@@ -70,19 +83,32 @@ pipeline {
                 stage('Frontend Dependencies') {
                     steps {
                         dir('learning-app-ui') {
-                            // Cache npm dependencies
-                            cache(maxCacheSize: 250, caches: [
-                                arbitraryFileCache(path: 'node_modules', includes: '**/*'),
-                                arbitraryFileCache(path: '.npm', includes: '**/*')
-                            ]) {
-                                sh '''
-                                    # Setup npm cache directory
-                                    mkdir -p ~/.npm
-                                    
+                            // Try to unstash cached dependencies first
+                            script {
+                                try {
+                                    unstash 'frontend-deps'
+                                    echo 'Using cached frontend dependencies'
+                                } catch (Exception e) {
+                                    echo 'No cached dependencies found, installing fresh'
+                                }
+                            }
+                            
+                            sh '''
+                                # Setup npm cache directory
+                                mkdir -p ~/.npm
+                                
+                                # Check if node_modules exists, if not install dependencies
+                                if [ ! -d "node_modules" ]; then
+                                    echo "Installing frontend dependencies..."
                                     # Use npm ci for faster, reliable installs with cache
                                     npm ci --prefer-offline --no-audit --no-fund --cache ~/.npm || npm install --prefer-offline --no-audit --no-fund --cache ~/.npm
-                                '''
-                            }
+                                else
+                                    echo "Frontend dependencies already installed"
+                                fi
+                            '''
+                            
+                            // Stash dependencies for next build
+                            stash includes: 'node_modules/**/*,package-lock.json', name: 'frontend-deps'
                         }
                     }
                 }
@@ -100,17 +126,11 @@ pipeline {
                     }
                     steps {
                         dir('learning-app') {
-                            // Cache test results and coverage
-                            cache(maxCacheSize: 100, caches: [
-                                arbitraryFileCache(path: 'coverage', includes: '**/*'),
-                                arbitraryFileCache(path: '.nyc_output', includes: '**/*')
-                            ]) {
-                                sh '''
-                                    # Run tests with coverage and quiet output
-                                    npm run test || echo "Tests skipped - no test script found"
-                                    npm run test:e2e || echo "E2E tests skipped - no test script found"
-                                '''
-                            }
+                            sh '''
+                                # Run tests with coverage and quiet output
+                                npm run test || echo "Tests skipped - no test script found"
+                                npm run test:e2e || echo "E2E tests skipped - no test script found"
+                            '''
                         }
                     }
                     post {
@@ -134,17 +154,11 @@ pipeline {
                     }
                     steps {
                         dir('learning-app-ui') {
-                            // Cache test results and coverage
-                            cache(maxCacheSize: 100, caches: [
-                                arbitraryFileCache(path: 'coverage', includes: '**/*'),
-                                arbitraryFileCache(path: '.nyc_output', includes: '**/*')
-                            ]) {
-                                sh '''
-                                    # Run tests with coverage and quiet output
-                                    npm run test || echo "Tests skipped - no test script found"
-                                    npm run test:e2e || echo "E2E tests skipped - no test script found"
-                                '''
-                            }
+                            sh '''
+                                # Run tests with coverage and quiet output
+                                npm run test || echo "Tests skipped - no test script found"
+                                npm run test:e2e || echo "E2E tests skipped - no test script found"
+                            '''
                         }
                     }
                     post {
@@ -172,15 +186,10 @@ pipeline {
                     }
                     steps {
                         dir('learning-app') {
-                            // Cache lint results
-                            cache(maxCacheSize: 50, caches: [
-                                arbitraryFileCache(path: '.eslintcache', includes: '**/*')
-                            ]) {
-                                sh '''
-                                    # Run lint with quiet output and cache
-                                    npm run lint || echo "Lint skipped - eslint not found"
-                                '''
-                            }
+                            sh '''
+                                # Run lint with quiet output and cache
+                                npm run lint || echo "Lint skipped - eslint not found"
+                            '''
                         }
                     }
                 }
@@ -194,15 +203,10 @@ pipeline {
                     }
                     steps {
                         dir('learning-app-ui') {
-                            // Cache lint results
-                            cache(maxCacheSize: 50, caches: [
-                                arbitraryFileCache(path: '.eslintcache', includes: '**/*')
-                            ]) {
-                                sh '''
-                                    # Run lint with quiet output and cache
-                                    npm run lint
-                                '''
-                            }
+                            sh '''
+                                # Run lint with quiet output and cache
+                                npm run lint
+                            '''
                         }
                     }
                 }
@@ -220,17 +224,11 @@ pipeline {
                     }
                     steps {
                         dir('learning-app') {
-                            // Cache build artifacts
-                            cache(maxCacheSize: 200, caches: [
-                                arbitraryFileCache(path: 'dist', includes: '**/*'),
-                                arbitraryFileCache(path: 'prisma/generated', includes: '**/*')
-                            ]) {
-                                sh '''
-                                    # Build with optimizations
-                                    npm run build
-                                    npx prisma generate
-                                '''
-                            }
+                            sh '''
+                                # Build with optimizations
+                                npm run build
+                                npx prisma generate
+                            '''
                         }
                     }
                 }
@@ -244,16 +242,10 @@ pipeline {
                     }
                     steps {
                         dir('learning-app-ui') {
-                            // Cache build artifacts
-                            cache(maxCacheSize: 300, caches: [
-                                arbitraryFileCache(path: '.next', includes: '**/*'),
-                                arbitraryFileCache(path: 'out', includes: '**/*')
-                            ]) {
-                                sh '''
-                                    # Build with optimizations and quiet output
-                                    npm run build
-                                '''
-                            }
+                            sh '''
+                                # Build with optimizations and quiet output
+                                npm run build
+                            '''
                         }
                     }
                 }
@@ -268,31 +260,26 @@ pipeline {
                         sh 'echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin'
                     }
 
-                    // Cache Docker layers
-                    cache(maxCacheSize: 500, caches: [
-                        arbitraryFileCache(path: '/var/lib/docker', includes: '**/*')
-                    ]) {
-                        // Check if we need to build images based on changes
-                        def backendChanged = sh(script: "git diff --name-only HEAD~1 HEAD | grep 'learning-app/'", returnStatus: true) == 0
-                        def frontendChanged = sh(script: "git diff --name-only HEAD~1 HEAD | grep 'learning-app-ui/'", returnStatus: true) == 0
-                        
-                        if (backendChanged || env.BRANCH_NAME == 'master' || env.BRANCH_NAME == 'main') {
-                            echo "Building backend image..."
-                            // 🛠 Build backend image with cache
-                            docker.build("${BACKEND_IMAGE}:${VERSION}", "--cache-from ${BACKEND_IMAGE}:latest --build-arg BUILDKIT_INLINE_CACHE=1 ./learning-app")
-                            docker.build("${BACKEND_IMAGE}:latest", "--cache-from ${BACKEND_IMAGE}:latest --build-arg BUILDKIT_INLINE_CACHE=1 ./learning-app")
-                        } else {
-                            echo "No backend changes detected, skipping backend build"
-                        }
-                        
-                        if (frontendChanged || env.BRANCH_NAME == 'master' || env.BRANCH_NAME == 'main') {
-                            echo "Building frontend image..."
-                            // 🛠 Build frontend image with cache
-                            docker.build("${FRONTEND_IMAGE}:${VERSION}", "--cache-from ${FRONTEND_IMAGE}:latest --build-arg BUILDKIT_INLINE_CACHE=1 ./learning-app-ui")
-                            docker.build("${FRONTEND_IMAGE}:latest", "--cache-from ${FRONTEND_IMAGE}:latest --build-arg BUILDKIT_INLINE_CACHE=1 ./learning-app-ui")
-                        } else {
-                            echo "No frontend changes detected, skipping frontend build"
-                        }
+                    // Check if we need to build images based on changes
+                    def backendChanged = sh(script: "git diff --name-only HEAD~1 HEAD | grep 'learning-app/'", returnStatus: true) == 0
+                    def frontendChanged = sh(script: "git diff --name-only HEAD~1 HEAD | grep 'learning-app-ui/'", returnStatus: true) == 0
+                    
+                    if (backendChanged || env.BRANCH_NAME == 'master' || env.BRANCH_NAME == 'main') {
+                        echo "Building backend image..."
+                        // 🛠 Build backend image with cache
+                        docker.build("${BACKEND_IMAGE}:${VERSION}", "--cache-from ${BACKEND_IMAGE}:latest --build-arg BUILDKIT_INLINE_CACHE=1 ./learning-app")
+                        docker.build("${BACKEND_IMAGE}:latest", "--cache-from ${BACKEND_IMAGE}:latest --build-arg BUILDKIT_INLINE_CACHE=1 ./learning-app")
+                    } else {
+                        echo "No backend changes detected, skipping backend build"
+                    }
+                    
+                    if (frontendChanged || env.BRANCH_NAME == 'master' || env.BRANCH_NAME == 'main') {
+                        echo "Building frontend image..."
+                        // 🛠 Build frontend image with cache
+                        docker.build("${FRONTEND_IMAGE}:${VERSION}", "--cache-from ${FRONTEND_IMAGE}:latest --build-arg BUILDKIT_INLINE_CACHE=1 ./learning-app-ui")
+                        docker.build("${FRONTEND_IMAGE}:latest", "--cache-from ${FRONTEND_IMAGE}:latest --build-arg BUILDKIT_INLINE_CACHE=1 ./learning-app-ui")
+                    } else {
+                        echo "No frontend changes detected, skipping frontend build"
                     }
                 }
             }
