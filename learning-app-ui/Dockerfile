@@ -27,12 +27,9 @@ COPY postcss.config.mjs .
 COPY eslint.config.mjs .
 COPY next-env.d.ts .
 
-# Environment variables will be set at runtime via docker-compose
-ARG NEXT_PUBLIC_HTTP_API_DOMAIN
-ARG NEXT_PUBLIC_HTTP_AI_DOMAIN
-
-ENV NEXT_PUBLIC_HTTP_API_DOMAIN=$NEXT_PUBLIC_HTTP_API_DOMAIN
-ENV NEXT_PUBLIC_HTTP_AI_DOMAIN=$NEXT_PUBLIC_HTTP_AI_DOMAIN
+# Environment variables hardcoded in Dockerfile
+ENV NEXT_PUBLIC_HTTP_API_DOMAIN=http://localhost:3010
+ENV NEXT_PUBLIC_HTTP_AI_DOMAIN=http://localhost:8000
 
 # Next.js collects completely anonymous telemetry data about general usage. Learn more here: https://nextjs.org/telemetry
 # Uncomment the following line to disable telemetry at build time

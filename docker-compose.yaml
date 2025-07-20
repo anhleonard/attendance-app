@@ -87,9 +87,6 @@ services:
     build:
       context: ./learning-app-ui
       dockerfile: Dockerfile
-      args:
-        NEXT_PUBLIC_HTTP_API_DOMAIN: http://localhost:3010
-        NEXT_PUBLIC_HTTP_AI_DOMAIN: http://localhost:8000
     env_file:
       - ./learning-app-ui/.env
     container_name: fe-attendance
