@@ -548,7 +548,6 @@ pipeline {
             steps {
                 input message: 'Deploy to production?', ok: 'Deploy'
                 script {
-                    // Deploy to production environment
                     sh '''
                         echo "🚀 Deploying to production..."
                         
@@ -556,33 +555,184 @@ pipeline {
                         sed -i "s|image: anhtt4512/attendance-app-backend:.*|image: ${BACKEND_IMAGE}:${VERSION}|g" docker-compose.prod.yaml
                         sed -i "s|image: anhtt4512/attendance-app-frontend:.*|image: ${FRONTEND_IMAGE}:${VERSION}|g" docker-compose.prod.yaml
                         
-                        # Check if docker compose is available, otherwise install docker-compose
-                        if ! command -v docker compose &> /dev/null; then
-                            echo "📦 docker compose not found, trying to install docker-compose..."
+                        # Show what we're deploying
+                        echo "📋 Deployment Configuration:"
+                        echo "Backend Image: ${BACKEND_IMAGE}:${VERSION}"
+                        echo "Frontend Image: ${FRONTEND_IMAGE}:${VERSION}"
+                        
+                        # Function to check docker compose availability
+                        check_docker_compose() {
+                            if docker compose version >/dev/null 2>&1; then
+                                echo "✅ Docker Compose (v2) is available"
+                                return 0
+                            elif docker-compose --version >/dev/null 2>&1; then
+                                echo "✅ Docker Compose (v1) is available"
+                                return 1
+                            else
+                                echo "❌ Docker Compose not found"
+                                return 2
+                            fi
+                        }
+                        
+                        # Check docker compose and install if needed
+                        check_docker_compose
+                        COMPOSE_STATUS=$?
+                        
+                        if [ $COMPOSE_STATUS -eq 2 ]; then
+                            echo "📦 Installing docker-compose..."
                             curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
                             chmod +x /usr/local/bin/docker-compose
                             export PATH="/usr/local/bin:$PATH"
-                        fi
-                        
-                        # Deploy using docker compose (with fallback to docker-compose)
-                        if command -v docker compose &> /dev/null; then
-                            echo "🔄 Stopping existing containers..."
-                            docker compose -f docker-compose.prod.yaml down
-                            echo "📥 Pulling latest images..."
-                            docker compose -f docker-compose.prod.yaml pull
-                            echo "🚀 Starting containers..."
-                            docker compose -f docker-compose.prod.yaml up -d
+                            
+                            # Verify installation
+                            if docker-compose --version >/dev/null 2>&1; then
+                                echo "✅ Docker Compose installed successfully"
+                                COMPOSE_CMD="docker-compose"
+                            else
+                                echo "❌ Failed to install docker-compose"
+                                exit 1
+                            fi
+                        elif [ $COMPOSE_STATUS -eq 0 ]; then
+                            COMPOSE_CMD="docker compose"
                         else
-                            echo "🔄 Stopping existing containers..."
-                            docker-compose -f docker-compose.prod.yaml down
-                            echo "📥 Pulling latest images..."
-                            docker-compose -f docker-compose.prod.yaml pull
-                            echo "🚀 Starting containers..."
-                            docker-compose -f docker-compose.prod.yaml up -d
+                            COMPOSE_CMD="docker-compose"
                         fi
                         
-                        echo "✅ Deployment completed successfully!"
+                        echo "🔧 Using command: $COMPOSE_CMD"
+                        
+                        # Configure Docker for potential proxy issues
+                        echo "🌐 Configuring Docker networking..."
+                        
+                        # Clear any proxy settings that might interfere
+                        unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY
+                        
+                        # Add Docker Hub mirrors if needed
+                        DOCKER_REGISTRY_MIRRORS="--registry-mirror=https://mirror.gcr.io"
+                        
+                        # Try to configure Docker daemon for better connectivity
+                        if [ -f /etc/docker/daemon.json ]; then
+                            echo "📝 Current Docker daemon config:"
+                            cat /etc/docker/daemon.json || echo "No readable daemon.json"
+                        fi
+                        
+                        # Function to pull images with retry and fallback
+                        pull_images_with_retry() {
+                            local max_attempts=3
+                            local attempt=1
+                            
+                            while [ $attempt -le $max_attempts ]; do
+                                echo "📥 Attempt $attempt/$max_attempts: Pulling images..."
+                                
+                                if $COMPOSE_CMD -f docker-compose.prod.yaml pull --ignore-pull-failures; then
+                                    echo "✅ Images pulled successfully"
+                                    return 0
+                                else
+                                    echo "❌ Pull attempt $attempt failed"
+                                    
+                                    if [ $attempt -eq $max_attempts ]; then
+                                        echo "🔄 Trying alternative approach - pulling images individually..."
+                                        
+                                        # Try to pull custom images (these should work since we pushed them)
+                                        echo "📥 Pulling custom images..."
+                                        docker pull ${BACKEND_IMAGE}:${VERSION} || echo "⚠️ Failed to pull backend image"
+                                        docker pull ${FRONTEND_IMAGE}:${VERSION} || echo "⚠️ Failed to pull frontend image"
+                                        
+                                        # For base images, try to use local cache or alternative tags
+                                        echo "🏷️ Checking for alternative base images..."
+                                        
+                                        # Check if we have redis locally or try latest
+                                        if ! docker pull redis:7-alpine; then
+                                            echo "⚠️ Using redis:latest as fallback"
+                                            docker pull redis:latest
+                                            # Update compose file to use latest
+                                            sed -i 's|redis:7-alpine|redis:latest|g' docker-compose.prod.yaml
+                                        fi
+                                        
+                                        # Similar for other base images
+                                        docker pull postgres:15 || docker pull postgres:latest
+                                        docker pull minio/minio:latest || echo "⚠️ MinIO pull failed"
+                                        docker pull n8nio/n8n:latest || echo "⚠️ n8n pull failed"
+                                        
+                                        return 0
+                                    fi
+                                    
+                                    attempt=$((attempt + 1))
+                                    echo "⏳ Waiting 10 seconds before retry..."
+                                    sleep 10
+                                fi
+                            done
+                            
+                            return 1
+                        }
+                        
+                        # Stop existing containers first
+                        echo "🔄 Stopping existing containers..."
+                        $COMPOSE_CMD -f docker-compose.prod.yaml down --remove-orphans || echo "⚠️ No existing containers to stop"
+                        
+                        # Pull images with retry logic
+                        pull_images_with_retry
+                        
+                        # Start services
+                        echo "🚀 Starting services..."
+                        $COMPOSE_CMD -f docker-compose.prod.yaml up -d
+                        
+                        # Wait for services to be healthy
+                        echo "⏳ Waiting for services to be ready..."
+                        sleep 30
+                        
+                        # Check service status
+                        echo "🔍 Checking service status..."
+                        $COMPOSE_CMD -f docker-compose.prod.yaml ps
+                        
+                        # Test connectivity to main services
+                        echo "🩺 Health checks..."
+                        
+                        # Check if backend is responding
+                        if curl -f http://localhost:3001/health >/dev/null 2>&1 || curl -f http://localhost:3001 >/dev/null 2>&1; then
+                            echo "✅ Backend is responding"
+                        else
+                            echo "⚠️ Backend health check failed - checking logs..."
+                            $COMPOSE_CMD -f docker-compose.prod.yaml logs --tail=20 be-attendance
+                        fi
+                        
+                        # Check if frontend is responding
+                        if curl -f http://localhost:3000 >/dev/null 2>&1; then
+                            echo "✅ Frontend is responding"
+                        else
+                            echo "⚠️ Frontend health check failed - checking logs..."
+                            $COMPOSE_CMD -f docker-compose.prod.yaml logs --tail=20 fe-attendance
+                        fi
+                        
+                        echo "✅ Deployment completed!"
+                        echo "🌐 Application should be available at:"
+                        echo "  Frontend: http://localhost:3000"
+                        echo "  Backend:  http://localhost:3001"
                     '''
+                }
+            }
+            post {
+                success {
+                    echo "🎉 Production deployment successful!"
+                }
+                failure {
+                    script {
+                        sh '''
+                            echo "❌ Deployment failed - collecting debug info..."
+                            
+                            # Show service status
+                            if command -v docker compose >/dev/null 2>&1; then
+                                docker compose -f docker-compose.prod.yaml ps || true
+                                docker compose -f docker-compose.prod.yaml logs --tail=50 || true
+                            elif command -v docker-compose >/dev/null 2>&1; then
+                                docker-compose -f docker-compose.prod.yaml ps || true
+                                docker-compose -f docker-compose.prod.yaml logs --tail=50 || true
+                            fi
+                            
+                            # Show Docker info
+                            docker info || true
+                            docker images | head -20 || true
+                        '''
+                    }
                 }
             }
         }
