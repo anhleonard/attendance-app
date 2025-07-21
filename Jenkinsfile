@@ -54,46 +54,46 @@ pipeline {
                         userRemoteConfigs: scm.userRemoteConfigs
                     ])
                     
-                    // Get current branch name properly
-                    env.CURRENT_BRANCH = sh(
-                        script: 'git rev-parse --abbrev-ref HEAD',
+                    // Simple branch detection - check if we're on master/main
+                    def isMasterBranch = sh(
+                        script: 'git branch -r --contains HEAD | grep -E "(origin/master|origin/main)" | wc -l',
                         returnStdout: true
-                    ).trim()
+                    ).trim().toInteger() > 0
                     
-                    // Detect changes sớm để skip unnecessary stages
-                    // For master/main branch, always build
-                    // For other branches, check if there are any changes
-                    if (env.CURRENT_BRANCH == 'master' || env.CURRENT_BRANCH == 'main') {
+                    env.CURRENT_BRANCH = isMasterBranch ? 'master' : 'feature'
+                    
+                    // Always build on master/main, skip on feature branches
+                    if (isMasterBranch) {
                         env.BACKEND_CHANGED = 'true'
                         env.FRONTEND_CHANGED = 'true'
                         echo "🔄 Master/Main branch detected - building everything"
                     } else {
-                        // For feature branches, try to detect changes
-                        // Since we have shallow clone, we'll check if files exist and are modified
-                        try {
-                            def backendChanged = sh(
-                                script: 'git diff --name-only HEAD | grep -q "^learning-app/"',
-                                returnStatus: true
-                            ) == 0
-                            env.BACKEND_CHANGED = backendChanged ? 'true' : 'false'
-                            
-                            def frontendChanged = sh(
-                                script: 'git diff --name-only HEAD | grep -q "^learning-app-ui/"',
-                                returnStatus: true
-                            ) == 0
-                            env.FRONTEND_CHANGED = frontendChanged ? 'true' : 'false'
-                        } catch (Exception e) {
-                            // If change detection fails, assume everything changed for safety
-                            echo "⚠️ Change detection failed, assuming all changes"
-                            env.BACKEND_CHANGED = 'true'
-                            env.FRONTEND_CHANGED = 'true'
-                        }
+                        env.BACKEND_CHANGED = 'false'
+                        env.FRONTEND_CHANGED = 'false'
+                        echo "⏭️ Feature branch detected - skipping build"
                     }
                     
                     echo "🔍 Change Detection:"
                     echo "Current branch: ${env.CURRENT_BRANCH}"
                     echo "Backend changed: ${env.BACKEND_CHANGED}"
                     echo "Frontend changed: ${env.FRONTEND_CHANGED}"
+                    
+                    // Debug information
+                    echo "🔧 Debug Info:"
+                    sh '''
+                        echo "Git status:"
+                        git status --porcelain
+                        echo "Git branch -r:"
+                        git branch -r
+                        echo "Git branch -a:"
+                        git branch -a
+                        echo "Git log --oneline -1:"
+                        git log --oneline -1
+                        echo "Current directory:"
+                        pwd
+                        echo "Directory contents:"
+                        ls -la
+                    '''
                 }
             }
         }
