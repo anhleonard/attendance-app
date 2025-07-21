@@ -54,30 +54,44 @@ pipeline {
                         userRemoteConfigs: scm.userRemoteConfigs
                     ])
                     
-                    // Detect changes sớm để skip unnecessary stages
-                    env.BACKEND_CHANGED = sh(
-                        script: """
-                            if [ "${env.BRANCH_NAME}" = "master" ] || [ "${env.BRANCH_NAME}" = "main" ]; then
-                                echo "true"
-                            else
-                                git diff --name-only HEAD~1 HEAD | grep -q '^learning-app/' && echo "true" || echo "false"
-                            fi
-                        """,
+                    // Get current branch name properly
+                    env.CURRENT_BRANCH = sh(
+                        script: 'git rev-parse --abbrev-ref HEAD',
                         returnStdout: true
                     ).trim()
                     
-                    env.FRONTEND_CHANGED = sh(
-                        script: """
-                            if [ "${env.BRANCH_NAME}" = "master" ] || [ "${env.BRANCH_NAME}" = "main" ]; then
-                                echo "true"
-                            else
-                                git diff --name-only HEAD~1 HEAD | grep -q '^learning-app-ui/' && echo "true" || echo "false"
-                            fi
-                        """,
-                        returnStdout: true
-                    ).trim()
+                    // Detect changes sớm để skip unnecessary stages
+                    // For master/main branch, always build
+                    // For other branches, check if there are any changes
+                    if (env.CURRENT_BRANCH == 'master' || env.CURRENT_BRANCH == 'main') {
+                        env.BACKEND_CHANGED = 'true'
+                        env.FRONTEND_CHANGED = 'true'
+                        echo "🔄 Master/Main branch detected - building everything"
+                    } else {
+                        // For feature branches, try to detect changes
+                        // Since we have shallow clone, we'll check if files exist and are modified
+                        try {
+                            def backendChanged = sh(
+                                script: 'git diff --name-only HEAD | grep -q "^learning-app/"',
+                                returnStatus: true
+                            ) == 0
+                            env.BACKEND_CHANGED = backendChanged ? 'true' : 'false'
+                            
+                            def frontendChanged = sh(
+                                script: 'git diff --name-only HEAD | grep -q "^learning-app-ui/"',
+                                returnStatus: true
+                            ) == 0
+                            env.FRONTEND_CHANGED = frontendChanged ? 'true' : 'false'
+                        } catch (Exception e) {
+                            // If change detection fails, assume everything changed for safety
+                            echo "⚠️ Change detection failed, assuming all changes"
+                            env.BACKEND_CHANGED = 'true'
+                            env.FRONTEND_CHANGED = 'true'
+                        }
+                    }
                     
                     echo "🔍 Change Detection:"
+                    echo "Current branch: ${env.CURRENT_BRANCH}"
                     echo "Backend changed: ${env.BACKEND_CHANGED}"
                     echo "Frontend changed: ${env.FRONTEND_CHANGED}"
                 }
@@ -377,7 +391,7 @@ pipeline {
             when {
                 allOf {
                     expression { env.BACKEND_CHANGED == 'true' }
-                    branch 'master'
+                    expression { env.CURRENT_BRANCH == 'master' || env.CURRENT_BRANCH == 'main' }
                 }
             }
             steps {
@@ -395,7 +409,7 @@ pipeline {
             when {
                 allOf {
                     expression { env.FRONTEND_CHANGED == 'true' }
-                    branch 'master'
+                    expression { env.CURRENT_BRANCH == 'master' || env.CURRENT_BRANCH == 'main' }
                 }
             }
             steps {
@@ -412,7 +426,7 @@ pipeline {
         stage('Deploy to Production') {
             when {
                 allOf {
-                    branch 'master'
+                    expression { env.CURRENT_BRANCH == 'master' || env.CURRENT_BRANCH == 'main' }
                     anyOf {
                         expression { env.BACKEND_CHANGED == 'true' }
                         expression { env.FRONTEND_CHANGED == 'true' }
