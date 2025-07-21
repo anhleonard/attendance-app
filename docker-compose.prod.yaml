@@ -67,7 +67,10 @@ services:
       - "3010:3010"
     command: >
       sh -c "
+        echo 'Checking migrations...' &&
+        ls -la prisma/migrations/ &&
         npx prisma migrate deploy &&
+        echo 'Migrations completed successfully' &&
         node dist/main"
     volumes:
       - ./learning-app/uploads:/app/uploads

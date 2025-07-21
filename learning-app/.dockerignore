@@ -112,5 +112,5 @@ __tests__/
 *.spec.js
 *.spec.ts
 
-# Prisma
-prisma/migrations/ 
+# Prisma - Keep migrations for production deployment
+# prisma/migrations/ 

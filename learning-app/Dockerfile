@@ -29,6 +29,9 @@ COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/package.json ./package.json
 
+# Ensure migrations are properly copied
+RUN ls -la prisma/migrations/
+
 RUN mkdir -p uploads && chown -R nestjs:nodejs uploads
 
 USER nestjs
