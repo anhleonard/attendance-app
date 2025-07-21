@@ -119,316 +119,293 @@ pipeline {
             }
         }
         
-        stage('Cache & Dependencies') {
-            parallel {
-                stage('Backend Pipeline') {
-                    when { expression { env.BACKEND_CHANGED == 'true' } }
-                    stages {
-                        stage('Backend Cache') {
-                            steps {
-                                script {
-                                    def backendCacheDir = "${env.CACHE_BASE_DIR}/${env.BACKEND_CACHE_KEY}"
-                                    def packageJson = readFile('learning-app/package.json')
-                                    def packageHash = sh(script: "echo '${packageJson}' | sha256sum | cut -d' ' -f1", returnStdout: true).trim()
-                                    
-                                    env.BACKEND_PACKAGE_HASH = packageHash
-                                    env.BACKEND_CACHE_PATH = "${backendCacheDir}/${packageHash}"
-                                    
-                                    sh '''
-                                        mkdir -p ${BACKEND_CACHE_PATH%/*}
-                                        
-                                        if [ -d "${BACKEND_CACHE_PATH}/node_modules" ]; then
-                                            echo "✅ Backend cache HIT"
-                                            cp -r "${BACKEND_CACHE_PATH}/node_modules" ./learning-app/
-                                            cp "${BACKEND_CACHE_PATH}/package-lock.json" ./learning-app/ 2>/dev/null || true
-                                            touch ./learning-app/.cache_restored
-                                        else
-                                            echo "❌ Backend cache MISS"
-                                            # Cleanup old cache (keep last 2)
-                                            find ${BACKEND_CACHE_PATH%/*} -maxdepth 1 -type d -name "*" | sort | head -n -2 | xargs rm -rf 2>/dev/null || true
-                                        fi
-                                    '''
-                                }
-                            }
-                        }
+        stage('Backend Cache') {
+            when { expression { env.BACKEND_CHANGED == 'true' } }
+            steps {
+                script {
+                    def backendCacheDir = "${env.CACHE_BASE_DIR}/${env.BACKEND_CACHE_KEY}"
+                    def packageJson = readFile('learning-app/package.json')
+                    def packageHash = sh(script: "echo '${packageJson}' | sha256sum | cut -d' ' -f1", returnStdout: true).trim()
+                    
+                    env.BACKEND_PACKAGE_HASH = packageHash
+                    env.BACKEND_CACHE_PATH = "${backendCacheDir}/${packageHash}"
+                    
+                    sh '''
+                        mkdir -p ${BACKEND_CACHE_PATH%/*}
                         
-                        stage('Backend Dependencies') {
-                            steps {
-                                dir('learning-app') {
-                                    sh '''
-                                        if [ -f .cache_restored ]; then
-                                            echo "✅ Using cached dependencies"
-                                            rm .cache_restored
-                                        else
-                                            echo "📦 Installing dependencies..."
-                                            
-                                            # Sử dụng npm ci với optimizations
-                                            if [ -f package-lock.json ]; then
-                                                npm ci --legacy-peer-deps --prefer-offline --no-audit --no-fund --silent
-                                            else
-                                                npm install --legacy-peer-deps --prefer-offline --no-audit --no-fund --silent
-                                            fi
-                                            
-                                            # Global packages
-                                            npm install -g @nestjs/cli prisma --silent
-                                            
-                                            # Save to cache
-                                            mkdir -p "${BACKEND_CACHE_PATH}"
-                                            cp -r node_modules "${BACKEND_CACHE_PATH}/" &
-                                            cp package-lock.json "${BACKEND_CACHE_PATH}/" 2>/dev/null &
-                                            wait
-                                        fi
-                                    '''
-                                }
-                            }
-                        }
-                        
-                        stage('Backend Quality & Build') {
-                            parallel {
-                                stage('Backend Tests') {
-                                    steps {
-                                        dir('learning-app') {
-                                            sh '''
-                                                echo "🧪 Running tests..."
-                                                timeout 300 npm run test || echo "⚠️ Tests completed with warnings"
-                                            '''
-                                        }
-                                    }
-                                }
-                                
-                                stage('Backend Lint') {
-                                    steps {
-                                        dir('learning-app') {
-                                            sh '''
-                                                echo "🔍 Running lint..."
-                                                npm run lint || echo "⚠️ Lint completed"
-                                            '''
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        
-                        stage('Backend Build') {
-                            steps {
-                                dir('learning-app') {
-                                    sh '''
-                                        echo "🏗️ Building backend..."
-                                        npm run build
-                                        npx prisma generate
-                                    '''
-                                }
-                            }
-                        }
-                    }
-                }
-                
-                stage('Frontend Pipeline') {
-                    when { expression { env.FRONTEND_CHANGED == 'true' } }
-                    stages {
-                        stage('Frontend Cache') {
-                            steps {
-                                script {
-                                    def frontendCacheDir = "${env.CACHE_BASE_DIR}/${env.FRONTEND_CACHE_KEY}"
-                                    def packageJson = readFile('learning-app-ui/package.json')
-                                    def packageHash = sh(script: "echo '${packageJson}' | sha256sum | cut -d' ' -f1", returnStdout: true).trim()
-                                    
-                                    env.FRONTEND_PACKAGE_HASH = packageHash
-                                    env.FRONTEND_CACHE_PATH = "${frontendCacheDir}/${packageHash}"
-                                    
-                                    sh '''
-                                        mkdir -p ${FRONTEND_CACHE_PATH%/*}
-                                        
-                                        if [ -d "${FRONTEND_CACHE_PATH}/node_modules" ]; then
-                                            echo "✅ Frontend cache HIT"
-                                            cp -r "${FRONTEND_CACHE_PATH}/node_modules" ./learning-app-ui/
-                                            cp "${FRONTEND_CACHE_PATH}/package-lock.json" ./learning-app-ui/ 2>/dev/null || true
-                                            touch ./learning-app-ui/.cache_restored
-                                        else
-                                            echo "❌ Frontend cache MISS"
-                                            find ${FRONTEND_CACHE_PATH%/*} -maxdepth 1 -type d -name "*" | sort | head -n -2 | xargs rm -rf 2>/dev/null || true
-                                        fi
-                                    '''
-                                }
-                            }
-                        }
-                        
-                        stage('Frontend Dependencies') {
-                            steps {
-                                dir('learning-app-ui') {
-                                    sh '''
-                                        if [ -f .cache_restored ]; then
-                                            echo "✅ Using cached dependencies"
-                                            rm .cache_restored
-                                        else
-                                            echo "📦 Installing dependencies..."
-                                            
-                                            if [ -f package-lock.json ]; then
-                                                npm ci --prefer-offline --no-audit --no-fund --silent
-                                            else
-                                                npm install --prefer-offline --no-audit --no-fund --silent
-                                            fi
-                                            
-                                            # Save to cache
-                                            mkdir -p "${FRONTEND_CACHE_PATH}"
-                                            cp -r node_modules "${FRONTEND_CACHE_PATH}/" &
-                                            cp package-lock.json "${FRONTEND_CACHE_PATH}/" 2>/dev/null &
-                                            wait
-                                        fi
-                                    '''
-                                }
-                            }
-                        }
-                        
-                        stage('Frontend Quality & Build') {
-                            parallel {
-                                stage('Frontend Tests') {
-                                    steps {
-                                        dir('learning-app-ui') {
-                                            sh '''
-                                                echo "🧪 Running tests..."
-                                                timeout 300 npm run test || echo "⚠️ Tests completed"
-                                            '''
-                                        }
-                                    }
-                                }
-                                
-                                stage('Frontend Lint') {
-                                    steps {
-                                        dir('learning-app-ui') {
-                                            sh '''
-                                                echo "🔍 Running lint..."
-                                                npm run lint || echo "⚠️ Lint completed"
-                                            '''
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        
-                        stage('Frontend Build') {
-                            steps {
-                                dir('learning-app-ui') {
-                                    sh '''
-                                        echo "🏗️ Building frontend..."
-                                        npm run build
-                                    '''
-                                }
-                            }
-                        }
-                    }
+                        if [ -d "${BACKEND_CACHE_PATH}/node_modules" ]; then
+                            echo "✅ Backend cache HIT"
+                            cp -r "${BACKEND_CACHE_PATH}/node_modules" ./learning-app/
+                            cp "${BACKEND_CACHE_PATH}/package-lock.json" ./learning-app/ 2>/dev/null || true
+                            touch ./learning-app/.cache_restored
+                        else
+                            echo "❌ Backend cache MISS"
+                            # Cleanup old cache (keep last 2)
+                            find ${BACKEND_CACHE_PATH%/*} -maxdepth 1 -type d -name "*" | sort | head -n -2 | xargs rm -rf 2>/dev/null || true
+                        fi
+                    '''
                 }
             }
         }
         
-        stage('Docker Operations') {
+        stage('Frontend Cache') {
+            when { expression { env.FRONTEND_CHANGED == 'true' } }
+            steps {
+                script {
+                    def frontendCacheDir = "${env.CACHE_BASE_DIR}/${env.FRONTEND_CACHE_KEY}"
+                    def packageJson = readFile('learning-app-ui/package.json')
+                    def packageHash = sh(script: "echo '${packageJson}' | sha256sum | cut -d' ' -f1", returnStdout: true).trim()
+                    
+                    env.FRONTEND_PACKAGE_HASH = packageHash
+                    env.FRONTEND_CACHE_PATH = "${frontendCacheDir}/${packageHash}"
+                    
+                    sh '''
+                        mkdir -p ${FRONTEND_CACHE_PATH%/*}
+                        
+                        if [ -d "${FRONTEND_CACHE_PATH}/node_modules" ]; then
+                            echo "✅ Frontend cache HIT"
+                            cp -r "${FRONTEND_CACHE_PATH}/node_modules" ./learning-app-ui/
+                            cp "${FRONTEND_CACHE_PATH}/package-lock.json" ./learning-app-ui/ 2>/dev/null || true
+                            touch ./learning-app-ui/.cache_restored
+                        else
+                            echo "❌ Frontend cache MISS"
+                            find ${FRONTEND_CACHE_PATH%/*} -maxdepth 1 -type d -name "*" | sort | head -n -2 | xargs rm -rf 2>/dev/null || true
+                        fi
+                    '''
+                }
+            }
+        }
+        
+        stage('Backend Dependencies') {
+            when { expression { env.BACKEND_CHANGED == 'true' } }
+            steps {
+                dir('learning-app') {
+                    sh '''
+                        if [ -f .cache_restored ]; then
+                            echo "✅ Using cached dependencies"
+                            rm .cache_restored
+                        else
+                            echo "📦 Installing dependencies..."
+                            
+                            # Sử dụng npm ci với optimizations
+                            if [ -f package-lock.json ]; then
+                                npm ci --legacy-peer-deps --prefer-offline --no-audit --no-fund --silent
+                            else
+                                npm install --legacy-peer-deps --prefer-offline --no-audit --no-fund --silent
+                            fi
+                            
+                            # Global packages
+                            npm install -g @nestjs/cli prisma --silent
+                            
+                            # Save to cache
+                            mkdir -p "${BACKEND_CACHE_PATH}"
+                            cp -r node_modules "${BACKEND_CACHE_PATH}/" &
+                            cp package-lock.json "${BACKEND_CACHE_PATH}/" 2>/dev/null &
+                            wait
+                        fi
+                    '''
+                }
+            }
+        }
+        
+        stage('Frontend Dependencies') {
+            when { expression { env.FRONTEND_CHANGED == 'true' } }
+            steps {
+                dir('learning-app-ui') {
+                    sh '''
+                        if [ -f .cache_restored ]; then
+                            echo "✅ Using cached dependencies"
+                            rm .cache_restored
+                        else
+                            echo "📦 Installing dependencies..."
+                            
+                            if [ -f package-lock.json ]; then
+                                npm ci --prefer-offline --no-audit --no-fund --silent
+                            else
+                                npm install --prefer-offline --no-audit --no-fund --silent
+                            fi
+                            
+                            # Save to cache
+                            mkdir -p "${FRONTEND_CACHE_PATH}"
+                            cp -r node_modules "${FRONTEND_CACHE_PATH}/" &
+                            cp package-lock.json "${FRONTEND_CACHE_PATH}/" 2>/dev/null &
+                            wait
+                        fi
+                    '''
+                }
+            }
+        }
+        
+        stage('Backend Tests') {
+            when { expression { env.BACKEND_CHANGED == 'true' } }
+            steps {
+                dir('learning-app') {
+                    sh '''
+                        echo "🧪 Running tests..."
+                        timeout 300 npm run test || echo "⚠️ Tests completed with warnings"
+                    '''
+                }
+            }
+        }
+        
+        stage('Frontend Tests') {
+            when { expression { env.FRONTEND_CHANGED == 'true' } }
+            steps {
+                dir('learning-app-ui') {
+                    sh '''
+                        echo "🧪 Running tests..."
+                        timeout 300 npm run test || echo "⚠️ Tests completed"
+                    '''
+                }
+            }
+        }
+        
+        stage('Backend Lint') {
+            when { expression { env.BACKEND_CHANGED == 'true' } }
+            steps {
+                dir('learning-app') {
+                    sh '''
+                        echo "🔍 Running lint..."
+                        npm run lint || echo "⚠️ Lint completed"
+                    '''
+                }
+            }
+        }
+        
+        stage('Frontend Lint') {
+            when { expression { env.FRONTEND_CHANGED == 'true' } }
+            steps {
+                dir('learning-app-ui') {
+                    sh '''
+                        echo "🔍 Running lint..."
+                        npm run lint || echo "⚠️ Lint completed"
+                    '''
+                }
+            }
+        }
+        
+        stage('Backend Build') {
+            when { expression { env.BACKEND_CHANGED == 'true' } }
+            steps {
+                dir('learning-app') {
+                    sh '''
+                        echo "🏗️ Building backend..."
+                        npm run build
+                        npx prisma generate
+                    '''
+                }
+            }
+        }
+        
+        stage('Frontend Build') {
+            when { expression { env.FRONTEND_CHANGED == 'true' } }
+            steps {
+                dir('learning-app-ui') {
+                    sh '''
+                        echo "🏗️ Building frontend..."
+                        npm run build
+                    '''
+                }
+            }
+        }
+        
+        stage('Docker Login') {
             when {
                 anyOf {
                     expression { env.BACKEND_CHANGED == 'true' }
                     expression { env.FRONTEND_CHANGED == 'true' }
                 }
             }
-            stages {
-                stage('Docker Login') {
-                    steps {
-                        withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
-                            sh '''
-                                echo "🔐 Logging into Docker Hub..."
-                                echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin
-                            '''
-                        }
-                    }
+            steps {
+                withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+                    sh '''
+                        echo "🔐 Logging into Docker Hub..."
+                        echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin
+                    '''
                 }
-                
-                stage('Build & Push Images') {
-                    parallel {
-                        stage('Backend Image') {
-                            when { expression { env.BACKEND_CHANGED == 'true' } }
-                            steps {
-                                script {
-                                    sh '''
-                                        echo "🏗️ Building backend image with BuildKit..."
-                                        
-                                        # Build with cache và multi-stage optimization
-                                        docker buildx build \
-                                            --platform linux/amd64 \
-                                            --cache-from ${BACKEND_IMAGE}:latest \
-                                            --cache-from ${BACKEND_IMAGE}:cache \
-                                            --cache-to type=registry,ref=${BACKEND_IMAGE}:cache,mode=max \
-                                            --build-arg BUILDKIT_INLINE_CACHE=1 \
-                                            --build-arg NODE_ENV=production \
-                                            -t ${BACKEND_IMAGE}:${VERSION} \
-                                            -t ${BACKEND_IMAGE}:latest \
-                                            --push \
-                                            ./learning-app
-                                    '''
-                                }
-                            }
-                        }
+            }
+        }
+        
+        stage('Build Backend Image') {
+            when { expression { env.BACKEND_CHANGED == 'true' } }
+            steps {
+                script {
+                    sh '''
+                        echo "🏗️ Building backend image with BuildKit..."
                         
-                        stage('Frontend Image') {
-                            when { expression { env.FRONTEND_CHANGED == 'true' } }
-                            steps {
-                                script {
-                                    sh '''
-                                        echo "🏗️ Building frontend image with BuildKit..."
-                                        
-                                        docker buildx build \
-                                            --platform linux/amd64 \
-                                            --cache-from ${FRONTEND_IMAGE}:latest \
-                                            --cache-from ${FRONTEND_IMAGE}:cache \
-                                            --cache-to type=registry,ref=${FRONTEND_IMAGE}:cache,mode=max \
-                                            --build-arg BUILDKIT_INLINE_CACHE=1 \
-                                            --build-arg NODE_ENV=production \
-                                            -t ${FRONTEND_IMAGE}:${VERSION} \
-                                            -t ${FRONTEND_IMAGE}:latest \
-                                            --push \
-                                            ./learning-app-ui
-                                    '''
-                                }
-                            }
-                        }
-                    }
+                        # Build with cache và multi-stage optimization
+                        docker buildx build \
+                            --platform linux/amd64 \
+                            --cache-from ${BACKEND_IMAGE}:latest \
+                            --cache-from ${BACKEND_IMAGE}:cache \
+                            --cache-to type=registry,ref=${BACKEND_IMAGE}:cache,mode=max \
+                            --build-arg BUILDKIT_INLINE_CACHE=1 \
+                            --build-arg NODE_ENV=production \
+                            -t ${BACKEND_IMAGE}:${VERSION} \
+                            -t ${BACKEND_IMAGE}:latest \
+                            --push \
+                            ./learning-app
+                    '''
                 }
-                
-                stage('Security Scan') {
-                    when {
-                        allOf {
-                            anyOf {
-                                expression { env.BACKEND_CHANGED == 'true' }
-                                expression { env.FRONTEND_CHANGED == 'true' }
-                            }
-                            branch 'master'
-                        }
-                    }
-                    parallel {
-                        stage('Backend Security Scan') {
-                            when { expression { env.BACKEND_CHANGED == 'true' } }
-                            steps {
-                                sh '''
-                                    echo "🔒 Scanning backend image..."
-                                    timeout 300 docker run --rm \
-                                        -v /var/run/docker.sock:/var/run/docker.sock \
-                                        aquasec/trivy image --quiet --severity HIGH,CRITICAL \
-                                        ${BACKEND_IMAGE}:${VERSION} || echo "Scan completed"
-                                '''
-                            }
-                        }
+            }
+        }
+        
+        stage('Build Frontend Image') {
+            when { expression { env.FRONTEND_CHANGED == 'true' } }
+            steps {
+                script {
+                    sh '''
+                        echo "🏗️ Building frontend image with BuildKit..."
                         
-                        stage('Frontend Security Scan') {
-                            when { expression { env.FRONTEND_CHANGED == 'true' } }
-                            steps {
-                                sh '''
-                                    echo "🔒 Scanning frontend image..."
-                                    timeout 300 docker run --rm \
-                                        -v /var/run/docker.sock:/var/run/docker.sock \
-                                        aquasec/trivy image --quiet --severity HIGH,CRITICAL \
-                                        ${FRONTEND_IMAGE}:${VERSION} || echo "Scan completed"
-                                '''
-                            }
-                        }
-                    }
+                        docker buildx build \
+                            --platform linux/amd64 \
+                            --cache-from ${FRONTEND_IMAGE}:latest \
+                            --cache-from ${FRONTEND_IMAGE}:cache \
+                            --cache-to type=registry,ref=${FRONTEND_IMAGE}:cache,mode=max \
+                            --build-arg BUILDKIT_INLINE_CACHE=1 \
+                            --build-arg NODE_ENV=production \
+                            -t ${FRONTEND_IMAGE}:${VERSION} \
+                            -t ${FRONTEND_IMAGE}:latest \
+                            --push \
+                            ./learning-app-ui
+                    '''
                 }
+            }
+        }
+        
+        stage('Backend Security Scan') {
+            when {
+                allOf {
+                    expression { env.BACKEND_CHANGED == 'true' }
+                    branch 'master'
+                }
+            }
+            steps {
+                sh '''
+                    echo "🔒 Scanning backend image..."
+                    timeout 300 docker run --rm \
+                        -v /var/run/docker.sock:/var/run/docker.sock \
+                        aquasec/trivy image --quiet --severity HIGH,CRITICAL \
+                        ${BACKEND_IMAGE}:${VERSION} || echo "Scan completed"
+                '''
+            }
+        }
+        
+        stage('Frontend Security Scan') {
+            when {
+                allOf {
+                    expression { env.FRONTEND_CHANGED == 'true' }
+                    branch 'master'
+                }
+            }
+            steps {
+                sh '''
+                    echo "🔒 Scanning frontend image..."
+                    timeout 300 docker run --rm \
+                        -v /var/run/docker.sock:/var/run/docker.sock \
+                        aquasec/trivy image --quiet --severity HIGH,CRITICAL \
+                        ${FRONTEND_IMAGE}:${VERSION} || echo "Scan completed"
+                '''
             }
         }
         
