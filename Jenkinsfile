@@ -456,17 +456,38 @@ pipeline {
                             COMPOSE_CMD="docker-compose"
                         fi
                         
-                        # Rolling update strategy
+                        # Clean up any orphaned containers and networks first
+                        echo "🧹 Cleaning up orphaned containers and networks..."
+                        $COMPOSE_CMD -f docker-compose.prod.yaml down --remove-orphans --volumes --timeout 30 || true
+                        
+                        # Remove any dangling networks that might cause conflicts
+                        docker network prune -f || true
+                        
+                        # Pull latest images
+                        echo "📥 Pulling latest images..."
                         $COMPOSE_CMD -f docker-compose.prod.yaml pull
+                        
+                        # Start services with proper cleanup
+                        echo "🚀 Starting services..."
                         $COMPOSE_CMD -f docker-compose.prod.yaml up -d --remove-orphans
                         
-                        # Health check
-                        echo "⏳ Waiting for services..."
-                        sleep 30
+                        # Health check with retry logic
+                        echo "⏳ Waiting for services to be ready..."
+                        for i in {1..6}; do
+                            echo "Health check attempt $i/6..."
+                            sleep 10
+                            
+                            # Check if containers are running
+                            if $COMPOSE_CMD -f docker-compose.prod.yaml ps | grep -q "Up"; then
+                                echo "✅ Services are running"
+                                break
+                            fi
+                        done
                         
-                        # Quick health checks
-                        curl -f http://localhost:3001/health >/dev/null 2>&1 && echo "✅ Backend healthy" || echo "⚠️ Backend check failed"
-                        curl -f http://localhost:3000 >/dev/null 2>&1 && echo "✅ Frontend healthy" || echo "⚠️ Frontend check failed"
+                        # Final health checks with correct ports
+                        echo "🔍 Performing health checks..."
+                        curl -f http://localhost:3010/health >/dev/null 2>&1 && echo "✅ Backend healthy" || echo "⚠️ Backend check failed"
+                        curl -f http://localhost:3015 >/dev/null 2>&1 && echo "✅ Frontend healthy" || echo "⚠️ Frontend check failed"
                         
                         echo "✅ Deployment completed!"
                     '''
@@ -488,6 +509,9 @@ pipeline {
                     # Remove unused networks and volumes
                     docker network prune -f || true
                     docker volume prune -f || true
+                    
+                    # Clean up any orphaned containers that might cause network issues
+                    docker container prune -f || true
                     
                     # Clean old cache entries (older than 7 days)
                     find ${CACHE_BASE_DIR} -type d -mtime +7 -exec rm -rf {} + 2>/dev/null || true
