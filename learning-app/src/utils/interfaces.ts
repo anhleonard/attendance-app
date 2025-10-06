@@ -1,6 +1,10 @@
 import { Permission, Role } from './enums';
 import { Role as PrismaRole } from '@prisma/client';
 
+export interface AlsStore {
+  requestId: string;
+}
+
 export interface CreateAttendance {
   studentId: number;
   sessionId: number;

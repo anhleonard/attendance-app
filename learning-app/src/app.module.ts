@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, MiddlewareConsumer, RequestMethod } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { UsersModule } from './users/users.module';
@@ -17,6 +17,8 @@ import { MessagesModule } from './messages/messages.module';
 import { UploadModule } from './upload/upload.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { BillsModule } from './bills/bills.module';
+import { AlsModule } from './common/modules/als.module';
+import { AlsMiddleware } from './common/middleware/als.middleware';
 
 @Module({
   imports: [
@@ -27,6 +29,7 @@ import { BillsModule } from './bills/bills.module';
           : '.env.local',
       isGlobal: true,
     }),
+    AlsModule,
     UsersModule,
     PrismaModule,
     AuthModule,
@@ -46,4 +49,10 @@ import { BillsModule } from './bills/bills.module';
   controllers: [AppController],
   providers: [AppService],
 })
-export class AppModule {}
+export class AppModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer
+      .apply(AlsMiddleware)
+      .forRoutes({ path: '*', method: RequestMethod.ALL });
+  }
+}

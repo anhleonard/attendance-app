@@ -3,15 +3,13 @@ import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as cookieParser from 'cookie-parser';
-import { LoggingInterceptor } from './interceptors/logging.interceptor';
-import { PrismaExceptionInterceptor } from './interceptors/prisma-exception.interceptor';
+import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
+import { PrismaExceptionInterceptor } from './common/interceptors/prisma-exception.interceptor';
 // Environment variables are injected by Docker Compose
 // No need to load .env files in production
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, {
-    logger: ['error', 'warn', 'log', 'debug', 'verbose'], // Enable all log levels
-  });
+  const app = await NestFactory.create(AppModule);
 
   app.enableCors({
     origin: [
@@ -31,6 +29,8 @@ async function bootstrap() {
       transform: true,
     }),
   );
+
+
 
   // Global interceptors
   app.useGlobalInterceptors(new LoggingInterceptor());

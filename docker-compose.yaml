@@ -6,7 +6,7 @@ services:
     env_file:
       - ./learning-app/.env.postgres
     ports:
-      - "5433:5432"
+      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
@@ -57,49 +57,121 @@ services:
       - postgres
     restart: unless-stopped
 
-  # Main NestJS application (Backend)
-  be-attendance:
-    build:
-      context: ./learning-app
-      dockerfile: Dockerfile
-    env_file:
-      - ./learning-app/.env
-    container_name: be-attendance
+  # Elasticsearch for log aggregation and search
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+    container_name: attendance-app-elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
     ports:
-      - "3010:3010"
-    command: >
-      sh -c "
-        npx prisma migrate deploy &&
-        node dist/main"
-        
+      - "9200:9200"
+      - "9300:9300"
     volumes:
-      - ./learning-app/uploads:/app/uploads
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    networks:
+      - attendance-app-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # Kibana for log visualization and management
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.11.0
+    container_name: attendance-app-kibana
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+    ports:
+      - "5601:5601"
+    volumes:
+      - kibana_data:/usr/share/kibana/data
     networks:
       - attendance-app-network
     depends_on:
-      - postgres
-      - redis
-      - minio
-      - n8n
+      elasticsearch:
+        condition: service_healthy
     restart: unless-stopped
 
-  fe-attendance:
-    build:
-      context: ./learning-app-ui
-      dockerfile: Dockerfile
-    env_file:
-      - ./learning-app-ui/.env
-    container_name: fe-attendance
-    ports:
-      - "3015:3000"
+  # Logstash for log processing
+  logstash:
+    image: docker.elastic.co/logstash/logstash:8.11.0
+    container_name: attendance-app-logstash
+    volumes:
+      - ./logstash.conf:/usr/share/logstash/pipeline/logstash.conf:ro
     networks:
       - attendance-app-network
     depends_on:
-      - postgres
-      - redis
-      - minio
-      - n8n
+      elasticsearch:
+        condition: service_healthy
     restart: unless-stopped
+    environment:
+      - "LS_JAVA_OPTS=-Xmx256m -Xms256m"
+
+  # Filebeat for log collection
+  filebeat:
+    image: docker.elastic.co/beats/filebeat:8.11.0
+    container_name: attendance-app-filebeat
+    user: root
+    volumes:
+      - ./filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
+      - ./learning-app/logs:/app/logs:ro
+    networks:
+      - attendance-app-network
+    depends_on:
+      - logstash
+    restart: unless-stopped
+    command: >
+      sh -c "
+        filebeat -e -strict.perms=false
+      "
+
+  # Main NestJS application (Backend)
+  # be-attendance:
+  #   build:
+  #     context: ./learning-app
+  #     dockerfile: Dockerfile
+  #   env_file:
+  #     - ./learning-app/.env
+  #   container_name: be-attendance
+  #   ports:
+  #     - "3010:3010"
+  #   command: >
+  #     sh -c "
+  #       npx prisma migrate deploy &&
+  #       node dist/main"
+        
+  #   volumes:
+  #     - ./learning-app/uploads:/app/uploads
+  #   networks:
+  #     - attendance-app-network
+  #   depends_on:
+  #     - postgres
+  #     - redis
+  #     - minio
+  #     - n8n
+  #   restart: unless-stopped
+
+  # fe-attendance:
+  #   build:
+  #     context: ./learning-app-ui
+  #     dockerfile: Dockerfile
+  #   env_file:
+  #     - ./learning-app-ui/.env
+  #   container_name: fe-attendance
+  #   ports:
+  #     - "3015:3000"
+  #   networks:
+  #     - attendance-app-network
+  #   depends_on:
+  #     - postgres
+  #     - redis
+  #     - minio
+  #     - n8n
+  #   restart: unless-stopped
 
 networks:
   attendance-app-network:
@@ -113,4 +185,8 @@ volumes:
   minio_data:
     driver: local
   n8n_data:
+    driver: local
+  elasticsearch_data:
+    driver: local
+  kibana_data:
     driver: local 
